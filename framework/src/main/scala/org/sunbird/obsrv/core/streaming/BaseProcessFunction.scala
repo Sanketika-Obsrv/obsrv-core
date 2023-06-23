@@ -79,12 +79,14 @@ trait BaseFunction {
     obsrvMeta.put("prevProcessingTime", currentTS.asInstanceOf[AnyRef])
   }
 
-  def markFailed(event: mutable.Map[String, AnyRef], error: Error, jobName: String): mutable.Map[String, AnyRef] = {
+  def markFailed(event: mutable.Map[String, AnyRef], error: Error, jobName: String, errorTypes: Array[Any] = Array(), errorReasons: Array[Any] = Array()): mutable.Map[String, AnyRef] = {
     val obsrvMeta = Util.getMutableMap(event("obsrv_meta").asInstanceOf[Map[String, AnyRef]])
     addError(obsrvMeta, Map("src" -> jobName, "error_code" -> error.errorCode, "error_msg" -> error.errorMsg))
     addFlags(obsrvMeta, Map(jobName -> "failed"))
     addTimespan(obsrvMeta, jobName)
     event.put("obsrv_meta", obsrvMeta.toMap)
+    event.put("error_type", errorTypes)
+    event.put("error_reason", errorReasons)
     event
   }
 

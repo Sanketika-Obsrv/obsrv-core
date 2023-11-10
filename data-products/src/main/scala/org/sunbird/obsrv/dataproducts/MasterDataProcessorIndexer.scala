@@ -31,17 +31,17 @@ object MasterDataProcessorIndexer {
   private val config: Config = ConfigFactory.load("masterdata-indexer.conf").withFallback(ConfigFactory.systemEnvironment())
   private val dayPeriodFormat: DateTimeFormatter = DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC()
   private final val logger: Logger = LogManager.getLogger(MasterDataProcessorIndexer.getClass)
-  private val prefix = config.getString("prefix")
+  private val metricsPrefix = config.getString("metrics.prefix")
 
   private case class Paths(datasourceRef: String, objectKey: String, outputFilePath: String, timestamp: Long)
 
   private val metricRegistry: MetricRegistry = new MetricRegistry
-  private val totalDatasetCount: Counter = metricRegistry.counter(prefix + "TOTAL_DATASET_COUNT")
-  private val successDatasetCount: Counter = metricRegistry.counter(prefix + "SUCCESS_DATASET_COUNT")
-  private val failedDatasetCount: Counter = metricRegistry.counter(prefix + "FAILED_DATASET_COUNT")
-  private val totalEventsProcessed: Counter = metricRegistry.counter(prefix + "TOTAL_EVENTS_PROCESSED")
-  private val successEventsPerDataset: Counter = metricRegistry.counter(prefix + "SUCCESS_EVENTS_PER_DATASET")
-  private val failedEventPerDataset: Counter = metricRegistry.counter(prefix + "FAILED_EVENTS_PER_DATASET")
+  private val totalDatasetCount: Counter = metricRegistry.counter(metricsPrefix + "TOTAL_DATASET_COUNT")
+  private val successDatasetCount: Counter = metricRegistry.counter(metricsPrefix + "SUCCESS_DATASET_COUNT")
+  private val failedDatasetCount: Counter = metricRegistry.counter(metricsPrefix + "FAILED_DATASET_COUNT")
+  private val totalEventsProcessed: Counter = metricRegistry.counter(metricsPrefix + "TOTAL_EVENTS_PROCESSED")
+  private val successEventsPerDataset: Counter = metricRegistry.counter(metricsPrefix + "SUCCESS_EVENTS_PER_DATASET")
+  private val failedEventPerDataset: Counter = metricRegistry.counter(metricsPrefix + "FAILED_EVENTS_PER_DATASET")
 
   def main(args: Array[String]): Unit = {
     val datasets = DatasetRegistry.getAllDatasets("master-dataset")
@@ -138,7 +138,7 @@ object MasterDataProcessorIndexer {
 
   private def submitIngestionTask(ingestionSpec: String) = {
     // TODO: Handle success and failure responses properly
-    val response = Unirest.post(config.getString("druid_indexer_url"))
+    val response = Unirest.post(config.getString("druid.indexer.url"))
       .header("Content-Type", "application/json")
       .body(ingestionSpec).asJson()
     response.ifFailure(response => throw new Exception("Exception while submitting ingestion task"))
@@ -150,7 +150,7 @@ object MasterDataProcessorIndexer {
 
   private def deleteDataSource(datasourceRef: String): Unit = {
     // TODO: Handle success and failure responses properly
-    val response = Unirest.delete(config.getString("druid_datasource_delete_url") + datasourceRef)
+    val response = Unirest.delete(config.getString("druid.datasource.delete.url") + datasourceRef)
       .header("Content-Type", "application/json")
       .asJson()
     response.ifFailure(response => throw new Exception("Exception while deleting datasource" + datasourceRef))
@@ -176,8 +176,8 @@ object MasterDataProcessorIndexer {
     df.coalesce(1).write.mode("overwrite").option("compression", "gzip").format("json").save(outputFilePath)
     val dt = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay()
     val date = dayPeriodFormat.print(dt)
-    val target = new File(s"/home/sankethika/Downloads/masterdata-indexer/telemetry-content-data/${date}.json.gz")
-    val srcDir = new File(s"/home/sankethika/Downloads/masterdata-indexer/telemetry-content-data/${date}/")
+    val srcDir = new File(outputFilePath)
+    val target = new File(objectKey)
     val files = srcDir.listFiles()
     files.foreach(file =>
       if (file.getName.endsWith(".json.gz")) {

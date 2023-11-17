@@ -78,7 +78,7 @@ object MasterDataProcessorIndexer {
     val cloudPrefix = if (config.getString("cloudStorage.provider") == "azure") {
       getProviderUriFormat() + s"""${config.getString("cloudStorage.accountName")}.blob.core.windows.net/${config.getString("cloudStorage.container")}/"""
     } else {
-      getProviderUriFormat() + s"""/home/sankethika/${config.getString("cloudStorage.container")}/"""
+      getProviderUriFormat() + s"""${config.getString("cloudStorage.container")}/"""
     }
     val pathSuffix = s"""masterdata-indexer/${datasource.datasetId}/$date/"""
     val ingestionPath = cloudPrefix.replace(getProviderUriFormat(), getProviderFilePrefix()) + pathSuffix
@@ -101,7 +101,7 @@ object MasterDataProcessorIndexer {
   @throws[Exception]
   private def getProviderUriFormat(): String = {
     config.getString("cloudStorage.provider") match {
-      case "local" => "file:///"
+      case "local" => "file:///home/sankethika/"
       case "aws" => "s3a://"
       case "azure" => "wasbs://"
       case "gcloud" => "gs://"
@@ -197,9 +197,7 @@ object MasterDataProcessorIndexer {
     val stringifiedResponse = JSONUtil.serialize(response)
     val df = spark.read.json(spark.sparkContext.parallelize(Seq(stringifiedResponse)))
     println("Dataset - " + dataset.id + " No. of records - " + df.count())
-    println("Writing to file - " + outputFilePath)
     df.coalesce(1).write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
-    println("path - " + outputFilePath)
     metrics.generate(datasetId = dataset.id, edata = Edata(metric = Map(metrics.getMetricName("total_events_processed") -> df.count()), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", "aws"))))
     spark.stop()
     sc.stop()

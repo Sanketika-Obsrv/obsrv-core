@@ -26,11 +26,4 @@ case class KafkaMessageProducer(config: Config) {
         println("Error sending message to Kafka", e.getMessage)
     }
   }
-
-  def sendMessages(topic: String = defaultTopicName, key: String = defaultKey, messages: List[String]): Unit = {
-    messages.foreach(message => {
-      sendMessage(topic = topic, key = key, message = message)
-    })
-  }
-
 }

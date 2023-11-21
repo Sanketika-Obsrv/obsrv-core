@@ -31,23 +31,6 @@ case class KafkaDispatcher(jobConfig: JobConfig, dispatcherConfig: Map[String, A
     new KafkaProducer[Long, String](props)
   }
 
-  override def dispatch[T](records: Dataset[T], config: Map[String, AnyRef]): Unit = {
-
-    val topic = config.getOrElse("topic", throw InvalidInputException("Kafka topic is not provided")).asInstanceOf[String]
-    val bootstrapServers = config.getOrElse("kafka.bootstrap.servers", throw InvalidInputException("Kafka bootstrap server is not provided")).asInstanceOf[String]
-
-    try {
-      records.selectExpr("CAST(id as string)", "to_json(struct(*)) AS value")
-        .write
-        .format(dispatcherType)
-        .option("kafka.bootstrap.servers", bootstrapServers)
-        .option("topic", topic)
-        .save()
-    } catch {
-      case e: Exception => throw new Exception(s"Error while dispatching data to kafka: $e")
-    }
-  }
-
   override def dispatchData(records: DataFrame, config: Map[String, AnyRef]): Unit = {
     val topic = config.getOrElse("topic", throw InvalidInputException("Kafka topic is not provided")).asInstanceOf[String]
     val bootstrapServers = config.getOrElse("kafka.bootstrap.servers", throw InvalidInputException("Kafka bootstrap server is not provided")).asInstanceOf[String]

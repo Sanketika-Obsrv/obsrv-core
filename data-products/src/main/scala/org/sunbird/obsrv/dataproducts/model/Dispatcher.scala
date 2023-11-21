@@ -7,7 +7,5 @@ trait Dispatcher {
   val config: Map[String, AnyRef]
   val jobConfig: JobConfig
 
-  def dispatch[T](records: Dataset[T], config: Map[String, AnyRef]): Unit
-
   def dispatchData(records: DataFrame, config: Map[String, AnyRef]): Unit
 }

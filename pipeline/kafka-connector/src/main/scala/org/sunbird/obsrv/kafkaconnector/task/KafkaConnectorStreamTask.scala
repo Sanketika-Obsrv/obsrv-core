@@ -21,7 +21,7 @@ class KafkaConnectorStreamTask(config: KafkaConnectorConfig, kafkaConnector: Fli
   def process(): Unit = {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
 
-    val datasetSourceConfig = DatasetRegistry.getDatasetSourceConfig()
+    val datasetSourceConfig = DatasetRegistry.getAllDatasetSourceConfig()
     datasetSourceConfig.map { configList =>
       configList.filter(_.connectorType.equalsIgnoreCase("kafka")).map {
         dataSourceConfig =>

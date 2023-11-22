@@ -21,7 +21,7 @@ object DatasetRegistry {
     datasets.get(id)
   }
 
-  def getDatasetSourceConfig(): Option[List[DatasetSourceConfig]] = {
+  def getAllDatasetSourceConfig(): Option[List[DatasetSourceConfig]] = {
     DatasetRegistryService.readAllDatasetSourceConfig()
   }
 

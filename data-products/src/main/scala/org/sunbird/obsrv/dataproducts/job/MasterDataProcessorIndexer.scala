@@ -9,8 +9,8 @@ import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 import org.joda.time.{DateTime, DateTimeZone}
 import org.json4s.native.JsonMethods._
 import org.sunbird.obsrv.core.util.JSONUtil
-import org.sunbird.obsrv.dataproducts.helper.MetricsHelper
-import org.sunbird.obsrv.dataproducts.model.{Edata, Metric, MetricLabel}
+import org.sunbird.obsrv.dataproducts.helper.BaseMetricHelper
+import org.sunbird.obsrv.dataproducts.model.{Edata, MetricLabel}
 import org.sunbird.obsrv.model.DatasetModels.{DataSource, Dataset}
 import org.sunbird.obsrv.registry.DatasetRegistry
 
@@ -24,12 +24,11 @@ object MasterDataProcessorIndexer {
   case class BlobProvider(sparkProviderURIFormat: String, druidProvider: String, druidProviderPrefix: String)
 
   def main(args: Array[String]): Unit = {
-    val jobConfig = MasterDataIndexerConfig(config, args)
     val datasets = DatasetRegistry.getAllDatasets("master-dataset")
     val indexedDatasets = datasets.filter(dataset => {
       dataset.datasetConfig.indexData.nonEmpty && dataset.datasetConfig.indexData.get
     })
-    val metrics = MetricsHelper(jobConfig)
+    val metrics = BaseMetricHelper(config)
     indexedDatasets.foreach(dataset => {
       metrics.generate(datasetId = dataset.id, edata = Edata(metric = Map(metrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}"))))
       try {
@@ -41,7 +40,7 @@ object MasterDataProcessorIndexer {
     })
   }
 
-  def indexDataset(dataset: Dataset, metrics: MetricsHelper, time: Long): Unit = {
+  def indexDataset(dataset: Dataset, metrics: BaseMetricHelper, time: Long): Unit = {
     try {
       val datasources = DatasetRegistry.getDatasources(dataset.id)
       if (datasources.isEmpty || datasources.get.size > 1) {
@@ -133,7 +132,7 @@ object MasterDataProcessorIndexer {
       .set("spark.redis.host", dataset.datasetConfig.redisDBHost.get)
       .set("spark.redis.port", String.valueOf(dataset.datasetConfig.redisDBPort.get))
       .set("spark.redis.db", String.valueOf(dataset.datasetConfig.redisDB.get))
-    val readWriteConf = ReadWriteConfig(scanCount = 1000, maxPipelineSize = 1000)
+    val readWriteConf = ReadWriteConfig(scanCount = config.getInt("redis_scan_count"), maxPipelineSize = config.getInt("redis_maxPipelineSize"))
     val sc = new SparkContext(conf)
     val spark = new SparkSession.Builder().config(conf).getOrCreate()
     val rdd = sc.fromRedisKV("*")(readWriteConfig = readWriteConf)

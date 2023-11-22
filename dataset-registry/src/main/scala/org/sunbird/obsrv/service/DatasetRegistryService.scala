@@ -108,8 +108,7 @@ object DatasetRegistryService {
       postgresConnect.executeQuery(s"UPDATE datasources set datasource_ref = '$datasourceRef' where datasource='${datasource.datasource}' and dataset_id='${datasource.datasetId}'")
     } catch {
       case ex: Exception =>
-        logger.error("Exception while reading dataset transformations from Postgres", ex)
-        Map()
+        logger.error("Exception while updating data source in Postgres", ex)
     } finally {
       postgresConnect.closeConnection()
     }

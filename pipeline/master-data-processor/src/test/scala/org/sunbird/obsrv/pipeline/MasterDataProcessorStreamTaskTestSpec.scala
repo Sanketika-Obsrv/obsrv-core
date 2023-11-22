@@ -13,7 +13,7 @@ import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.{FlinkUtil, PostgresConnect}
 import org.sunbird.obsrv.fixture.EventFixture
 import org.sunbird.obsrv.pipeline.task.{MasterDataProcessorConfig, MasterDataProcessorStreamTask}
-import org.sunbird.spec.BaseSpecWithDatasetRegistry
+import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global

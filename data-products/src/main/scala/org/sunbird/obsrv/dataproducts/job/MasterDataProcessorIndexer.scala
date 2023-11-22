@@ -33,8 +33,7 @@ object MasterDataProcessorIndexer {
     indexedDatasets.foreach(dataset => {
       metrics.generate(datasetId = dataset.id, edata = Edata(metric = Map(metrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}"))))
       try {
-        val start_time = System.currentTimeMillis()
-        indexDataset(dataset, metrics, start_time)
+        indexDataset(dataset, metrics, System.currentTimeMillis())
       } catch {
         case e: Exception =>
           e.getMessage
@@ -53,9 +52,9 @@ object MasterDataProcessorIndexer {
       val events_count = createDataFile(dataset, paths.timestamp, paths.outputFilePath)
       val ingestionSpec = updateIngestionSpec(datasource, paths.datasourceRef, paths.ingestionPath)
       submitIngestionTask(ingestionSpec)
-      updateDataSourceRef(datasource, paths.datasourceRef)
+
       if (!datasource.datasourceRef.equals(paths.datasourceRef)) {
-        deleteDataSource(datasource.datasourceRef)
+        updateDataSourceRef(datasource, paths.datasourceRef)
       }
       val end_time = System.currentTimeMillis()
       val success_time = end_time - time
@@ -72,9 +71,9 @@ object MasterDataProcessorIndexer {
     val date = dayPeriodFormat.print(dt)
     val provider = providerFormat(config.getString("cloudStorage.provider"))
     val cloudPrefix = if (config.getString("cloudStorage.provider") == "azure") {
-      provider.sparkProviderURIFormat + s"""${config.getString("cloudStorage.accountName")}.blob.core.windows.net/${config.getString("cloudStorage.container")}/"""
+      provider.sparkProviderURIFormat + s"""://${config.getString("cloudStorage.accountName")}.blob.core.windows.net/${config.getString("cloudStorage.container")}/"""
     } else {
-      provider.sparkProviderURIFormat + s"""${config.getString("cloudStorage.container")}/"""
+      provider.sparkProviderURIFormat + s"""://${config.getString("cloudStorage.container")}/"""
     }
     val pathSuffix = s"""masterdata-indexer/${datasource.datasetId}/$date/"""
     val ingestionPath = cloudPrefix.replace(provider.sparkProviderURIFormat, provider.druidProviderPrefix) + pathSuffix
@@ -98,12 +97,12 @@ object MasterDataProcessorIndexer {
 
   private def providerFormat(cloudProvider: String): BlobProvider = {
     cloudProvider match {
-      case "local" => BlobProvider("file://", "local", "file")
-      case "aws" => BlobProvider("s3a://","s3", "s3")
-      case "azure" => BlobProvider("wasbs://", "azure", "azure")
-      case "gcloud" => BlobProvider("gs://", "google", "gs")
-      case "cephs3" => BlobProvider("s3a://", "s3", "s3") // TODO: Have to check Druid compatibility
-      case "oci" => BlobProvider("s3a://", "s3", "s3") // TODO: Have to check Druid compatibility
+      case "local" => BlobProvider("file", "local", "file")
+      case "aws" => BlobProvider("s3a","s3", "s3")
+      case "azure" => BlobProvider("wasbs", "azure", "azure")
+      case "gcloud" => BlobProvider("gs", "google", "gs")
+      case "cephs3" => BlobProvider("s3a", "s3", "s3") // TODO: Have to check Druid compatibility
+      case "oci" => BlobProvider("s3a", "s3", "s3") // TODO: Have to check Druid compatibility
       case _ => throw new Exception("Unsupported provider")
     }
   }

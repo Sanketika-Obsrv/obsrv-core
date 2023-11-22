@@ -47,5 +47,13 @@ class TestSchemaValidator extends FlatSpec with Matchers {
     an[ObsrvException] should be thrownBy schemaValidator.schemaFileExists(dataset2)
     schemaValidator.schemaFileExists(dataset) should be (false)
   }
+  it should "should throw an exception when invalid schema format found" in {
+    val dataset = Dataset("d1", "dataset", None, None, None, Option(EventFixtures.INVALID_JSON_SCHEMA), None, RouterConfig(""), DatasetConfig("id", "date", "ingest"), "Active")
+    schemaValidator.loadDataSchemas(List(dataset))
+
+    val dataset2 = Dataset("d1", "dataset", None, None, None, None, None, RouterConfig(""), DatasetConfig("id", "date", "ingest"), "Active")
+    an[ObsrvException] should be thrownBy schemaValidator.schemaFileExists(dataset2)
+    schemaValidator.schemaFileExists(dataset) should be(false)
+  }
 
 }

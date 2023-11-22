@@ -1,7 +1,7 @@
 package org.sunbird.obsrv.preprocessor.util
 
 import com.github.fge.jackson.JsonLoader
-import com.github.fge.jsonschema.core.exceptions.ProcessingException
+import com.github.fge.jsonschema.core.exceptions.{ProcessingException, InvalidSchemaException}
 import com.github.fge.jsonschema.core.report.ProcessingReport
 import com.github.fge.jsonschema.main.{JsonSchema, JsonSchemaFactory}
 import org.slf4j.LoggerFactory
@@ -35,15 +35,23 @@ class SchemaValidator(config: PipelinePreprocessorConfig) extends java.io.Serial
 
   private def loadJsonSchema(datasetId: String, jsonSchemaStr: String) = {
     val schemaFactory = JsonSchemaFactory.byDefault
-    try {
-      val jsonSchema = schemaFactory.getJsonSchema(JsonLoader.fromString(jsonSchemaStr))
-      schemaMap.put(datasetId, (jsonSchema, true))
+    val jsonSchema = try {
+      schemaFactory.getJsonSchema(JsonLoader.fromString(jsonSchemaStr))
     } catch {
       case ex: Exception =>
-        logger.error("SchemaValidator:loadJsonSchema() - Exception", ex)
-        throw new ObsrvException(ErrorConstants.INVALID_JSON_SCHEMA.copy(errorReason = ex.getMessage))
+        logger.error("SchemaValidator:loadJsonSchema() - Invalid JSON", ex)
+        throw new ObsrvException(ErrorConstants.INVALID_JSON_SCHEMA)
     }
+    try {
+      jsonSchema.validate(JSONUtil.convertValue(Map[String, AnyRef]()))
+    } catch {
+      case ex: InvalidSchemaException =>
+        logger.error("SchemaValidator:loadJsonSchema() - Exception", ex)
+        throw new ObsrvException(ErrorConstants.INVALID_JSON_SCHEMA)
+    }
+    schemaMap.put(datasetId, (jsonSchema, true))
   }
+
 
   def schemaFileExists(dataset: Dataset): Boolean = {
 
@@ -55,6 +63,7 @@ class SchemaValidator(config: PipelinePreprocessorConfig) extends java.io.Serial
 
   @throws[IOException]
   @throws[ProcessingException]
+  @throws[InvalidSchemaException]
   def validate(datasetId: String, event: Map[String, AnyRef]): ProcessingReport = {
     schemaMap(datasetId)._1.validate(JSONUtil.convertValue(event))
   }

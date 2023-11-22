@@ -52,7 +52,6 @@ object MasterDataProcessorIndexer {
       val events_count = createDataFile(dataset, paths.timestamp, paths.outputFilePath)
       val ingestionSpec = updateIngestionSpec(datasource, paths.datasourceRef, paths.ingestionPath)
       submitIngestionTask(ingestionSpec)
-
       if (!datasource.datasourceRef.equals(paths.datasourceRef)) {
         updateDataSourceRef(datasource, paths.datasourceRef)
       }

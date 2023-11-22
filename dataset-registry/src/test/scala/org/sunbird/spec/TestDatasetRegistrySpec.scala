@@ -1,4 +1,4 @@
-package org.sunbird.obsrv.spec
+package org.sunbird.spec
 
 import org.scalatest.Matchers
 import org.scalatestplus.mockito.MockitoSugar

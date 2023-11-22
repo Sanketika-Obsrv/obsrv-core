@@ -1,4 +1,4 @@
-package org.sunbird.obsrv.spec
+package org.sunbird.spec
 
 import com.typesafe.config.{Config, ConfigFactory}
 import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}

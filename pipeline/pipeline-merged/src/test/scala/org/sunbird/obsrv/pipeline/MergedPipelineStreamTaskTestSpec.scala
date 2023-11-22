@@ -12,7 +12,7 @@ import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.FlinkUtil
 import org.sunbird.obsrv.fixture.EventFixture
 import org.sunbird.obsrv.pipeline.task.{MergedPipelineConfig, MergedPipelineStreamTask}
-import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
+import org.sunbird.spec.BaseSpecWithDatasetRegistry
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global

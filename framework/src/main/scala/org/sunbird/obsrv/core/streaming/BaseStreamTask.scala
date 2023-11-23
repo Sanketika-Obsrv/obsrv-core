@@ -2,23 +2,28 @@ package org.sunbird.obsrv.core.streaming
 
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy
-import org.apache.flink.api.connector.sink2.Sink
 import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSink, SingleOutputStreamOperator}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 
 import java.util.Properties
 import scala.collection.mutable
 
-abstract class BaseStreamTask[T] {
+class BaseStreamTaskSink[T] {
+  def addDefaultSinks(dataStream: SingleOutputStreamOperator[T], config: BaseJobConfig[T], kafkaConnector: FlinkKafkaConnector): DataStreamSink[T] = {
+
+    dataStream.getSideOutput(config.systemEventsOutputTag).sinkTo(kafkaConnector.kafkaSink[String](config.kafkaSystemTopic))
+      .name(config.jobName + "-" + config.systemEventsProducer).uid(config.jobName + "-" + config.systemEventsProducer).setParallelism(config.downstreamOperatorsParallelism)
+
+    dataStream.getSideOutput(config.failedEventsOutputTag()).sinkTo(kafkaConnector.kafkaSink[T](config.kafkaFailedTopic))
+      .name(config.jobName + "-" + config.failedEventProducer).uid(config.jobName + "-" + config.failedEventProducer).setParallelism(config.downstreamOperatorsParallelism)
+  }
+}
+
+abstract class BaseStreamTask[T] extends BaseStreamTaskSink[T] {
 
   def process()
 
   def processStream(dataStream: DataStream[T]): DataStream[T]
-
-  def addDefaultSinks(dataStream: SingleOutputStreamOperator[T], config: BaseJobConfig[T], kafkaConnector: FlinkKafkaConnector): DataStreamSink[T] = {
-    dataStream.getSideOutput(config.failedEventsOutputTag()).sinkTo(kafkaConnector.kafkaSink[T](config.kafkaFailedTopic))
-      .name(config.jobName + "-" + config.failedEventProducer).uid(config.jobName + "-" + config.failedEventProducer).setParallelism(config.downstreamOperatorsParallelism)
-  }
 
   def getMapDataStream(env: StreamExecutionEnvironment, config: BaseJobConfig[T], kafkaConnector: FlinkKafkaConnector): DataStream[mutable.Map[String, AnyRef]] = {
     env.fromSource(kafkaConnector.kafkaMapSource(config.inputTopic()), WatermarkStrategy.noWatermarks[mutable.Map[String, AnyRef]](), config.inputConsumer())

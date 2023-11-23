@@ -3,6 +3,7 @@ package org.sunbird.obsrv.core.model
 object Constants {
 
   val EVENT = "event"
+  val INVALID_JSON = "invalid_json"
   val OBSRV_META = "obsrv_meta"
   val SRC = "src"
   val ERROR_CODE = "error_code"

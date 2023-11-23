@@ -77,12 +77,16 @@ class TestSchemaValidator extends FlatSpec with Matchers {
   }
 
   it should "validate the negative scenarios" in {
-    val dataset = Dataset("d1", "dataset", None, None, None, Option(EventFixtures.INVALID_SCHEMA), None, RouterConfig(""), DatasetConfig("id","date","ingest"), DatasetStatus.Live)
+    val dataset = Dataset("d4", "dataset", None, None, None, Option(EventFixtures.INVALID_SCHEMA_JSON), None, RouterConfig(""), DatasetConfig("id","date","ingest"), DatasetStatus.Live)
     schemaValidator.loadDataSchema(dataset)
-
-    val dataset2 = Dataset("d1", "dataset", None, None, None, None, None, RouterConfig(""), DatasetConfig("id","date","ingest"), DatasetStatus.Live)
-    an[ObsrvException] should be thrownBy schemaValidator.schemaFileExists(dataset2)
     schemaValidator.schemaFileExists(dataset) should be (false)
+
+    val dataset2 = Dataset("d5", "dataset", None, None, None, None, None, RouterConfig(""), DatasetConfig("id","date","ingest"), DatasetStatus.Live)
+    an[ObsrvException] should be thrownBy schemaValidator.schemaFileExists(dataset2)
+
+    val dataset3 = Dataset("d6", "dataset", None, None, None, Option(EventFixtures.INVALID_SCHEMA), None, RouterConfig(""), DatasetConfig("id", "date", "ingest"), DatasetStatus.Live)
+    schemaValidator.loadDataSchema(dataset3)
+    schemaValidator.schemaFileExists(dataset3) should be(false)
   }
 
 }

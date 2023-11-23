@@ -3,9 +3,9 @@ package org.sunbird.obsrv.core.model
 object ErrorConstants extends Enumeration {
 
   type Error = ErrorValue
-  case class ErrorValue(errorCode: String, errorMsg: String, errorReason: Option[String] = None)
-  protected final def ErrorInternalValue(errorCode: String, errorMsg: String, errorReason: Option[String] = None): ErrorValue = {
-    ErrorValue(errorCode, errorMsg, errorReason)
+  case class ErrorValue(errorCode: String, errorMsg: String)
+  protected final def ErrorInternalValue(errorCode: String, errorMsg: String): ErrorValue = {
+    ErrorValue(errorCode, errorMsg)
   }
 
   val NO_IMPLEMENTATION_FOUND = ErrorInternalValue("ERR_0001", "Unimplemented method")
@@ -17,7 +17,7 @@ object ErrorConstants extends Enumeration {
   val MISSING_DATASET_CONFIGURATION = ErrorInternalValue("ERR_EXT_1005", "Dataset configuration is missing")
   val EVENT_MISSING = ErrorInternalValue("ERR_EXT_1006", "Event missing in the batch event")
   val NO_DEDUP_KEY_FOUND = ErrorInternalValue("ERR_DEDUP_1007", "No dedup key found or missing data")
-  val DEDUP_KEY_NOT_A_STRING = ErrorInternalValue("ERR_DEDUP_1008", "Dedup key value is not a String or Text")
+  val DEDUP_KEY_NOT_A_STRING_OR_NUMBER = ErrorInternalValue("ERR_DEDUP_1008", "Dedup key value is not a String or Text")
   val DUPLICATE_BATCH_EVENT_FOUND = ErrorInternalValue("ERR_EXT_1009", "Duplicate batch event found")
   val DUPLICATE_EVENT_FOUND = ErrorInternalValue("ERR_PP_1010", "Duplicate event found")
   val JSON_SCHEMA_NOT_FOUND = ErrorInternalValue("ERR_PP_1011", "Json schema not found for the dataset")

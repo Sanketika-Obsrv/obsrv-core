@@ -4,7 +4,7 @@ import scala.collection.mutable.Map
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.sunbird.obsrv.core.cache.{DedupEngine, RedisConnect}
-import org.sunbird.obsrv.core.model.ErrorConstants
+import org.sunbird.obsrv.core.model.{ErrorConstants, Producer}
 import org.sunbird.obsrv.core.streaming.{BaseProcessFunction, Metrics, MetricsList}
 import org.sunbird.obsrv.core.util.JSONUtil
 
@@ -25,9 +25,9 @@ class TestMapStreamFunc(config: BaseProcessTestMapConfig)(implicit val stringTyp
     metrics.getAndReset("ALL", config.mapEventCount)
     context.output(config.mapOutputTag, event)
 
-    super.markSuccess(event, "test-job")
-    super.markFailed(event, ErrorConstants.NO_IMPLEMENTATION_FOUND, config.jobName)
-    super.markSkipped(event, config.jobName)
+    super.markSuccess(event, Producer.extractor)
+    super.markFailed(event, ErrorConstants.NO_IMPLEMENTATION_FOUND, Producer.extractor)
+    super.markSkipped(event, Producer.extractor)
     super.markComplete(event, None)
     assert(super.containsEvent(event))
     assert(!super.containsEvent(Map("dataset" -> "d1")))

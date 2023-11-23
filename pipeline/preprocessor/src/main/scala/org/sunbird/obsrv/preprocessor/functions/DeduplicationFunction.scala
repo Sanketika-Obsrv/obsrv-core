@@ -5,7 +5,7 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.cache._
-import org.sunbird.obsrv.core.model.ErrorConstants
+import org.sunbird.obsrv.core.model.{ErrorConstants, Producer}
 import org.sunbird.obsrv.core.streaming._
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
@@ -18,7 +18,6 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
   extends BaseDatasetProcessFunction(config) {
 
   @transient private var dedupEngine: DedupEngine = null
-  private[this] val logger = LoggerFactory.getLogger(classOf[DeduplicationFunction])
 
   override def getMetrics(): List[String] = {
     List(config.duplicationTotalMetricsCount, config.duplicationSkippedEventMetricsCount, config.duplicationEventMetricsCount, config.duplicationProcessedEventMetricsCount)
@@ -38,28 +37,23 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
   override def processElement(dataset: Dataset, msg: mutable.Map[String, AnyRef],
                               context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
                               metrics: Metrics): Unit = {
-    try {
-      metrics.incCounter(config.defaultDatasetID, config.duplicationTotalMetricsCount)
-      val dedupConfig = dataset.dedupConfig
-      if (dedupConfig.isDefined && dedupConfig.get.dropDuplicates.get) {
-        val event = msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]]
-        val eventAsText = JSONUtil.serialize(event)
-        val isDup = isDuplicate(dataset.id, dedupConfig.get.dedupKey, eventAsText, context, config)(dedupEngine)
-        if (isDup) {
-          metrics.incCounter(dataset.id, config.duplicationEventMetricsCount)
-          context.output(config.duplicateEventsOutputTag, markFailed(msg, ErrorConstants.DUPLICATE_EVENT_FOUND, "Deduplication"))
-        } else {
-          metrics.incCounter(dataset.id, config.duplicationProcessedEventMetricsCount)
-          context.output(config.uniqueEventsOutputTag, markSuccess(msg, "Deduplication"))
-        }
+
+    metrics.incCounter(config.defaultDatasetID, config.duplicationTotalMetricsCount)
+    val dedupConfig = dataset.dedupConfig
+    if (dedupConfig.isDefined && dedupConfig.get.dropDuplicates.get) {
+      val event = msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]]
+      val eventAsText = JSONUtil.serialize(event)
+      val isDup = isDuplicate(dataset.id, dedupConfig.get.dedupKey, eventAsText, context, config)(dedupEngine)
+      if (isDup) {
+        metrics.incCounter(dataset.id, config.duplicationEventMetricsCount)
+        context.output(config.duplicateEventsOutputTag, markFailed(msg, ErrorConstants.DUPLICATE_EVENT_FOUND, Producer.dedup))
       } else {
-        metrics.incCounter(dataset.id, config.duplicationSkippedEventMetricsCount)
-        context.output(config.uniqueEventsOutputTag, msg)
+        metrics.incCounter(dataset.id, config.duplicationProcessedEventMetricsCount)
+        context.output(config.uniqueEventsOutputTag, markSuccess(msg, Producer.dedup))
       }
-    } catch {
-      case ex: Exception =>
-        logger.error("DeduplicationFunction:processElement() - Exception: ", ex.getMessage)
-        ex.printStackTrace()
+    } else {
+      metrics.incCounter(dataset.id, config.duplicationSkippedEventMetricsCount)
+      context.output(config.uniqueEventsOutputTag, msg)
     }
   }
 

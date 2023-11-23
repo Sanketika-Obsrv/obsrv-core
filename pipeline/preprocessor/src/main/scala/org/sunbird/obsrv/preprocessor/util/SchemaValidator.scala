@@ -15,7 +15,9 @@ import java.io.IOException
 import scala.collection.mutable
 
 case class Schema(loadingURI: String, pointer: String)
+
 case class Instance(pointer: String)
+
 case class ValidationMsg(level: String, schema: Schema, instance: Instance, domain: String, keyword: String, message: String, allowed: Option[String],
                          found: Option[String], expected: Option[List[String]], unwanted: Option[List[String]], required: Option[List[String]], missing: Option[List[String]])
 
@@ -31,8 +33,7 @@ class SchemaValidator(config: PipelinePreprocessorConfig) extends java.io.Serial
         try {
           loadJsonSchema(dataset.id, dataset.jsonSchema.get)
         } catch {
-          case ex: ObsrvException => ex.printStackTrace()
-            schemaMap.put(dataset.id, (null, false))
+          case ex: ObsrvException => schemaMap.put(dataset.id, (null, false))
         }
       }
     })
@@ -43,7 +44,7 @@ class SchemaValidator(config: PipelinePreprocessorConfig) extends java.io.Serial
       try {
         loadJsonSchema(dataset.id, dataset.jsonSchema.get)
       } catch {
-        case ex: ObsrvException => schemaMap.put(dataset.id, (null, false)) // TODO: Invalid schema file. Does this scenario occur?
+        case ex: ObsrvException => schemaMap.put(dataset.id, (null, false))
       }
     }
   }
@@ -52,11 +53,12 @@ class SchemaValidator(config: PipelinePreprocessorConfig) extends java.io.Serial
     val schemaFactory = JsonSchemaFactory.byDefault
     try {
       val jsonSchema = schemaFactory.getJsonSchema(JsonLoader.fromString(jsonSchemaStr))
+      jsonSchema.validate(JSONUtil.convertValue(Map("pqr" -> "value"))) // Test validate to check if Schema is valid
       schemaMap.put(datasetId, (jsonSchema, true))
     } catch {
       case ex: Exception =>
-        logger.error("SchemaValidator:loadJsonSchema() - Exception", ex)
-        throw new ObsrvException(ErrorConstants.INVALID_JSON_SCHEMA.copy(errorReason = Some(ex.getMessage)))
+        logger.error(s"SchemaValidator:loadJsonSchema() - Unable to parse the schema json for dataset: $datasetId", ex)
+        throw new ObsrvException(ErrorConstants.INVALID_JSON_SCHEMA)
     }
   }
 
@@ -81,7 +83,6 @@ class SchemaValidator(config: PipelinePreprocessorConfig) extends java.io.Serial
     })
     buffer.toList
   }
-
 
 }
 // $COVERAGE-ON$

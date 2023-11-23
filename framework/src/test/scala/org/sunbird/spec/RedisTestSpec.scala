@@ -19,10 +19,10 @@ class RedisTestSpec extends BaseSpec with Matchers with MockitoSugar {
     status.isConnected should be(true)
   }
 
-  "DedupEngine functionality" should "be able to identify if the key is unique or duplicate & it should able throw jedis excption for invalid action" in  intercept[JedisException] {
+  "DedupEngine functionality" should "be able to identify if the key is unique or duplicate & it should able throw jedis exception for invalid action" in  intercept[JedisException] {
     val redisConnection = new RedisConnect(baseConfig.redisHost, baseConfig.redisPort, baseConfig.redisConnectionTimeout)
     val dedupEngine = new DedupEngine(redisConnection, 2, 200)
-    dedupEngine.getRedisConnection should not be (null)
+    dedupEngine.getRedisConnection should not be null
     dedupEngine.isUniqueEvent("key-1") should be(true)
     dedupEngine.storeChecksum("key-1")
     dedupEngine.isUniqueEvent("key-1") should be(false)
@@ -35,15 +35,15 @@ class RedisTestSpec extends BaseSpec with Matchers with MockitoSugar {
     val dedupEngine = new DedupEngine(redisConnection, 0, 4309535)
     dedupEngine.isUniqueEvent("event-id-3") should be(true)
     dedupEngine.storeChecksum(null)
-    dedupEngine.getRedisConnection should not be(null)
+    dedupEngine.getRedisConnection should not be null
   }
 
 
 
   "RestUtil functionality" should "be able to return response" in {
     val restUtil = new RestUtil()
-    val url = "https://httpbin.org/json";
-    val response = restUtil.get(url);
+    val url = "https://httpbin.org/json"
+    val response = restUtil.get(url)
     response should not be null
   }
 

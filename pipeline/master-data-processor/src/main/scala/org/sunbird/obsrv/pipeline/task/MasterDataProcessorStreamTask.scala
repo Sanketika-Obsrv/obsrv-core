@@ -65,12 +65,7 @@ class MasterDataProcessorStreamTask(config: Config, masterDataConfig: MasterData
     val processedStream = windowedStream.process(new MasterDataProcessorFunction(masterDataConfig)).name(masterDataConfig.masterDataProcessFunction)
       .uid(masterDataConfig.masterDataProcessFunction).setParallelism(masterDataConfig.downstreamOperatorsParallelism)
 
-    processedStream.getSideOutput(masterDataConfig.failedEventsOutputTag()).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](masterDataConfig.kafkaFailedTopic))
-      .name(masterDataConfig.failedEventProducer).uid(masterDataConfig.failedEventProducer).setParallelism(masterDataConfig.downstreamOperatorsParallelism)
-
-    processedStream.getSideOutput(masterDataConfig.successTag()).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](masterDataConfig.kafkaStatsTopic))
-      .name("stats-producer").uid("stats-producer").setParallelism(masterDataConfig.downstreamOperatorsParallelism)
-
+    addDefaultSinks(processedStream, masterDataConfig, kafkaConnector)
     processedStream.getSideOutput(masterDataConfig.successTag())
   }
 }

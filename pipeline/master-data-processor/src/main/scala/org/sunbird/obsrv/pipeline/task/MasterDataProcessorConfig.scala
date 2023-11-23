@@ -13,9 +13,6 @@ class MasterDataProcessorConfig(override val config: Config) extends BaseJobConf
   private val serialVersionUID = 2905979434303791379L
   implicit val eventTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeExtractor.getForClass(classOf[mutable.Map[String, AnyRef]])
 
-  // Kafka Topics Configuration
-  val kafkaStatsTopic: String = config.getString("kafka.stats.topic")
-
   // Metric List
   val totalEventCount = "total-event-count"
   val successEventCount = "success-event-count"

@@ -141,7 +141,7 @@ class BaseProcessFunctionTestSpec extends BaseSpec with Matchers {
     ErrorConstants.MISSING_DATASET_ID.errorCode should be ("ERR_EXT_1004")
     ErrorConstants.MISSING_DATASET_CONFIGURATION.errorCode should be ("ERR_EXT_1005")
     ErrorConstants.NO_DEDUP_KEY_FOUND.errorCode should be ("ERR_DEDUP_1007")
-    ErrorConstants.DEDUP_KEY_NOT_A_STRING.errorCode should be ("ERR_DEDUP_1008")
+    ErrorConstants.DEDUP_KEY_NOT_A_STRING_OR_NUMBER.errorCode should be ("ERR_DEDUP_1008")
     ErrorConstants.DUPLICATE_BATCH_EVENT_FOUND.errorCode should be ("ERR_EXT_1009")
     ErrorConstants.DUPLICATE_EVENT_FOUND.errorCode should be ("ERR_PP_1010")
     ErrorConstants.JSON_SCHEMA_NOT_FOUND.errorCode should be ("ERR_PP_1011")

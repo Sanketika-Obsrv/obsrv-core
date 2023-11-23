@@ -9,7 +9,7 @@ import org.sunbird.obsrv.core.util.FlinkUtil
 import org.sunbird.obsrv.denormalizer.task.{DenormalizerConfig, DenormalizerStreamTask}
 import org.sunbird.obsrv.extractor.task.{ExtractorConfig, ExtractorStreamTask}
 import org.sunbird.obsrv.preprocessor.task.{PipelinePreprocessorConfig, PipelinePreprocessorStreamTask}
-import org.sunbird.obsrv.router.task.{DruidRouterConfig, DruidRouterStreamTask, DynamicRouterStreamTask}
+import org.sunbird.obsrv.router.task.{DruidRouterConfig, DynamicRouterStreamTask}
 import org.sunbird.obsrv.transformer.task.{TransformerConfig, TransformerStreamTask}
 
 import java.io.File
@@ -34,7 +34,7 @@ class MergedPipelineStreamTask(config: Config, mergedPipelineConfig: MergedPipel
 
   /**
    * Created an overloaded process function to enable unit testing
-   * @param env
+   * @param env StreamExecutionEnvironment
    */
   def process(env: StreamExecutionEnvironment): Unit = {
 

@@ -20,7 +20,6 @@ class TransformerConfig(override val config: Config) extends BaseJobConfig[mutab
   val transformFailedCount = "transform-failed-count"
   val transformSkippedCount = "transform-skipped-count"
 
-  val kafkaInputTopic: String = config.getString("kafka.input.topic")
   val kafkaTransformTopic: String = config.getString("kafka.output.transform.topic")
 
   val transformerFunction = "transformer-function"
@@ -29,7 +28,7 @@ class TransformerConfig(override val config: Config) extends BaseJobConfig[mutab
   private val TRANSFORMER_OUTPUT_TAG = "transformed-events"
   val transformerOutputTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]](TRANSFORMER_OUTPUT_TAG)
 
-  override def inputTopic(): String = kafkaInputTopic
+  override def inputTopic(): String = config.getString("kafka.input.topic")
 
   override def inputConsumer(): String = "transformer-consumer"
 

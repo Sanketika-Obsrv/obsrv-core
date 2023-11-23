@@ -6,7 +6,7 @@ import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.slf4j.LoggerFactory
-import org.sunbird.obsrv.core.model.ErrorConstants
+import org.sunbird.obsrv.core.model.{ErrorConstants, Producer}
 import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.core.streaming.Metrics
 import org.sunbird.obsrv.core.util.JSONUtil
@@ -77,7 +77,7 @@ class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends Bas
   private def markEventFailed(dataset: String, event: mutable.Map[String, AnyRef], error: Error, obsrvMeta: Map[String, AnyRef]): mutable.Map[String, AnyRef] = {
     val wrapperEvent = createWrapperEvent(dataset, event)
     updateEvent(wrapperEvent, obsrvMeta)
-    super.markFailed(wrapperEvent, error, config.jobName)
+    super.markFailed(wrapperEvent, error, Producer.masterdataprocessor)
     wrapperEvent
   }
 

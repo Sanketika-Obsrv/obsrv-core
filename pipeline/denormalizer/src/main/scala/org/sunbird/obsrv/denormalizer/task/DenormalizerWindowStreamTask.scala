@@ -9,7 +9,7 @@ import org.apache.flink.streaming.api.datastream.WindowedStream
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
-import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
+import org.sunbird.obsrv.core.streaming.{BaseStreamTaskSink, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.{DatasetKeySelector, FlinkUtil, TumblingProcessingTimeCountWindows}
 import org.sunbird.obsrv.denormalizer.functions.DenormalizerWindowFunction
 
@@ -19,7 +19,7 @@ import scala.collection.mutable
 /**
  * Denormalization stream task does the following pipeline processing in a sequence:
  */
-class DenormalizerWindowStreamTask(config: DenormalizerConfig, kafkaConnector: FlinkKafkaConnector) {
+class DenormalizerWindowStreamTask(config: DenormalizerConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTaskSink[mutable.Map[String, AnyRef]] {
 
   private val serialVersionUID = -7729362727131516112L
 
@@ -42,9 +42,8 @@ class DenormalizerWindowStreamTask(config: DenormalizerConfig, kafkaConnector: F
       .name(config.DENORM_EVENTS_PRODUCER).uid(config.DENORM_EVENTS_PRODUCER).setParallelism(config.downstreamOperatorsParallelism)
     denormStream.getSideOutput(config.denormFailedStatsTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.failedStatsTopic))
       .name(config.DENORM_FAILED_STATS_PRODUCER).uid(config.DENORM_FAILED_STATS_PRODUCER).setParallelism(config.downstreamOperatorsParallelism)
-    denormStream.getSideOutput(config.failedEventsOutputTag()).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaFailedTopic))
-      .name(config.failedEventProducer).uid(config.failedEventProducer).setParallelism(config.downstreamOperatorsParallelism)
 
+    addDefaultSinks(denormStream, config, kafkaConnector)
     env.execute(config.jobName)
   }
 }

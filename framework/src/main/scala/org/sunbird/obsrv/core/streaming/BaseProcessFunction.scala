@@ -8,7 +8,8 @@ import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.apache.flink.util.Collector
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.ErrorConstants.Error
-import org.sunbird.obsrv.core.model.{Constants, SystemConfig}
+import org.sunbird.obsrv.core.model.Producer.Producer
+import org.sunbird.obsrv.core.model.{Constants, Stats, StatusCode, SystemConfig}
 import org.sunbird.obsrv.core.util.{JSONUtil, Util}
 
 import java.lang
@@ -77,7 +78,7 @@ trait BaseFunction {
     obsrvMeta.put("error", error)
   }
 
-  def addTimespan(obsrvMeta: mutable.Map[String, AnyRef], jobName: String): Unit = {
+  def addTimespan(obsrvMeta: mutable.Map[String, AnyRef], producer: Producer): Unit = {
     val prevTS = if (obsrvMeta.contains("prevProcessingTime")) {
       obsrvMeta("prevProcessingTime").asInstanceOf[Long]
     } else {
@@ -85,33 +86,33 @@ trait BaseFunction {
     }
     val currentTS = System.currentTimeMillis()
     val span = currentTS - prevTS
-    obsrvMeta.put("timespans", obsrvMeta("timespans").asInstanceOf[Map[String, AnyRef]] ++ Map(jobName -> span))
+    obsrvMeta.put("timespans", obsrvMeta("timespans").asInstanceOf[Map[String, AnyRef]] ++ Map(producer.toString -> span))
     obsrvMeta.put("prevProcessingTime", currentTS.asInstanceOf[AnyRef])
   }
 
-  def markFailed(event: mutable.Map[String, AnyRef], error: Error, jobName: String): mutable.Map[String, AnyRef] = {
+  def markFailed(event: mutable.Map[String, AnyRef], error: Error, producer: Producer): mutable.Map[String, AnyRef] = {
     val obsrvMeta = Util.getMutableMap(event(Constants.OBSRV_META).asInstanceOf[Map[String, AnyRef]])
-    addError(obsrvMeta, Map(Constants.SRC -> jobName, Constants.ERROR_CODE -> error.errorCode, Constants.ERROR_MSG -> error.errorMsg, Constants.ERROR_REASON -> error.errorReason))
-    addFlags(obsrvMeta, Map(jobName -> Constants.FAILED))
-    addTimespan(obsrvMeta, jobName)
+    addError(obsrvMeta, Map(Constants.SRC -> producer, Constants.ERROR_CODE -> error.errorCode, Constants.ERROR_MSG -> error.errorMsg))
+    addFlags(obsrvMeta, Map(producer.toString -> StatusCode.failed.toString))
+    addTimespan(obsrvMeta, producer)
     event.remove(Constants.OBSRV_META)
     event.put(Constants.EVENT, JSONUtil.serialize(event))
     event.put(Constants.OBSRV_META, obsrvMeta.toMap)
     event
   }
 
-  def markSkipped(event: mutable.Map[String, AnyRef], jobName: String): mutable.Map[String, AnyRef] = {
+  def markSkipped(event: mutable.Map[String, AnyRef], producer: Producer): mutable.Map[String, AnyRef] = {
     val obsrvMeta = Util.getMutableMap(event("obsrv_meta").asInstanceOf[Map[String, AnyRef]])
-    addFlags(obsrvMeta, Map(jobName -> "skipped"))
-    addTimespan(obsrvMeta, jobName)
+    addFlags(obsrvMeta, Map(producer.toString -> StatusCode.skipped.toString))
+    addTimespan(obsrvMeta, producer)
     event.put("obsrv_meta", obsrvMeta.toMap)
     event
   }
 
-  def markSuccess(event: mutable.Map[String, AnyRef], jobName: String): mutable.Map[String, AnyRef] = {
+  def markSuccess(event: mutable.Map[String, AnyRef], producer: Producer): mutable.Map[String, AnyRef] = {
     val obsrvMeta = Util.getMutableMap(event("obsrv_meta").asInstanceOf[Map[String, AnyRef]])
-    addFlags(obsrvMeta, Map(jobName -> "success"))
-    addTimespan(obsrvMeta, jobName)
+    addFlags(obsrvMeta, Map(producer.toString -> StatusCode.success.toString))
+    addTimespan(obsrvMeta, producer)
     event.put("obsrv_meta", obsrvMeta.toMap)
     event
   }
@@ -121,9 +122,9 @@ trait BaseFunction {
     val syncts = obsrvMeta("syncts").asInstanceOf[Long]
     val processingStartTime = obsrvMeta("processingStartTime").asInstanceOf[Long]
     val processingEndTime = System.currentTimeMillis()
-    obsrvMeta.put("total_processing_time", (processingEndTime - syncts).asInstanceOf[AnyRef])
-    obsrvMeta.put("latency_time", (processingStartTime - syncts).asInstanceOf[AnyRef])
-    obsrvMeta.put("processing_time", (processingEndTime - processingStartTime).asInstanceOf[AnyRef])
+    obsrvMeta.put(Stats.total_processing_time.toString, (processingEndTime - syncts).asInstanceOf[AnyRef])
+    obsrvMeta.put(Stats.latency_time.toString, (processingStartTime - syncts).asInstanceOf[AnyRef])
+    obsrvMeta.put(Stats.processing_time.toString, (processingEndTime - processingStartTime).asInstanceOf[AnyRef])
     obsrvMeta.put("data_version", dataVersion.getOrElse(1).asInstanceOf[AnyRef])
     event.put("obsrv_meta", obsrvMeta.toMap)
     event

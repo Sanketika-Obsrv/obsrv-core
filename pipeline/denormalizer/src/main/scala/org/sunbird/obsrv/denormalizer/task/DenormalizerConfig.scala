@@ -18,7 +18,6 @@ class DenormalizerConfig(override val config: Config) extends BaseJobConfig[muta
   // Kafka Topics Configuration
   val kafkaInputTopic: String = config.getString("kafka.input.topic")
   val denormOutputTopic: String = config.getString("kafka.output.denorm.topic")
-  val failedStatsTopic: String = config.getString("kafka.output.failed.stats.topic")
 
   // Windows
   val windowTime: Int = config.getInt("task.window.time.in.seconds")

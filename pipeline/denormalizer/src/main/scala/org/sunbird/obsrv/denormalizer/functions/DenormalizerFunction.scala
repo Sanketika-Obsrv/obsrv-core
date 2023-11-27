@@ -53,7 +53,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
         case StatusCode.success => metrics.incCounter(dataset.id, config.denormSuccess)
         case _ =>
           metrics.incCounter(dataset.id, config.denormFailed)
-          metrics.incCounter(dataset.id, if(status == StatusCode.partial) config.denormPartialSuccess else config.denormFailed)
+          metrics.incCounter(dataset.id, if (status == StatusCode.partial) config.denormPartialSuccess else config.denormFailed)
           generateSystemEvent(dataset.id, denormEvent, context)
           logData(dataset.id, denormEvent)
       }
@@ -69,19 +69,19 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
 
   private def generateSystemEvent(datasetId: String, denormEvent: DenormEvent, context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
     if (denormEvent.fieldStatus.isDefined) {
-      denormEvent.fieldStatus.get.filter(f => !f._2.success).foreach(f => (_: String, status: DenormFieldStatus) => {
-        val error = status.error.get
-        val functionalError = error match {
-          case ErrorConstants.DENORM_KEY_MISSING => FunctionalError.DenormKeyMissing
-          case ErrorConstants.DENORM_KEY_NOT_A_STRING_OR_NUMBER => FunctionalError.DenormKeyInvalid
-          case ErrorConstants.DENORM_DATA_NOT_FOUND => FunctionalError.DenormDataNotFound
-        }
-        context.output(config.systemEventsOutputTag, JSONUtil.serialize(SystemEvent(
-          EventID.METRIC,
-          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(datasetId)),
-          data = EData(error = Some(ErrorLog(pdata_id = Producer.denorm, pdata_status = StatusCode.failed, error_type = functionalError, error_code = error.errorCode, error_message = error.errorMsg, error_level = ErrorLevel.critical)))
-        )))
-      })
+      denormEvent.fieldStatus.get.filter(f => !f._2.success).groupBy(f => f._2.error.get).map(f => (f._1, f._2.size))
+        .foreach(_ => (err: ErrorConstants.Error, count: Int) => {
+          val functionalError = err match {
+            case ErrorConstants.DENORM_KEY_MISSING => FunctionalError.DenormKeyMissing
+            case ErrorConstants.DENORM_KEY_NOT_A_STRING_OR_NUMBER => FunctionalError.DenormKeyInvalid
+            case ErrorConstants.DENORM_DATA_NOT_FOUND => FunctionalError.DenormDataNotFound
+          }
+          context.output(config.systemEventsOutputTag, JSONUtil.serialize(SystemEvent(
+            EventID.METRIC,
+            ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(datasetId)),
+            data = EData(error = Some(ErrorLog(pdata_id = Producer.denorm, pdata_status = StatusCode.failed, error_type = functionalError, error_code = err.errorCode, error_message = err.errorMsg, error_level = ErrorLevel.critical, error_count = Some(count))))
+          )))
+        })
     }
   }
 

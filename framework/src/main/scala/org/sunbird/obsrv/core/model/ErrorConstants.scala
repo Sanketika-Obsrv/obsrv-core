@@ -29,5 +29,9 @@ object ErrorConstants extends Enumeration {
   val MISSING_DATASET_CONFIG_KEY = ErrorInternalValue("ERR_MASTER_DATA_1017", "Master dataset configuration key is missing")
   val ERR_INVALID_EVENT =  ErrorInternalValue("ERR_EXT_1018", "Invalid JSON event, error while deserializing the event")
   val INDEX_KEY_MISSING_OR_BLANK = ErrorInternalValue("ERR_ROUTER_1019", "Unable to index data as the timestamp key is missing or blank or not a datetime value")
+  val INVALID_EXPR_FUNCTION = ErrorInternalValue("ERR_TRANSFORM_1020", "Transformation expression function is not valid")
+  val ERR_EVAL_EXPR_FUNCTION = ErrorInternalValue("ERR_TRANSFORM_1021", "Unable to evaluate the transformation expression function")
+  val ERR_UNKNOWN_TRANSFORM_EXCEPTION = ErrorInternalValue("ERR_TRANSFORM_1022", "Unable to evaluate the transformation expression function")
+  val ERR_TRANSFORMATION_FAILED = ErrorInternalValue("ERR_TRANSFORM_1023", "Atleast one mandatory transformation has failed")
 
 }

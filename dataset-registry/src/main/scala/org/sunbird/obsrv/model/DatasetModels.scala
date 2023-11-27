@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.module.scala.JsonScalaEnumeration
 import org.sunbird.obsrv.core.model.SystemConfig
 import org.sunbird.obsrv.model.DatasetStatus.DatasetStatus
+import org.sunbird.obsrv.model.TransformMode.TransformMode
 import org.sunbird.obsrv.model.ValidationMode.ValidationMode
 
 import scala.beans.BeanProperty
@@ -49,7 +50,7 @@ object DatasetModels {
 
   case class DatasetTransformation(@JsonProperty("id") id: String, @JsonProperty("dataset_id") datasetId: String,
                                    @JsonProperty("field_key") fieldKey: String, @JsonProperty("transformation_function") transformationFunction: TransformationFunction,
-                                   @JsonProperty("status") status: String)
+                                   @JsonProperty("status") status: String, @JsonProperty("mode") @JsonScalaEnumeration(classOf[TransformModeType]) mode: Option[TransformMode] = Some(TransformMode.Strict))
 
   case class ConnectorConfig(@JsonProperty("kafkaBrokers") kafkaBrokers: String, @JsonProperty("topic") topic: String,  @JsonProperty("type")databaseType: String,
                              @JsonProperty("connection") connection: Connection, @JsonProperty("tableName") tableName: String, @JsonProperty("databaseName") databaseName: String,
@@ -76,6 +77,12 @@ class ValidationModeType extends TypeReference[ValidationMode.type]
 object ValidationMode extends Enumeration {
   type ValidationMode = Value
   val Strict, IgnoreNewFields, DiscardNewFields = Value
+}
+
+class TransformModeType extends TypeReference[TransformMode.type]
+object TransformMode extends Enumeration {
+  type TransformMode = Value
+  val Strict, Lenient = Value
 }
 
 class DatasetStatusType extends TypeReference[DatasetStatus.type]

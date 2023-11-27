@@ -14,9 +14,9 @@ object Models {
 
   case class ContextData(module: ModuleID, pdata: PData, dataset: Option[String] = None, eid: Option[String] = None)
 
-  case class ErrorLog(pdata_id: Producer, pdata_status: StatusCode, error_type: FunctionalError, error_code: String, error_message: String, error_level: ErrorLevel)
+  case class ErrorLog(pdata_id: Producer, pdata_status: StatusCode, error_type: FunctionalError, error_code: String, error_message: String, error_level: ErrorLevel, error_count:Option[Int] = None)
 
-  case class PipelineStats(validation_errors: Option[Int] = None, extractor_events: Option[Int] = None, extractor_status: Option[StatusCode] = None,
+  case class PipelineStats(extractor_events: Option[Int] = None, extractor_status: Option[StatusCode] = None,
                            extractor_time: Option[Long] = None, validator_status: Option[StatusCode] = None, validator_time: Option[Long] = None,
                            dedup_status: Option[StatusCode] = None, dedup_time: Option[Long] = None, denorm_status: Option[StatusCode] = None,
                            denorm_time: Option[Long] = None, transform_status: Option[StatusCode] = None, transform_time: Option[Long] = None,
@@ -40,7 +40,8 @@ object ErrorLevel extends Enumeration {
 object FunctionalError extends Enumeration {
   type FunctionalError = Value
   val DedupFailed, RequiredFieldsMissing, DataTypeMismatch, UnknownValidationError, MissingDatasetId, MissingEventData, MissingTimestampKey,
-  EventSizeExceeded, ExtractionDataFormatInvalid, DenormKeyMissing, DenormKeyInvalid, DenormDataNotFound = Value
+  EventSizeExceeded, ExtractionDataFormatInvalid, DenormKeyMissing, DenormKeyInvalid, DenormDataNotFound,
+  TransformParseError, TransformEvalError, TransformFailedError = Value
 }
 
 object Producer extends Enumeration {

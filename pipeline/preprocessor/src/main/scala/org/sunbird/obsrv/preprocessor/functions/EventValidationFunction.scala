@@ -101,8 +101,8 @@ class EventValidationFunction(config: PipelinePreprocessorConfig, @transient var
     JSONUtil.serialize(SystemEvent(EventID.METRIC,
       ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.validator)), dataset = Some(dataset.id)),
       data = EData(
-        error = Some(ErrorLog(pdata_id = Producer.validator, pdata_status = StatusCode.failed, error_type = functionalError, error_code = ErrorConstants.SCHEMA_VALIDATION_FAILED.errorCode, error_message = ErrorConstants.SCHEMA_VALIDATION_FAILED.errorMsg, error_level = ErrorLevel.warn)),
-        pipeline_stats = Some(PipelineStats(validation_errors = Some(failedCount)))
+        error = Some(ErrorLog(pdata_id = Producer.validator, pdata_status = StatusCode.failed, error_type = functionalError, error_code = ErrorConstants.SCHEMA_VALIDATION_FAILED.errorCode, error_message = ErrorConstants.SCHEMA_VALIDATION_FAILED.errorMsg, error_level = ErrorLevel.warn, error_count = Some(failedCount))),
+        pipeline_stats = None
       )
     ))
   }

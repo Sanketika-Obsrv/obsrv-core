@@ -156,7 +156,7 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
     SystemEvent(
       EventID.METRIC,
       ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = Some(dataset)),
-      data = EData(error = None, pipeline_stats = Some(PipelineStats(None, Some(totalEvents), Some(StatusCode.success))))
+      data = EData(error = None, pipeline_stats = Some(PipelineStats(Some(totalEvents), Some(StatusCode.success))))
     )
   }
 

@@ -9,6 +9,7 @@ import org.apache.flink.util.Collector
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.core.model.Producer.Producer
+import org.sunbird.obsrv.core.model.StatusCode.StatusCode
 import org.sunbird.obsrv.core.model.{Constants, Stats, StatusCode, SystemConfig}
 import org.sunbird.obsrv.core.util.{JSONUtil, Util}
 
@@ -102,16 +103,20 @@ trait BaseFunction {
   }
 
   def markSkipped(event: mutable.Map[String, AnyRef], producer: Producer): mutable.Map[String, AnyRef] = {
-    val obsrvMeta = Util.getMutableMap(event("obsrv_meta").asInstanceOf[Map[String, AnyRef]])
-    addFlags(obsrvMeta, Map(producer.toString -> StatusCode.skipped.toString))
-    addTimespan(obsrvMeta, producer)
-    event.put("obsrv_meta", obsrvMeta.toMap)
-    event
+    markStatus(event, producer, StatusCode.skipped)
   }
 
   def markSuccess(event: mutable.Map[String, AnyRef], producer: Producer): mutable.Map[String, AnyRef] = {
+    markStatus(event, producer, StatusCode.success)
+  }
+
+  def markPartial(event: mutable.Map[String, AnyRef], producer: Producer): mutable.Map[String, AnyRef] = {
+    markStatus(event, producer, StatusCode.partial)
+  }
+
+  private def markStatus(event: mutable.Map[String, AnyRef], producer: Producer, statusCode: StatusCode): mutable.Map[String, AnyRef] = {
     val obsrvMeta = Util.getMutableMap(event("obsrv_meta").asInstanceOf[Map[String, AnyRef]])
-    addFlags(obsrvMeta, Map(producer.toString -> StatusCode.success.toString))
+    addFlags(obsrvMeta, Map(producer.toString -> statusCode.toString))
     addTimespan(obsrvMeta, producer)
     event.put("obsrv_meta", obsrvMeta.toMap)
     event

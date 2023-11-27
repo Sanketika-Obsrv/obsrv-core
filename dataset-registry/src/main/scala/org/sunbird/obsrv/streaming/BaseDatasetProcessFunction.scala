@@ -47,7 +47,7 @@ trait SystemEventHandler {
 
     JSONUtil.serialize(SystemEvent(
       EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = dataset),
-      data = EData(error = error, pipeline_stats = Some(PipelineStats(validation_errors = None, extractor_events = None,
+      data = EData(error = error, pipeline_stats = Some(PipelineStats(extractor_events = None,
         extractor_status = getStatus(flags, Producer.extractor), extractor_time = getTime(timespans, Producer.extractor),
         validator_status = getStatus(flags, Producer.validator), validator_time = getTime(timespans, Producer.validator),
         dedup_status = getStatus(flags, Producer.dedup), dedup_time = getTime(timespans, Producer.dedup),

@@ -35,8 +35,6 @@ class DenormalizerStreamTask(config: DenormalizerConfig, kafkaConnector: FlinkKa
 
     denormStream.getSideOutput(config.denormEventsTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.denormOutputTopic))
       .name(config.DENORM_EVENTS_PRODUCER).uid(config.DENORM_EVENTS_PRODUCER).setParallelism(config.downstreamOperatorsParallelism)
-    denormStream.getSideOutput(config.denormFailedStatsTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.failedStatsTopic))
-      .name(config.DENORM_FAILED_STATS_PRODUCER).uid(config.DENORM_FAILED_STATS_PRODUCER).setParallelism(config.downstreamOperatorsParallelism)
 
     addDefaultSinks(denormStream, config, kafkaConnector)
     denormStream.getSideOutput(config.successTag())

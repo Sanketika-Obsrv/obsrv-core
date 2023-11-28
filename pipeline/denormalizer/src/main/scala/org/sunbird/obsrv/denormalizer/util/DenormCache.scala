@@ -103,12 +103,12 @@ class DenormCache(val config: DenormalizerConfig) {
 
     if (denormEvent.responses.isDefined) {
       val event = Util.getMutableMap(denormEvent.msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]])
-      denormEvent.responses.get.map(_ => (denormField: String, response: Response[String]) => {
-        if (response.get() != null) {
-          denormEvent.fieldStatus.get(denormField).success = true
-          event.put(denormField, JSONUtil.deserialize[Map[String, AnyRef]](response.get()))
+      denormEvent.responses.get.map(f => {
+        if (f._2.get() != null) {
+          denormEvent.fieldStatus.get(f._1).success = true
+          event.put(f._1, JSONUtil.deserialize[Map[String, AnyRef]](f._2.get()))
         } else {
-          denormEvent.fieldStatus.get(denormField).error = Some(ErrorConstants.DENORM_DATA_NOT_FOUND)
+          denormEvent.fieldStatus.get(f._1).error = Some(ErrorConstants.DENORM_DATA_NOT_FOUND)
         }
       })
       denormEvent.msg.put(config.CONST_EVENT, event.toMap)

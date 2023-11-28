@@ -39,8 +39,6 @@ class DynamicRouterStreamTask(config: DruidRouterConfig, kafkaConnector: FlinkKa
 
     routerStream.getSideOutput(config.routerOutputTag).sinkTo(kafkaConnector.kafkaMapDynamicSink())
       .name(config.druidRouterProducer).uid(config.druidRouterProducer).setParallelism(config.downstreamOperatorsParallelism)
-    routerStream.getSideOutput(config.statsOutputTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaStatsTopic))
-      .name(config.processingStatsProducer).uid(config.processingStatsProducer).setParallelism(config.downstreamOperatorsParallelism)
 
     addDefaultSinks(routerStream, config, kafkaConnector)
     routerStream.getSideOutput(config.successTag())

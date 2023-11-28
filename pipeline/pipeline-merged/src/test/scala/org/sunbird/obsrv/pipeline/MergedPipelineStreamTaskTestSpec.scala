@@ -8,8 +8,9 @@ import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
 import org.sunbird.obsrv.BaseMetricsReporter
+import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
-import org.sunbird.obsrv.core.util.FlinkUtil
+import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil}
 import org.sunbird.obsrv.fixture.EventFixture
 import org.sunbird.obsrv.pipeline.task.{MergedPipelineConfig, MergedPipelineStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
@@ -28,7 +29,6 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     .build)
 
   val mergedPipelineConfig = new MergedPipelineConfig(config)
-  //val mockKafkaUtil: FlinkKafkaConnector = mock[FlinkKafkaConnector](Mockito.withSettings().serializable())
   val kafkaConnector = new FlinkKafkaConnector(mergedPipelineConfig)
   val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> "test-event-schema-group")
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
@@ -63,6 +63,9 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
   }
 
   override def afterAll(): Unit = {
+    val redisConnection = new RedisConnect(mergedPipelineConfig.redisHost, mergedPipelineConfig.redisPort, mergedPipelineConfig.redisConnectionTimeout)
+    redisConnection.getConnection(config.getInt("redis.database.extractor.duplication.store.id")).flushAll()
+    redisConnection.getConnection(config.getInt("redis.database.preprocessor.duplication.store.id")).flushAll()
     super.afterAll()
     flinkCluster.after()
     EmbeddedKafka.stop()
@@ -70,10 +73,11 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
   def createTestTopics(): Unit = {
     List(
-      config.getString("kafka.stats.topic"), config.getString("kafka.output.transform.topic"), config.getString("kafka.output.denorm.failed.topic"),
+      config.getString("kafka.output.system.event.topic"), config.getString("kafka.output.transform.topic"), config.getString("kafka.output.denorm.failed.topic"),
       config.getString("kafka.output.denorm.topic"), config.getString("kafka.output.duplicate.topic"), config.getString("kafka.output.unique.topic"),
       config.getString("kafka.output.invalid.topic"), config.getString("kafka.output.batch.failed.topic"), config.getString("kafka.output.failed.topic"),
-      config.getString("kafka.output.extractor.duplicate.topic"), config.getString("kafka.output.raw.topic"), config.getString("kafka.input.topic")
+      config.getString("kafka.output.extractor.duplicate.topic"), config.getString("kafka.output.raw.topic"), config.getString("kafka.input.topic"),
+      "d1-events", "d2-events"
     ).foreach(EmbeddedKafka.createCustomTopic(_))
   }
 
@@ -84,19 +88,29 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     task.process(env)
     Future {
       env.execute(mergedPipelineConfig.jobName)
-      Thread.sleep(10000)
     }
 
-    val stats = EmbeddedKafka.consumeNumberMessagesFrom[String](mergedPipelineConfig.kafkaStatsTopic, 1, timeout = 20.seconds)
-    stats.foreach(Console.println("Stats Event:", _))
+//    val input = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.raw.topic"), 1, timeout = 30.seconds)
+//    input.foreach(Console.println("Input Event:", _))
 
-    val failed = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.failed.topic"), 1, timeout = 20.seconds)
-    failed.foreach(Console.println("Failed Event:", _))
+    try {
+      val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.system.event.topic"), 1, timeout = 30.seconds)
+      systemEvents.foreach(Console.println("System Event:", _))
+    } catch {
+      case ex: Exception => ex.printStackTrace()
+    }
+    try {
+      val failed = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.failed.topic"), 1, timeout = 30.seconds)
+      failed.foreach(Console.println("Failed Event:", _))
+    } catch {
+      case ex: Exception => ex.printStackTrace()
+    }
+
 
     val mutableMetricsMap = mutable.Map[String, Long]();
     BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
+    Console.println("### MergedPipelineStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
 
-    mutableMetricsMap.foreach(println(_))
     //TODO: Add assertions
     mergedPipelineConfig.successTag().getId should be ("processing_stats")
     

@@ -14,8 +14,6 @@ class MergedPipelineConfig(override val config: Config) extends BaseJobConfig[mu
   implicit val eventTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeExtractor.getForClass(classOf[mutable.Map[String, AnyRef]])
 
   // Kafka Topics Configuration
-  val kafkaStatsTopic: String = config.getString("kafka.stats.topic")
-
   override def inputTopic(): String = config.getString("kafka.input.topic")
 
   override def inputConsumer(): String = "pipeline-consumer"

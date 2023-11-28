@@ -43,14 +43,14 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
                               metrics: Metrics): Unit = {
     metrics.incCounter(config.defaultDatasetID, config.totalEventCount)
     if (batchEvent.contains(Constants.INVALID_JSON)) {
-      context.output(config.failedEventsOutputTag(), markBatchFailed(batchEvent, ErrorConstants.ERR_INVALID_EVENT, ""))
+      context.output(config.failedEventsOutputTag(), markBatchFailed(batchEvent, ErrorConstants.ERR_INVALID_EVENT))
       metrics.incCounter(config.defaultDatasetID, config.eventFailedMetricsCount)
       return
     }
     val eventAsText = JSONUtil.serialize(batchEvent)
     val datasetIdOpt = batchEvent.get(config.CONST_DATASET)
     if (datasetIdOpt.isEmpty) {
-      context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_ID, ""))
+      context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_ID))
       metrics.incCounter(config.defaultDatasetID, config.failedExtractionCount)
       context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), ErrorConstants.MISSING_DATASET_ID, FunctionalError.MissingDatasetId))
       return
@@ -59,7 +59,7 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
     metrics.incCounter(datasetId, config.totalEventCount)
     val datasetOpt = DatasetRegistry.getDataset(datasetId)
     if (datasetOpt.isEmpty) {
-      context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_CONFIGURATION, ""))
+      context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_CONFIGURATION))
       metrics.incCounter(datasetId, config.failedExtractionCount)
       context.output(config.systemEventsOutputTag, failedSystemEvent(Some(datasetId), ErrorConstants.MISSING_DATASET_CONFIGURATION, FunctionalError.MissingDatasetId))
       return
@@ -70,7 +70,7 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
         val isDup = isDuplicate(dataset.id, dataset.extractionConfig.get.dedupConfig.get.dedupKey, eventAsText, context, config)(dedupEngine)
         if (isDup) {
           metrics.incCounter(dataset.id, config.duplicateExtractionCount)
-          context.output(config.duplicateEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.DUPLICATE_BATCH_EVENT_FOUND, dataset.extractionConfig.get.extractionKey.get))
+          context.output(config.duplicateEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.DUPLICATE_BATCH_EVENT_FOUND))
           return
         }
       }
@@ -85,7 +85,7 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
     val obsrvMeta = batchEvent(config.CONST_OBSRV_META).asInstanceOf[Map[String, AnyRef]]
     if (!super.containsEvent(batchEvent)) {
       metrics.incCounter(dataset.id, config.eventFailedMetricsCount)
-      context.output(config.failedEventsOutputTag(), markBatchFailed(batchEvent, ErrorConstants.EVENT_MISSING, dataset.extractionConfig.get.extractionKey.get))
+      context.output(config.failedEventsOutputTag(), markBatchFailed(batchEvent, ErrorConstants.EVENT_MISSING))
       context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), ErrorConstants.EVENT_MISSING, FunctionalError.MissingEventData))
       return
     }
@@ -128,7 +128,7 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
     } catch {
       case ex: ObsrvException =>
         metrics.incCounter(dataset.id, config.failedExtractionCount)
-        context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ex.error, dataset.extractionConfig.get.extractionKey.get))
+        context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ex.error))
         context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), ex.error, FunctionalError.ExtractionDataFormatInvalid))
         logger.error(s"Extractor | Exception extracting data | dataset=${dataset.id}", ex)
       case re: Exception => logger.error(s"Extractor | Exception extracting data | dataset=${dataset.id}", re)
@@ -180,10 +180,8 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
     wrapperEvent
   }
 
-  private def markBatchFailed(batchEvent: mutable.Map[String, AnyRef], error: Error, extractionKey: String): mutable.Map[String, AnyRef] = {
+  private def markBatchFailed(batchEvent: mutable.Map[String, AnyRef], error: Error): mutable.Map[String, AnyRef] = {
     super.markFailed(batchEvent, error, Producer.extractor)
-    if (extractionKey.nonEmpty && StringUtils.equals(extractionKey, Constants.EVENT))
-      batchEvent.remove(extractionKey)
     batchEvent
   }
 

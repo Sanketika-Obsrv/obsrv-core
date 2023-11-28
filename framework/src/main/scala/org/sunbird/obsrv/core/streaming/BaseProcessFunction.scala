@@ -148,12 +148,14 @@ abstract class BaseProcessFunction[T, R](config: BaseJobConfig[R]) extends Proce
   protected val metrics: Metrics = registerMetrics(metricsList.datasets, metricsList.metrics)
 
   override def open(parameters: Configuration): Unit = {
-    (metricsList.datasets ++ List(SystemConfig.defaultDatasetId)).map { dataset =>
+    metricsList.datasets.map { dataset =>
       metricsList.metrics.map(metric => {
         getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(dataset)
           .gauge[Long, ScalaGauge[Long]](metric, ScalaGauge[Long](() => metrics.getAndReset(dataset, metric)))
       })
     }
+    getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(SystemConfig.defaultDatasetId)
+      .gauge[Long, ScalaGauge[Long]](config.eventFailedMetricsCount, ScalaGauge[Long](() => metrics.getAndReset(SystemConfig.defaultDatasetId, config.eventFailedMetricsCount)))
   }
 
   def processElement(event: T, context: ProcessFunction[T, R]#Context, metrics: Metrics): Unit

@@ -58,8 +58,8 @@ trait SystemEventHandler {
     ))
   }
 
-  def getDatasetId(dataset: Option[Dataset], config: BaseJobConfig[_]): String = {
-    if (dataset.isDefined) dataset.get.id else config.defaultDatasetID
+  def getDatasetId(dataset: Option[String], config: BaseJobConfig[_]): String = {
+    if (dataset.isDefined) dataset.get else config.defaultDatasetID
   }
 
 }
@@ -92,7 +92,7 @@ abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[Stri
     }
   }
 
-  def markFailure(dataset: Option[Dataset], event: mutable.Map[String, AnyRef], ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
+  def markFailure(dataset: Option[String], event: mutable.Map[String, AnyRef], ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
                  metrics: Metrics, error: ErrorConstants.Error, producer: Producer, functionalError: FunctionalError): Unit = {
 
     metrics.incCounter(getDatasetId(dataset, config), config.eventFailedMetricsCount)
@@ -118,12 +118,12 @@ abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[Stri
     initMetrics(datasetId)
     val datasetOpt = DatasetRegistry.getDataset(datasetId)
     if (datasetOpt.isEmpty) {
-      markFailure(None, event, context, metrics, ErrorConstants.MISSING_DATASET_CONFIGURATION, Producer.validator, FunctionalError.MissingDatasetId)
+      markFailure(Some(datasetId), event, context, metrics, ErrorConstants.MISSING_DATASET_CONFIGURATION, Producer.validator, FunctionalError.MissingDatasetId)
       return
     }
     val dataset = datasetOpt.get
     if (!super.containsEvent(event)) {
-      markFailure(Some(dataset), event, context, metrics, ErrorConstants.EVENT_MISSING, Producer.validator, FunctionalError.MissingEventData)
+      markFailure(Some(datasetId), event, context, metrics, ErrorConstants.EVENT_MISSING, Producer.validator, FunctionalError.MissingEventData)
       return
     }
     try {
@@ -162,7 +162,7 @@ abstract class BaseDatasetWindowProcessFunction(config: BaseJobConfig[mutable.Ma
     }
   }
 
-  def markFailure(dataset: Option[Dataset], event: mutable.Map[String, AnyRef], ctx: ProcessWindowFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], String, TimeWindow]#Context,
+  def markFailure(dataset: Option[String], event: mutable.Map[String, AnyRef], ctx: ProcessWindowFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], String, TimeWindow]#Context,
                   metrics: Metrics, error: ErrorConstants.Error, producer: Producer, functionalError: FunctionalError): Unit = {
 
     metrics.incCounter(getDatasetId(dataset, config), config.eventFailedMetricsCount)
@@ -184,7 +184,7 @@ abstract class BaseDatasetWindowProcessFunction(config: BaseJobConfig[mutable.Ma
     val eventsList = elements.asScala.toList
     if (datasetOpt.isEmpty) {
       eventsList.foreach(event => {
-        markFailure(None, event, context, metrics, ErrorConstants.MISSING_DATASET_CONFIGURATION, Producer.validator, FunctionalError.MissingDatasetId)
+        markFailure(Some(datasetId), event, context, metrics, ErrorConstants.MISSING_DATASET_CONFIGURATION, Producer.validator, FunctionalError.MissingDatasetId)
       })
       return
     }
@@ -192,7 +192,7 @@ abstract class BaseDatasetWindowProcessFunction(config: BaseJobConfig[mutable.Ma
     val buffer = mutable.Buffer[mutable.Map[String, AnyRef]]()
     eventsList.foreach(event => {
       if (!super.containsEvent(event)) {
-        markFailure(Some(dataset), event, context, metrics, ErrorConstants.EVENT_MISSING, Producer.validator, FunctionalError.MissingEventData)
+        markFailure(Some(datasetId), event, context, metrics, ErrorConstants.EVENT_MISSING, Producer.validator, FunctionalError.MissingEventData)
       } else {
         buffer.append(event)
       }

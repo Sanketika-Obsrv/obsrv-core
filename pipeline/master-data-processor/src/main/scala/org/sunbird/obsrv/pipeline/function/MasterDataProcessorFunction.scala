@@ -54,7 +54,7 @@ class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends Bas
       val json = parse(JSONUtil.serialize(msg(config.CONST_EVENT)), useBigIntForLong = false)
       val key = json.customExtract[String](dataset.datasetConfig.key)
       if (key == null) {
-        markFailure(None, msg, context, metrics, ErrorConstants.MISSING_DATASET_CONFIG_KEY, Producer.masterdataprocessor, FunctionalError.MissingMasterDatasetKey)
+        markFailure(Some(dataset.id), msg, context, metrics, ErrorConstants.MISSING_DATASET_CONFIG_KEY, Producer.masterdataprocessor, FunctionalError.MissingMasterDatasetKey)
       }
       (key, json)
     }).toMap

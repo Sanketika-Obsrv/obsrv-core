@@ -8,8 +8,9 @@ import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
 import org.sunbird.obsrv.BaseMetricsReporter
+import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
-import org.sunbird.obsrv.core.util.FlinkUtil
+import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil}
 import org.sunbird.obsrv.preprocessor.fixture.EventFixtures
 import org.sunbird.obsrv.preprocessor.task.{PipelinePreprocessorConfig, PipelinePreprocessorStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
@@ -62,6 +63,8 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
   }
 
   override def afterAll(): Unit = {
+    val redisConnection = new RedisConnect(pConfig.redisHost, pConfig.redisPort, pConfig.redisConnectionTimeout)
+    redisConnection.getConnection(config.getInt("redis.database.preprocessor.duplication.store.id")).flushAll()
     super.afterAll()
     flinkCluster.after()
     EmbeddedKafka.stop()
@@ -84,27 +87,32 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
       Thread.sleep(5000)
     }
     //val extractorFailed = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.input.topic"), 2, timeout = 60.seconds)
-    val uniqueEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaUniqueTopic, 1, timeout = 60.seconds)
-    uniqueEvents.foreach(Console.println("Event:", _))
+    val uniqueEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaUniqueTopic, 2, timeout = 60.seconds)
+    uniqueEvents.size should be (2)
+
+    val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSystemTopic, 4, timeout = 60.seconds)
+    systemEvents.size should be (4)
 
     val mutableMetricsMap = mutable.Map[String, Long]();
-    val metricsMap = BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
+    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
+    Console.println("### PipelinePreprocessorStreamTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
 
-    // TODO: The validation failure count has to be 7. There are three failures which are generated from BaseDatasetProcessFunction.scala
-    mutableMetricsMap(s"${pConfig.jobName}.ALL.${pConfig.validationTotalMetricsCount}") should be (4)
-    mutableMetricsMap(s"${pConfig.jobName}.ALL.${pConfig.eventFailedMetricsCount}") should be (2)
-    mutableMetricsMap(s"${pConfig.jobName}.ALL.${pConfig.duplicationTotalMetricsCount}") should be (3)
+    mutableMetricsMap(s"${pConfig.jobName}.ALL.${pConfig.eventFailedMetricsCount}") should be (1)
+    mutableMetricsMap(s"${pConfig.jobName}.dX.${pConfig.eventFailedMetricsCount}") should be (1)
 
     mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.validationFailureMetricsCount}") should be (1)
     mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.duplicationProcessedEventMetricsCount}") should be (1)
     mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.duplicationEventMetricsCount}") should be (1)
     mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.validationSuccessMetricsCount}") should be (2)
+    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.validationTotalMetricsCount}") should be (3)
+    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.duplicationTotalMetricsCount}") should be (2)
 
     mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.duplicationSkippedEventMetricsCount}") should be (1)
     mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.validationSkipMetricsCount}") should be (1)
     mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.eventFailedMetricsCount}") should be (1)
+    mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.validationTotalMetricsCount}") should be(1)
+    mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.duplicationTotalMetricsCount}") should be(1)
 
   }
-
 
 }

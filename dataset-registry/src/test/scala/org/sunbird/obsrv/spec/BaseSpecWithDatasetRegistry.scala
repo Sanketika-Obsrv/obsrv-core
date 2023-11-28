@@ -4,6 +4,8 @@ import com.typesafe.config.{Config, ConfigFactory}
 import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 import org.sunbird.spec.BaseSpecWithPostgres
 
+import scala.collection.mutable
+
 class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
 
 
@@ -42,6 +44,17 @@ class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
     postgresConnect.execute("insert into dataset_transformations values('tf1', 'd1', 'dealer.email', '{\"type\":\"mask\",\"expr\":\"dealer.email\"}', 'active', 'System', 'System', now(), now());")
     postgresConnect.execute("insert into dataset_transformations values('tf2', 'd1', 'dealer.maskedPhone', '{\"type\":\"mask\",\"expr\": \"dealer.phone\"}', 'active', 'System', 'System', now(), now());")
     postgresConnect.execute("insert into datasets(id, type, data_schema, router_config, dataset_config, status, created_by, updated_by, created_date, updated_date) values ('d2', 'dataset', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"topic\":\"d1-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'System', 'System', now(), now());")
+  }
+
+  def getPrintableMetrics(metricsMap: mutable.Map[String, Long]): Map[String, Map[String, Map[String, Long]]] = {
+    metricsMap.map(f => {
+      val keys = f._1.split('.')
+      val metricValue = f._2
+      val jobId = keys.apply(0)
+      val datasetId = keys.apply(1)
+      val metric = keys.apply(2)
+      (jobId, datasetId, metric, metricValue)
+    }).groupBy(f => f._1).mapValues(f => f.map(p => (p._2, p._3, p._4))).mapValues(f => f.groupBy(p => p._1).mapValues(q => q.map(r => (r._2, r._3)).toMap))
   }
 
 }

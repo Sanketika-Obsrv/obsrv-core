@@ -31,16 +31,16 @@ class PipelinePreprocessorConfig(override val config: Config) extends BaseJobCon
   val duplicateEventsOutputTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]]("duplicate-events")
 
   // Validation job metrics
-  val validationTotalMetricsCount = "validation-total-event-count"
-  val validationSuccessMetricsCount = "validation-success-event-count"
-  val validationFailureMetricsCount = "validation-failed-event-count"
-  val validationSkipMetricsCount = "validation-skipped-event-count"
-  val eventIgnoredMetricsCount = "ignored-event-count"
+  val validationTotalMetricsCount = "validator-total-count"
+  val validationSuccessMetricsCount = "validator-success-count"
+  val validationFailureMetricsCount = "validator-failed-count"
+  val validationSkipMetricsCount = "validator-skipped-count"
+  val eventIgnoredMetricsCount = "validator-ignored-count"
 
-  val duplicationTotalMetricsCount = "duplicate-total-count"
-  val duplicationEventMetricsCount = "duplicate-event-count"
-  val duplicationSkippedEventMetricsCount = "duplicate-skipped-event-count"
-  val duplicationProcessedEventMetricsCount = "duplicate-processed-event-count"
+  val duplicationTotalMetricsCount = "dedup-total-count"
+  val duplicationEventMetricsCount = "dedup-failed-count"
+  val duplicationSkippedEventMetricsCount = "dedup-skipped-count"
+  val duplicationProcessedEventMetricsCount = "dedup-success-count"
 
   // Consumers
   val validationConsumer = "validation-consumer"

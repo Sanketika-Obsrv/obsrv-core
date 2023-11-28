@@ -38,7 +38,7 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
                               context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
                               metrics: Metrics): Unit = {
 
-    metrics.incCounter(config.defaultDatasetID, config.duplicationTotalMetricsCount)
+    metrics.incCounter(dataset.id, config.duplicationTotalMetricsCount)
     val dedupConfig = dataset.dedupConfig
     if (dedupConfig.isDefined && dedupConfig.get.dropDuplicates.get) {
       val event = msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]]

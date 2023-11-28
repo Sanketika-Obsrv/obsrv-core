@@ -48,18 +48,20 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
       return
     }
     val eventAsText = JSONUtil.serialize(batchEvent)
-    val datasetId = batchEvent.get(config.CONST_DATASET)
-    if (datasetId.isEmpty) {
+    val datasetIdOpt = batchEvent.get(config.CONST_DATASET)
+    if (datasetIdOpt.isEmpty) {
       context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_ID, ""))
       metrics.incCounter(config.defaultDatasetID, config.failedExtractionCount)
       context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), ErrorConstants.MISSING_DATASET_ID, FunctionalError.MissingDatasetId))
       return
     }
-    val datasetOpt = DatasetRegistry.getDataset(datasetId.get.asInstanceOf[String])
+    val datasetId = datasetIdOpt.get.asInstanceOf[String]
+    metrics.incCounter(datasetId, config.totalEventCount)
+    val datasetOpt = DatasetRegistry.getDataset(datasetId)
     if (datasetOpt.isEmpty) {
       context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_CONFIGURATION, ""))
-      metrics.incCounter(config.defaultDatasetID, config.failedExtractionCount)
-      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), ErrorConstants.MISSING_DATASET_CONFIGURATION, FunctionalError.MissingDatasetId))
+      metrics.incCounter(datasetId, config.failedExtractionCount)
+      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(datasetId), ErrorConstants.MISSING_DATASET_CONFIGURATION, FunctionalError.MissingDatasetId))
       return
     }
     val dataset = datasetOpt.get

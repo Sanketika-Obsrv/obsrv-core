@@ -18,7 +18,7 @@ object JSONUtil {
     .enable(Feature.WRITE_BIGDECIMAL_AS_PLAIN)
     .build() :: ClassTagExtensions
 
-  mapper.setSerializationInclusion(Include.NON_NULL)
+  mapper.setSerializationInclusion(Include.NON_ABSENT)
 
   @throws(classOf[Exception])
   def serialize(obj: Any): String = {

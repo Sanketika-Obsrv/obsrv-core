@@ -46,7 +46,7 @@ class EventValidationFunction(config: PipelinePreprocessorConfig, @transient var
                               ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
                               metrics: Metrics): Unit = {
 
-    metrics.incCounter(config.defaultDatasetID, config.validationTotalMetricsCount)
+    metrics.incCounter(dataset.id, config.validationTotalMetricsCount)
     if (dataset.status != DatasetStatus.Live) {
       metrics.incCounter(dataset.id, config.eventIgnoredMetricsCount)
       return

@@ -43,9 +43,6 @@ class ExtractorStreamTask(config: ExtractorConfig, kafkaConnector: FlinkKafkaCon
     extractorStream.getSideOutput(config.duplicateEventOutputTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaDuplicateTopic))
       .name(config.extractorDuplicateProducer).uid(config.extractorDuplicateProducer).setParallelism(config.downstreamOperatorsParallelism)
 
-    extractorStream.getSideOutput(config.systemEventsOutputTag).sinkTo(kafkaConnector.kafkaSink[String](config.kafkaSystemTopic))
-      .name(config.systemEventsProducer).uid(config.systemEventsProducer).setParallelism(config.downstreamOperatorsParallelism)
-
     addDefaultSinks(extractorStream, config, kafkaConnector)
     extractorStream.getSideOutput(config.successTag())
   }

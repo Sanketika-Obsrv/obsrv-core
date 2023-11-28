@@ -6,7 +6,7 @@ import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.slf4j.LoggerFactory
-import org.sunbird.obsrv.core.model.{ErrorConstants, Producer}
+import org.sunbird.obsrv.core.model.{ErrorConstants, FunctionalError, Producer}
 import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.core.streaming.Metrics
 import org.sunbird.obsrv.core.util.JSONUtil
@@ -54,8 +54,7 @@ class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends Bas
       val json = parse(JSONUtil.serialize(msg(config.CONST_EVENT)), useBigIntForLong = false)
       val key = json.customExtract[String](dataset.datasetConfig.key)
       if (key == null) {
-        metrics.incCounter(dataset.id, config.eventFailedMetricsCount)
-        context.output(config.failedEventsOutputTag(), markEventFailed(dataset.id, msg, ErrorConstants.MISSING_DATASET_CONFIG_KEY, msg(config.CONST_OBSRV_META).asInstanceOf[Map[String, AnyRef]]))
+        markFailure(None, msg, context, metrics, ErrorConstants.MISSING_DATASET_CONFIG_KEY, Producer.masterdataprocessor, FunctionalError.MissingMasterDatasetKey)
       }
       (key, json)
     }).toMap
@@ -67,7 +66,7 @@ class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends Bas
 
     elements.foreach(event => {
       event.remove(config.CONST_EVENT)
-      context.output(config.successTag(), markComplete(event, dataset.dataVersion))
+      markCompletion(dataset, super.markComplete(event, dataset.dataVersion), context)
     })
   }
 

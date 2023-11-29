@@ -30,12 +30,12 @@ class ExtractorConfig(override val config: Config) extends BaseJobConfig[mutable
   private val DUPLICATE_EVENTS_OUTPUT_TAG = "duplicate-batch-events"
 
   // Metric List
-  val totalEventCount = "total-event-count"
-  val successEventCount = "success-event-count"
-  val failedExtractionCount = "failed-extraction-count"
-  val successExtractionCount = "success-extraction-count"
-  val duplicateExtractionCount = "duplicate-extraction-count"
-  val skippedExtractionCount = "skipped-extraction-count"
+  val totalEventCount = "extractor-total-count"
+  val successEventCount = "extractor-event-count"
+  val failedExtractionCount = "extractor-failed-count"
+  val successExtractionCount = "extractor-success-count"
+  val duplicateExtractionCount = "extractor-duplicate-count"
+  val skippedExtractionCount = "extractor-skipped-count"
 
   val rawEventsOutputTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]](RAW_EVENTS_OUTPUT_TAG)
   val failedBatchEventOutputTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]](FAILED_BATCH_EVENTS_OUTPUT_TAG)

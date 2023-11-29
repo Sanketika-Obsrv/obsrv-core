@@ -109,14 +109,14 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
     Console.println("### MergedPipelineStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
 
-    mutableMetricsMap("ExtractorJob.d1.total-event-count") should be(4)
-    mutableMetricsMap("ExtractorJob.d1.duplicate-extraction-count") should be(1)
-    mutableMetricsMap("ExtractorJob.d1.success-event-count") should be(1)
-    mutableMetricsMap("ExtractorJob.d1.success-extraction-count") should be(1)
-    mutableMetricsMap("ExtractorJob.d1.failed-extraction-count") should be(2)
-    mutableMetricsMap("ExtractorJob.d2.total-event-count") should be(2)
+    mutableMetricsMap("ExtractorJob.d1.extractor-total-count") should be(4)
+    mutableMetricsMap("ExtractorJob.d1.extractor-duplicate-count") should be(1)
+    mutableMetricsMap("ExtractorJob.d1.extractor-event-count") should be(1)
+    mutableMetricsMap("ExtractorJob.d1.extractor-success-count") should be(1)
+    mutableMetricsMap("ExtractorJob.d1.extractor-failed-count") should be(2)
+    mutableMetricsMap("ExtractorJob.d2.extractor-total-count") should be(2)
     mutableMetricsMap("ExtractorJob.d2.failed-event-count") should be(1)
-    mutableMetricsMap("ExtractorJob.d2.skipped-extraction-count") should be(1)
+    mutableMetricsMap("ExtractorJob.d2.extractor-skipped-count") should be(1)
 
     mutableMetricsMap("PipelinePreprocessorJob.d1.validator-total-count") should be(1)
     mutableMetricsMap("PipelinePreprocessorJob.d1.validator-success-count") should be(1)
@@ -132,9 +132,9 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     mutableMetricsMap("DenormalizerJob.d2.denorm-total") should be(1)
     mutableMetricsMap("DenormalizerJob.d2.denorm-skipped") should be(1)
 
-    mutableMetricsMap("TransformerJob.d1.total-event-count") should be(1)
+    mutableMetricsMap("TransformerJob.d1.transform-total-count") should be(1)
     mutableMetricsMap("TransformerJob.d1.transform-success-count") should be(1)
-    mutableMetricsMap("TransformerJob.d2.total-event-count") should be(1)
+    mutableMetricsMap("TransformerJob.d2.transform-total-count") should be(1)
     mutableMetricsMap("TransformerJob.d2.transform-skipped-count") should be(1)
 
     mutableMetricsMap("DruidRouterJob.d1.router-total-count") should be(1)
@@ -142,8 +142,6 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     mutableMetricsMap("DruidRouterJob.d2.router-total-count") should be(1)
     mutableMetricsMap("DruidRouterJob.d2.router-success-count") should be(1)
 
-    
   }
-
 
 }

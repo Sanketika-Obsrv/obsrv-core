@@ -15,7 +15,7 @@ class TransformerConfig(override val config: Config) extends BaseJobConfig[mutab
   implicit val mapTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeExtractor.getForClass(classOf[mutable.Map[String, AnyRef]])
 
   // Metric List
-  val totalEventCount = "total-event-count"
+  val totalEventCount = "transform-total-count"
   val transformSuccessCount = "transform-success-count"
   val transformFailedCount = "transform-failed-count"
   val transformSkippedCount = "transform-skipped-count"

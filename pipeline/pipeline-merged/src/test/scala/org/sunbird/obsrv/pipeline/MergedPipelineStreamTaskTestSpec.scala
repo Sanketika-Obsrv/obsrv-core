@@ -90,29 +90,58 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
       env.execute(mergedPipelineConfig.jobName)
     }
 
-//    val input = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.raw.topic"), 1, timeout = 30.seconds)
-//    input.foreach(Console.println("Input Event:", _))
-
     try {
-      val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.system.event.topic"), 1, timeout = 30.seconds)
-      systemEvents.foreach(Console.println("System Event:", _))
+      val d1Events = EmbeddedKafka.consumeNumberMessagesFrom[String]("d1-events", 1, timeout = 30.seconds)
+      d1Events.size should be (1)
+      val d2Events = EmbeddedKafka.consumeNumberMessagesFrom[String]("d2-events", 1, timeout = 30.seconds)
+      d2Events.size should be (1)
     } catch {
       case ex: Exception => ex.printStackTrace()
     }
     try {
-      val failed = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.failed.topic"), 1, timeout = 30.seconds)
-      failed.foreach(Console.println("Failed Event:", _))
+      val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.system.event.topic"), 7, timeout = 30.seconds)
+      systemEvents.size should be(7)
     } catch {
       case ex: Exception => ex.printStackTrace()
     }
-
 
     val mutableMetricsMap = mutable.Map[String, Long]();
     BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
     Console.println("### MergedPipelineStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
 
-    //TODO: Add assertions
-    mergedPipelineConfig.successTag().getId should be ("processing_stats")
+    mutableMetricsMap("ExtractorJob.d1.total-event-count") should be(4)
+    mutableMetricsMap("ExtractorJob.d1.duplicate-extraction-count") should be(1)
+    mutableMetricsMap("ExtractorJob.d1.success-event-count") should be(1)
+    mutableMetricsMap("ExtractorJob.d1.success-extraction-count") should be(1)
+    mutableMetricsMap("ExtractorJob.d1.failed-extraction-count") should be(2)
+    mutableMetricsMap("ExtractorJob.d2.total-event-count") should be(2)
+    mutableMetricsMap("ExtractorJob.d2.failed-event-count") should be(1)
+    mutableMetricsMap("ExtractorJob.d2.skipped-extraction-count") should be(1)
+
+    mutableMetricsMap("PipelinePreprocessorJob.d1.validator-total-count") should be(1)
+    mutableMetricsMap("PipelinePreprocessorJob.d1.validator-success-count") should be(1)
+    mutableMetricsMap("PipelinePreprocessorJob.d1.dedup-total-count") should be(1)
+    mutableMetricsMap("PipelinePreprocessorJob.d1.dedup-success-count") should be(1)
+    mutableMetricsMap("PipelinePreprocessorJob.d2.validator-total-count") should be(1)
+    mutableMetricsMap("PipelinePreprocessorJob.d2.validator-skipped-count") should be(1)
+    mutableMetricsMap("PipelinePreprocessorJob.d2.dedup-total-count") should be(1)
+    mutableMetricsMap("PipelinePreprocessorJob.d2.dedup-skipped-count") should be(1)
+
+    mutableMetricsMap("DenormalizerJob.d1.denorm-total") should be(1)
+    mutableMetricsMap("DenormalizerJob.d1.denorm-failed") should be(1)
+    mutableMetricsMap("DenormalizerJob.d2.denorm-total") should be(1)
+    mutableMetricsMap("DenormalizerJob.d2.denorm-skipped") should be(1)
+
+    mutableMetricsMap("TransformerJob.d1.total-event-count") should be(1)
+    mutableMetricsMap("TransformerJob.d1.transform-success-count") should be(1)
+    mutableMetricsMap("TransformerJob.d2.total-event-count") should be(1)
+    mutableMetricsMap("TransformerJob.d2.transform-skipped-count") should be(1)
+
+    mutableMetricsMap("DruidRouterJob.d1.router-total-count") should be(1)
+    mutableMetricsMap("DruidRouterJob.d1.router-success-count") should be(1)
+    mutableMetricsMap("DruidRouterJob.d2.router-total-count") should be(1)
+    mutableMetricsMap("DruidRouterJob.d2.router-success-count") should be(1)
+
     
   }
 

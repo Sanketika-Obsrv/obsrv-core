@@ -24,15 +24,12 @@ class DenormalizerConfig(override val config: Config) extends BaseJobConfig[muta
   val windowCount: Int = config.getInt("task.window.count")
 
   val DENORM_EVENTS_PRODUCER = "denorm-events-producer"
-  val DENORM_FAILED_STATS_PRODUCER = "denorm-failed-stats-producer"
 
   private val DENORM_EVENTS = "denorm_events"
-  private val FAILED_STATS = "failed_stats"
 
   val denormEventsTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]](DENORM_EVENTS)
-  val denormFailedStatsTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]](FAILED_STATS)
 
-  val eventsSkipped = "events-skipped"
+  val eventsSkipped = "denorm-skipped"
   val denormFailed = "denorm-failed"
   val denormPartialSuccess = "denorm-partial-success"
   val denormSuccess = "denorm-success"

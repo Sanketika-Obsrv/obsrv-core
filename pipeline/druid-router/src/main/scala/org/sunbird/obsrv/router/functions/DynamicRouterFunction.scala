@@ -48,7 +48,6 @@ class DynamicRouterFunction(config: DruidRouterConfig) extends BaseDatasetProces
       val topicEventMap = mutable.Map(Constants.TOPIC -> routerConfig.topic, Constants.MESSAGE -> event)
       ctx.output(config.routerOutputTag, topicEventMap)
       metrics.incCounter(dataset.id, config.routerSuccessCount)
-      msg.remove(config.CONST_EVENT)
       markCompletion(dataset, super.markComplete(event, dataset.dataVersion), ctx)
     } else {
       markFailure(Some(dataset.id), event, ctx, metrics, ErrorConstants.INDEX_KEY_MISSING_OR_BLANK, Producer.router, FunctionalError.MissingTimestampKey)

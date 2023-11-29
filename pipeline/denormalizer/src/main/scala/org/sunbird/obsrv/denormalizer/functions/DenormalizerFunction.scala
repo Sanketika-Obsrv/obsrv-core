@@ -52,7 +52,6 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
       status match {
         case StatusCode.success => metrics.incCounter(dataset.id, config.denormSuccess)
         case _ =>
-          metrics.incCounter(dataset.id, config.denormFailed)
           metrics.incCounter(dataset.id, if (status == StatusCode.partial) config.denormPartialSuccess else config.denormFailed)
           generateSystemEvent(dataset.id, denormEvent, context)
           logData(dataset.id, denormEvent)

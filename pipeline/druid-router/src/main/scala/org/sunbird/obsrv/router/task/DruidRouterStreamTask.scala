@@ -19,19 +19,18 @@ import scala.collection.mutable
 /**
  * Druid Router stream task routes every event into its respective topic configured at dataset level
  */
+// $COVERAGE-OFF$ Disabling scoverage as this stream task is deprecated
 @Deprecated
 class DruidRouterStreamTask(config: DruidRouterConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTask[mutable.Map[String, AnyRef]] {
 
   private val serialVersionUID = 146697324640926024L
 
-  // $COVERAGE-OFF$ Disabling scoverage as the below code can only be invoked within flink cluster
   def process(): Unit = {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
     val dataStream = getMapDataStream(env, config, kafkaConnector)
     processStream(dataStream)
     env.execute(config.jobName)
   }
-  // $COVERAGE-ON$
 
   override def processStream(dataStream: DataStream[mutable.Map[String, AnyRef]]): DataStream[mutable.Map[String, AnyRef]] = {
 
@@ -55,7 +54,7 @@ class DruidRouterStreamTask(config: DruidRouterConfig, kafkaConnector: FlinkKafk
 
   }
 }
-
+// $COVERAGE-ON$
 // $COVERAGE-OFF$ Disabling scoverage as the below code can only be invoked within flink cluster
 @Deprecated
 object DruidRouterStreamTask {

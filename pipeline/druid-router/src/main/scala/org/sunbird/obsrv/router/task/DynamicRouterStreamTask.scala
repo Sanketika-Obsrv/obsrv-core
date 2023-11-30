@@ -30,6 +30,11 @@ class DynamicRouterStreamTask(config: DruidRouterConfig, kafkaConnector: FlinkKa
   }
   // $COVERAGE-ON$
 
+  def process(env: StreamExecutionEnvironment): Unit = {
+    val dataStream = getMapDataStream(env, config, kafkaConnector)
+    processStream(dataStream)
+  }
+
   override def processStream(dataStream: DataStream[mutable.Map[String, AnyRef]]): DataStream[mutable.Map[String, AnyRef]] = {
 
     implicit val mapTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeExtractor.getForClass(classOf[mutable.Map[String, AnyRef]])

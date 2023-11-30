@@ -37,16 +37,16 @@ trait SystemEventHandler {
   }
 
   def getError(error: ErrorConstants.Error, producer: Producer, functionalError: FunctionalError): Option[ErrorLog] = {
-    Some(ErrorLog(pdata_id = producer, pdata_status = StatusCode.failed, error_type = functionalError, error_code = error.errorCode, error_message = error.errorMsg, error_level = ErrorLevel.critical))
+    Some(ErrorLog(pdata_id = producer, pdata_status = StatusCode.failed, error_type = functionalError, error_code = error.errorCode, error_message = error.errorMsg, error_level = ErrorLevel.critical, error_count = Some(1)))
   }
 
-  def generateSystemEvent(dataset: Option[String], event: mutable.Map[String, AnyRef], config: BaseJobConfig[_], error: Option[ErrorLog] = None): String = {
+  def generateSystemEvent(dataset: Option[String], event: mutable.Map[String, AnyRef], config: BaseJobConfig[_], producer: Producer, error: Option[ErrorLog] = None): String = {
     val obsrvMeta = event("obsrv_meta").asInstanceOf[Map[String, AnyRef]]
     val flags = obsrvMeta("flags").asInstanceOf[Map[String, AnyRef]]
     val timespans = obsrvMeta("timespans").asInstanceOf[Map[String, AnyRef]]
 
     JSONUtil.serialize(SystemEvent(
-      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = dataset),
+      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(producer)), dataset = dataset),
       data = EData(error = error, pipeline_stats = Some(PipelineStats(extractor_events = None,
         extractor_status = getStatus(flags, Producer.extractor), extractor_time = getTime(timespans, Producer.extractor),
         validator_status = getStatus(flags, Producer.validator), validator_time = getTime(timespans, Producer.validator),
@@ -98,12 +98,12 @@ abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[Stri
     metrics.incCounter(getDatasetId(dataset, config), config.eventFailedMetricsCount)
     ctx.output(config.failedEventsOutputTag(), super.markFailed(event, error, producer))
     val errorLog = getError(error, producer, functionalError)
-    val systemEvent = generateSystemEvent(Some(getDatasetId(dataset, config)), event, config, errorLog)
+    val systemEvent = generateSystemEvent(Some(getDatasetId(dataset, config)), event, config, producer, errorLog)
     ctx.output(config.systemEventsOutputTag, systemEvent)
   }
 
-  def markCompletion(dataset: Dataset, event: mutable.Map[String, AnyRef], ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
-    ctx.output(config.systemEventsOutputTag, generateSystemEvent(Some(dataset.id), super.markComplete(event, dataset.dataVersion), config))
+  def markCompletion(dataset: Dataset, event: mutable.Map[String, AnyRef], ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, producer: Producer): Unit = {
+    ctx.output(config.systemEventsOutputTag, generateSystemEvent(Some(dataset.id), super.markComplete(event, dataset.dataVersion), config, producer))
   }
 
   def processElement(dataset: Dataset, event: mutable.Map[String, AnyRef],context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit
@@ -168,12 +168,12 @@ abstract class BaseDatasetWindowProcessFunction(config: BaseJobConfig[mutable.Ma
     metrics.incCounter(getDatasetId(dataset, config), config.eventFailedMetricsCount)
     ctx.output(config.failedEventsOutputTag(), super.markFailed(event, error, producer))
     val errorLog = getError(error, producer, functionalError)
-    val systemEvent = generateSystemEvent(Some(getDatasetId(dataset, config)), event, config, errorLog)
+    val systemEvent = generateSystemEvent(Some(getDatasetId(dataset, config)), event, config, producer, errorLog)
     ctx.output(config.systemEventsOutputTag, systemEvent)
   }
 
-  def markCompletion(dataset: Dataset, event: mutable.Map[String, AnyRef], ctx: ProcessWindowFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], String, TimeWindow]#Context): Unit = {
-    ctx.output(config.systemEventsOutputTag, generateSystemEvent(Some(dataset.id), super.markComplete(event, dataset.dataVersion), config))
+  def markCompletion(dataset: Dataset, event: mutable.Map[String, AnyRef], ctx: ProcessWindowFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], String, TimeWindow]#Context, producer: Producer): Unit = {
+    ctx.output(config.systemEventsOutputTag, generateSystemEvent(Some(dataset.id), super.markComplete(event, dataset.dataVersion), config, producer))
   }
 
   def processWindow(dataset: Dataset, context: ProcessWindowFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], String, TimeWindow]#Context, elements: List[mutable.Map[String, AnyRef]], metrics: Metrics): Unit

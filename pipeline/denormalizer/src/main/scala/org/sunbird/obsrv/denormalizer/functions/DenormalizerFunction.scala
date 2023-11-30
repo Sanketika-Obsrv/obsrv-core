@@ -3,14 +3,14 @@ package org.sunbird.obsrv.denormalizer.functions
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.slf4j.LoggerFactory
-import org.sunbird.obsrv.core.model.Models.{ContextData, EData, ErrorLog, PData, SystemEvent}
+import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
-import org.sunbird.obsrv.core.model.{ErrorConstants, ErrorLevel, EventID, FunctionalError, ModuleID, PDataType, Producer, StatusCode}
+import org.sunbird.obsrv.core.model._
 import org.sunbird.obsrv.core.streaming.Metrics
 import org.sunbird.obsrv.core.util.{JSONUtil, Util}
 import org.sunbird.obsrv.denormalizer.task.DenormalizerConfig
-import org.sunbird.obsrv.denormalizer.util.{DenormCache, DenormEvent, DenormFieldStatus}
+import org.sunbird.obsrv.denormalizer.util.{DenormCache, DenormEvent}
 import org.sunbird.obsrv.model.DatasetModels.Dataset
 import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.streaming.BaseDatasetProcessFunction
@@ -24,7 +24,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
   private[this] var denormCache: DenormCache = _
 
   override def getMetrics(): List[String] = {
-    List(config.denormSuccess, config.denormTotal, config.denormFailed, config.eventsSkipped)
+    List(config.denormSuccess, config.denormTotal, config.denormFailed, config.eventsSkipped, config.denormPartialSuccess)
   }
 
   override def open(parameters: Configuration): Unit = {
@@ -45,7 +45,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
     metrics.incCounter(dataset.id, config.denormTotal)
     denormCache.open(dataset)
     if (dataset.denormConfig.isDefined) {
-      val event = DenormEvent(msg, None, None)
+      val event = DenormEvent(msg)
       val denormEvent = denormCache.denormEvent(dataset.id, event, dataset.denormConfig.get.denormFields)
       val status = getDenormStatus(denormEvent)
       context.output(config.denormEventsTag, markStatus(denormEvent.msg, Producer.denorm, status))
@@ -67,31 +67,27 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
   }
 
   private def generateSystemEvent(datasetId: String, denormEvent: DenormEvent, context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
-    if (denormEvent.fieldStatus.isDefined) {
-      denormEvent.fieldStatus.get.filter(f => !f._2.success).groupBy(f => f._2.error.get).map(f => (f._1, f._2.size))
-        .foreach(_ => (err: ErrorConstants.Error, count: Int) => {
-          val functionalError = err match {
-            case ErrorConstants.DENORM_KEY_MISSING => FunctionalError.DenormKeyMissing
-            case ErrorConstants.DENORM_KEY_NOT_A_STRING_OR_NUMBER => FunctionalError.DenormKeyInvalid
-            case ErrorConstants.DENORM_DATA_NOT_FOUND => FunctionalError.DenormDataNotFound
-          }
-          context.output(config.systemEventsOutputTag, JSONUtil.serialize(SystemEvent(
-            EventID.METRIC,
-            ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(datasetId)),
-            data = EData(error = Some(ErrorLog(pdata_id = Producer.denorm, pdata_status = StatusCode.failed, error_type = functionalError, error_code = err.errorCode, error_message = err.errorMsg, error_level = ErrorLevel.critical, error_count = Some(count))))
-          )))
-        })
-    }
+
+    denormEvent.fieldStatus.filter(f => !f._2.success).groupBy(f => f._2.error.get).map(f => (f._1, f._2.size))
+      .foreach(f => {
+        val functionalError = f._1 match {
+          case ErrorConstants.DENORM_KEY_MISSING => FunctionalError.DenormKeyMissing
+          case ErrorConstants.DENORM_KEY_NOT_A_STRING_OR_NUMBER => FunctionalError.DenormKeyInvalid
+          case ErrorConstants.DENORM_DATA_NOT_FOUND => FunctionalError.DenormDataNotFound
+        }
+        context.output(config.systemEventsOutputTag, JSONUtil.serialize(SystemEvent(
+          EventID.METRIC,
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(datasetId)),
+          data = EData(error = Some(ErrorLog(pdata_id = Producer.denorm, pdata_status = StatusCode.failed, error_type = functionalError, error_code = f._1.errorCode, error_message = f._1.errorMsg, error_level = ErrorLevel.critical, error_count = Some(f._2))))
+        )))
+      })
   }
 
   private def getDenormStatus(denormEvent: DenormEvent): StatusCode = {
-    if (denormEvent.fieldStatus.isDefined) {
-      val totalFieldsCount = denormEvent.fieldStatus.get.size
-      val successCount = denormEvent.fieldStatus.get.values.count(f => f.success)
-      if (totalFieldsCount == successCount) StatusCode.success else if (successCount > 0) StatusCode.partial else StatusCode.failed
-    } else {
-      StatusCode.failed
-    }
+    val totalFieldsCount = denormEvent.fieldStatus.size
+    val successCount = denormEvent.fieldStatus.values.count(f => f.success)
+    if (totalFieldsCount == successCount) StatusCode.success else if (successCount > 0) StatusCode.partial else StatusCode.failed
+
   }
 
   private def markStatus(event: mutable.Map[String, AnyRef], producer: Producer, status: StatusCode): mutable.Map[String, AnyRef] = {

@@ -1,6 +1,5 @@
 package org.sunbird.obsrv.denormalizer.util
 
-import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.model.ErrorConstants.Error
@@ -13,11 +12,10 @@ import scala.collection.mutable
 
 case class DenormFieldStatus(fieldValue: String, var success: Boolean, var error: Option[Error])
 
-case class DenormEvent(msg: mutable.Map[String, AnyRef], var responses: Option[mutable.Map[String, Response[String]]], var fieldStatus: Option[mutable.Map[String, DenormFieldStatus]])
+case class DenormEvent(msg: mutable.Map[String, AnyRef], var responses: Option[mutable.Map[String, Response[String]]] = None, var fieldStatus: mutable.Map[String, DenormFieldStatus] = mutable.Map[String, DenormFieldStatus]())
 
 class DenormCache(val config: DenormalizerConfig) {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[DenormCache])
   private val datasetPipelineMap: mutable.Map[String, Pipeline] = mutable.Map[String, Pipeline]()
 
   def close(): Unit = {
@@ -57,7 +55,7 @@ class DenormCache(val config: DenormalizerConfig) {
         responses.put(fieldConfig.denormOutField, getFromCache(pipeline, denormFieldStatus.fieldValue, fieldConfig))
       }
     })
-    denormEvent.fieldStatus = Some(fieldStatus)
+    denormEvent.fieldStatus = fieldStatus
     denormEvent.responses = Some(responses)
   }
 
@@ -101,18 +99,16 @@ class DenormCache(val config: DenormalizerConfig) {
 
   private def updateEvent(denormEvent: DenormEvent): DenormEvent = {
 
-    if (denormEvent.responses.isDefined) {
-      val event = Util.getMutableMap(denormEvent.msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]])
-      denormEvent.responses.get.map(f => {
-        if (f._2.get() != null) {
-          denormEvent.fieldStatus.get(f._1).success = true
-          event.put(f._1, JSONUtil.deserialize[Map[String, AnyRef]](f._2.get()))
-        } else {
-          denormEvent.fieldStatus.get(f._1).error = Some(ErrorConstants.DENORM_DATA_NOT_FOUND)
-        }
-      })
-      denormEvent.msg.put(config.CONST_EVENT, event.toMap)
-    }
+    val event = Util.getMutableMap(denormEvent.msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]])
+    denormEvent.responses.get.foreach(f => {
+      if (f._2.get() != null) {
+        denormEvent.fieldStatus(f._1).success = true
+        event.put(f._1, JSONUtil.deserialize[Map[String, AnyRef]](f._2.get()))
+      } else {
+        denormEvent.fieldStatus(f._1).error = Some(ErrorConstants.DENORM_DATA_NOT_FOUND)
+      }
+    })
+    denormEvent.msg.put(config.CONST_EVENT, event.toMap)
     denormEvent
   }
 

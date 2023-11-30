@@ -28,6 +28,11 @@ class DenormalizerStreamTask(config: DenormalizerConfig, kafkaConnector: FlinkKa
   }
   // $COVERAGE-ON$
 
+  def process(env: StreamExecutionEnvironment): Unit = {
+    val dataStream = getMapDataStream(env, config, kafkaConnector)
+    processStream(dataStream)
+  }
+
   override def processStream(dataStream: DataStream[mutable.Map[String, AnyRef]]): DataStream[mutable.Map[String, AnyRef]] = {
     val denormStream = dataStream
       .process(new DenormalizerFunction(config)).name(config.denormalizationFunction).uid(config.denormalizationFunction)

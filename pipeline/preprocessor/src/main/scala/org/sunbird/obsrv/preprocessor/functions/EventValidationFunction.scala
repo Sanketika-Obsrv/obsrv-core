@@ -17,14 +17,13 @@ import org.sunbird.obsrv.preprocessor.util.{SchemaValidator, ValidationMsg}
 import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.streaming.BaseDatasetProcessFunction
 
-import java.lang
 import scala.collection.mutable
 
-class EventValidationFunction(config: PipelinePreprocessorConfig, @transient var schemaValidator: SchemaValidator = null)
-                             (implicit val eventTypeInfo: TypeInformation[mutable.Map[String, AnyRef]])
+class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val eventTypeInfo: TypeInformation[mutable.Map[String, AnyRef]])
   extends BaseDatasetProcessFunction(config) {
   private[this] val logger = LoggerFactory.getLogger(classOf[EventValidationFunction])
 
+  @transient private var schemaValidator: SchemaValidator = null
   override def getMetrics(): List[String] = {
     List(config.validationTotalMetricsCount, config.validationFailureMetricsCount, config.validationSuccessMetricsCount,
       config.validationSkipMetricsCount, config.eventIgnoredMetricsCount)
@@ -32,10 +31,8 @@ class EventValidationFunction(config: PipelinePreprocessorConfig, @transient var
 
   override def open(parameters: Configuration): Unit = {
     super.open(parameters)
-    if (schemaValidator == null) {
-      schemaValidator = new SchemaValidator(config)
-      schemaValidator.loadDataSchemas(DatasetRegistry.getAllDatasets(config.datasetType()))
-    }
+    schemaValidator = new SchemaValidator(config)
+    schemaValidator.loadDataSchemas(DatasetRegistry.getAllDatasets(config.datasetType()))
   }
 
   override def close(): Unit = {
@@ -64,11 +61,13 @@ class EventValidationFunction(config: PipelinePreprocessorConfig, @transient var
   private def validateEvent(dataset: Dataset, msg: mutable.Map[String, AnyRef],
                             ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
                             metrics: Metrics): Unit = {
-
     val event = msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]]
     if (schemaValidator.schemaFileExists(dataset)) {
       val validationReport = schemaValidator.validate(dataset.id, event)
       onValidationResult(dataset, msg, metrics, ctx, validationReport)
+    } else {
+      metrics.incCounter(dataset.id, config.validationSkipMetricsCount)
+      ctx.output(config.validEventsOutputTag, markSkipped(msg, Producer.validator))
     }
   }
 
@@ -111,28 +110,32 @@ class EventValidationFunction(config: PipelinePreprocessorConfig, @transient var
 
     val reqFailedCount = validationFailureMsgs.count(f => "required".equals(f.keyword))
     val typeFailedCount = validationFailureMsgs.count(f => "type".equals(f.keyword))
-    val unknownFailureCount = validationFailureMsgs.count(f => !("type".equals(f.keyword) && "required".equals(f.keyword) && "additionalProperties".equals(f.keyword)))
+    val addTypeFailedCount = validationFailureMsgs.count(f => "additionalProperties".equals(f.keyword))
+    val unknownFailureCount = validationFailureMsgs.count(f => !List("type","required","additionalProperties").contains(f.keyword))
     if (reqFailedCount > 0) {
       context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.RequiredFieldsMissing, reqFailedCount))
     }
     if (typeFailedCount > 0) {
       context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.DataTypeMismatch, typeFailedCount))
     }
+    if (addTypeFailedCount > 0) {
+      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.AdditionalFieldsFound, typeFailedCount))
+    }
     if (unknownFailureCount > 0) {
       context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.UnknownValidationError, unknownFailureCount))
     }
 
     // Log the validation failure messages
-    validationFailureMsgs.foreach(_ => (msg: ValidationMsg) => {
-      msg.keyword match {
+    validationFailureMsgs.foreach(f => {
+      f.keyword match {
         case "additionalProperties" =>
-          logger.warn(s"SchemaValidator | Additional properties found | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(msg)}")
+          logger.warn(s"SchemaValidator | Additional properties found | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(f)}")
         case "required" =>
-          logger.error(s"SchemaValidator | Required Fields Missing | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(msg)}")
+          logger.error(s"SchemaValidator | Required Fields Missing | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(f)}")
         case "type" =>
-          logger.error(s"SchemaValidator | Data type mismatch found | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(msg)}")
+          logger.error(s"SchemaValidator | Data type mismatch found | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(f)}")
         case _ =>
-          logger.warn(s"SchemaValidator | Unknown Validation errors found | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(msg)}")
+          logger.warn(s"SchemaValidator | Unknown Validation errors found | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(f)}")
       }
     })
   }

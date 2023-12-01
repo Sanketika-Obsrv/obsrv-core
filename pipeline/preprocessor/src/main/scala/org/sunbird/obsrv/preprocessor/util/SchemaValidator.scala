@@ -63,11 +63,7 @@ class SchemaValidator(config: PipelinePreprocessorConfig) extends java.io.Serial
   }
 
   def schemaFileExists(dataset: Dataset): Boolean = {
-
-    if (dataset.jsonSchema.isEmpty) {
-      throw new ObsrvException(ErrorConstants.JSON_SCHEMA_NOT_FOUND)
-    }
-    schemaMap.get(dataset.id).map(f => f._2).orElse(Some(false)).get
+      schemaMap.get(dataset.id).map(f => f._2).orElse(Some(false)).get
   }
 
   @throws[IOException]

@@ -44,7 +44,7 @@ object ErrorLevel extends Enumeration {
 class FunctionalErrorType extends TypeReference[FunctionalError.type]
 object FunctionalError extends Enumeration {
   type FunctionalError = Value
-  val DedupFailed, RequiredFieldsMissing, DataTypeMismatch, UnknownValidationError, MissingDatasetId, MissingEventData, MissingTimestampKey,
+  val DedupFailed, RequiredFieldsMissing, DataTypeMismatch, AdditionalFieldsFound, UnknownValidationError, MissingDatasetId, MissingEventData, MissingTimestampKey,
   EventSizeExceeded, ExtractionDataFormatInvalid, DenormKeyMissing, DenormKeyInvalid, DenormDataNotFound,
   TransformParseError, TransformEvalError, TransformFailedError, MissingMasterDatasetKey = Value
 }

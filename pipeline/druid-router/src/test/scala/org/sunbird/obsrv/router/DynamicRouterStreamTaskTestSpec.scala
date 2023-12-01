@@ -8,13 +8,10 @@ import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
 import org.sunbird.obsrv.BaseMetricsReporter
-import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model._
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, PostgresConnect}
-import org.sunbird.obsrv.model.DatasetModels.{Dataset, DatasetConfig, DenormConfig, DenormFieldConfig, RouterConfig}
-import org.sunbird.obsrv.model.DatasetStatus
 import org.sunbird.obsrv.router.task.{DruidRouterConfig, DynamicRouterStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 

@@ -14,12 +14,7 @@ import scala.collection.mutable
 class FlinkKafkaConnector(config: BaseJobConfig[_]) extends Serializable {
 
   def kafkaStringSource(kafkaTopic: String): KafkaSource[String] = {
-    KafkaSource.builder[String]()
-      .setTopics(kafkaTopic)
-      .setDeserializer(new StringDeserializationSchema)
-      .setProperties(config.kafkaConsumerProperties())
-      .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
-      .build()
+    kafkaStringSource(List(kafkaTopic), config.kafkaConsumerProperties())
   }
 
   def kafkaStringSource(kafkaTopic: List[String], consumerProperties: Properties): KafkaSource[String] = {
@@ -40,19 +35,14 @@ class FlinkKafkaConnector(config: BaseJobConfig[_]) extends Serializable {
   }
 
   def kafkaMapSource(kafkaTopic: String): KafkaSource[mutable.Map[String, AnyRef]] = {
-    KafkaSource.builder[mutable.Map[String, AnyRef]]()
-      .setTopics(kafkaTopic)
-      .setDeserializer(new MapDeserializationSchema)
-      .setProperties(config.kafkaConsumerProperties())
-      .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
-      .build()
+    kafkaMapSource(List(kafkaTopic), config.kafkaConsumerProperties())
   }
 
   def kafkaMapSource(kafkaTopics: List[String], consumerProperties: Properties): KafkaSource[mutable.Map[String, AnyRef]] = {
     KafkaSource.builder[mutable.Map[String, AnyRef]]()
       .setTopics(kafkaTopics.asJava)
       .setDeserializer(new MapDeserializationSchema)
-      .setProperties(consumerProperties)
+      .setProperties(config.kafkaConsumerProperties())
       .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
       .build()
   }

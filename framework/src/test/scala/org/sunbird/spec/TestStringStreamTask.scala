@@ -14,6 +14,7 @@ class TestStringStreamTask(config: BaseProcessTestConfig, kafkaConnector: FlinkK
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
     val dataStream = getStringDataStream(env, config, kafkaConnector)
     processStream(dataStream)
+    val dataStream2 = getStringDataStream(env, config, List(config.inputTopic()), config.kafkaConsumerProperties(), config.inputConsumer(), kafkaConnector)
     env.execute(config.jobName)
   }
 

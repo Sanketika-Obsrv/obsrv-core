@@ -45,11 +45,11 @@ abstract class BaseJobConfig[T](val config: Config, val jobName: String) extends
   val systemEventsProducer = "system-events-sink"
 
   // Checkpointing config
-  val enableCompressedCheckpointing: Boolean = config.getBoolean("job.enable.distributed.checkpointing")
+  val enableCompressedCheckpointing: Boolean = if (config.hasPath("job.enable.distributed.checkpointing")) config.getBoolean("job.enable.distributed.checkpointing") else false
   val checkpointingInterval: Int = config.getInt("task.checkpointing.interval")
   val checkpointingPauseSeconds: Int = config.getInt("task.checkpointing.pause.between.seconds")
-  val enableDistributedCheckpointing: Option[Boolean] = if (config.hasPath("job")) Option(config.getBoolean("job.enable.distributed.checkpointing")) else None
-  val checkpointingBaseUrl: Option[String] = if (config.hasPath("job")) Option(config.getString("job.statebackend.base.url")) else None
+  val enableDistributedCheckpointing: Option[Boolean] = if (config.hasPath("job.enable.distributed.checkpointing")) Option(config.getBoolean("job.enable.distributed.checkpointing")) else None
+  val checkpointingBaseUrl: Option[String] = if (config.hasPath("job.statebackend.base.url")) Option(config.getString("job.statebackend.base.url")) else None
 
   // Base Methods
   def datasetType(): String = if (config.hasPath("dataset.type")) config.getString("dataset.type") else "dataset"

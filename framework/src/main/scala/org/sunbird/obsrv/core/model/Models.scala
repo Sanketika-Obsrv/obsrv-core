@@ -73,7 +73,6 @@ object PDataType extends Enumeration {
   val flink, spark, druid, kafka, api = Value
 }
 
-class StatsType extends TypeReference[Stats.type]
 object Stats extends Enumeration {
   type Stats = Value
   val total_processing_time, latency_time, processing_time = Value

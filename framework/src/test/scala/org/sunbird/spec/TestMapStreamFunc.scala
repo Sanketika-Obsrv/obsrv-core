@@ -4,9 +4,13 @@ import scala.collection.mutable.Map
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.sunbird.obsrv.core.cache.{DedupEngine, RedisConnect}
-import org.sunbird.obsrv.core.model.{ErrorConstants, Producer}
+import org.sunbird.obsrv.core.model.{Constants, ErrorConstants, Producer}
 import org.sunbird.obsrv.core.streaming.{BaseProcessFunction, Metrics, MetricsList}
 import org.sunbird.obsrv.core.util.JSONUtil
+
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import scala.collection.mutable
 
 
 class TestMapStreamFunc(config: BaseProcessTestMapConfig)(implicit val stringTypeInfo: TypeInformation[String])
@@ -23,13 +27,18 @@ class TestMapStreamFunc(config: BaseProcessTestMapConfig)(implicit val stringTyp
     metrics.reset("ALL", config.mapEventCount)
     metrics.incCounter("ALL", config.mapEventCount)
     metrics.getAndReset("ALL", config.mapEventCount)
-    context.output(config.mapOutputTag, event)
+    assert(metrics.hasDataset("ALL"))
+    metrics.initDataset("d2", new ConcurrentHashMap[String, AtomicLong]())
+
+    context.output(config.mapOutputTag, mutable.Map(Constants.TOPIC -> config.kafkaMapOutputTopic, Constants.MESSAGE -> event))
 
     super.markSuccess(event, Producer.extractor)
     super.markFailed(event, ErrorConstants.NO_IMPLEMENTATION_FOUND, Producer.extractor)
     super.markSkipped(event, Producer.extractor)
     super.markComplete(event, None)
+    super.markPartial(event, Producer.extractor)
     assert(super.containsEvent(event))
+    assert(!super.containsEvent(mutable.Map("test" -> "123".asInstanceOf[AnyRef])))
     assert(!super.containsEvent(Map("dataset" -> "d1")))
 
     val eventStr = JSONUtil.serialize(event)

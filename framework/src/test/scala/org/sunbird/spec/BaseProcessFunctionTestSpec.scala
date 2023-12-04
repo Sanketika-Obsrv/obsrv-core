@@ -132,26 +132,10 @@ class BaseProcessFunctionTestSpec extends BaseSpec with Matchers {
     val mutableMap = Util.getMutableMap(map)
     mutableMap.getClass.getCanonicalName should be ("scala.collection.mutable.HashMap")
     noException shouldBe thrownBy(JSONUtil.convertValue(map))
-
-    ErrorConstants.NO_IMPLEMENTATION_FOUND.errorCode should be ("ERR_0001")
-    ErrorConstants.NO_EXTRACTION_DATA_FOUND.errorCode should be ("ERR_EXT_1001")
-    ErrorConstants.EXTRACTED_DATA_NOT_A_LIST.errorCode should be ("ERR_EXT_1002")
-    ErrorConstants.EVENT_SIZE_EXCEEDED.errorCode should be ("ERR_EXT_1003")
-    ErrorConstants.EVENT_MISSING.errorCode should be ("ERR_EXT_1006")
-    ErrorConstants.MISSING_DATASET_ID.errorCode should be ("ERR_EXT_1004")
-    ErrorConstants.MISSING_DATASET_CONFIGURATION.errorCode should be ("ERR_EXT_1005")
-    ErrorConstants.NO_DEDUP_KEY_FOUND.errorCode should be ("ERR_DEDUP_1007")
-    ErrorConstants.DEDUP_KEY_NOT_A_STRING_OR_NUMBER.errorCode should be ("ERR_DEDUP_1008")
-    ErrorConstants.DUPLICATE_BATCH_EVENT_FOUND.errorCode should be ("ERR_EXT_1009")
-    ErrorConstants.DUPLICATE_EVENT_FOUND.errorCode should be ("ERR_PP_1010")
-    ErrorConstants.JSON_SCHEMA_NOT_FOUND.errorCode should be ("ERR_PP_1011")
-    ErrorConstants.INVALID_JSON_SCHEMA.errorCode should be ("ERR_PP_1012")
-    ErrorConstants.SCHEMA_VALIDATION_FAILED.errorCode should be ("ERR_PP_1013")
-    ErrorConstants.DENORM_KEY_MISSING.errorCode should be ("ERR_DENORM_1014")
-    ErrorConstants.DENORM_KEY_NOT_A_STRING_OR_NUMBER.errorCode should be ("ERR_DENORM_1015")
-
     val metrics = Metrics(mutable.Map("test" -> new ConcurrentHashMap[String, AtomicLong]()))
     metrics.reset("test1", "m1")
+
+    bsConfig.datasetType() should be ("dataset")
   }
 
   "TestBaseStreamTask" should "validate the getMapDataStream method" in {

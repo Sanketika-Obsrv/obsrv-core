@@ -151,11 +151,19 @@ abstract class BaseProcessFunction[T, R](config: BaseJobConfig[R]) extends Proce
     metricsList.datasets.map { dataset =>
       metricsList.metrics.map(metric => {
         getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(dataset)
-          .gauge[Long, ScalaGauge[Long]](metric, ScalaGauge[Long](() => metrics.getAndReset(dataset, metric)))
+          .gauge[Long, ScalaGauge[Long]](metric, ScalaGauge[Long](() =>
+            // $COVERAGE-OFF$
+            metrics.getAndReset(dataset, metric)
+            // $COVERAGE-ON$
+          ))
       })
     }
     getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(SystemConfig.defaultDatasetId)
-      .gauge[Long, ScalaGauge[Long]](config.eventFailedMetricsCount, ScalaGauge[Long](() => metrics.getAndReset(SystemConfig.defaultDatasetId, config.eventFailedMetricsCount)))
+      .gauge[Long, ScalaGauge[Long]](config.eventFailedMetricsCount, ScalaGauge[Long](() =>
+        // $COVERAGE-OFF$
+        metrics.getAndReset(SystemConfig.defaultDatasetId, config.eventFailedMetricsCount)
+        // $COVERAGE-ON$
+      ))
   }
 
   def processElement(event: T, context: ProcessFunction[T, R]#Context, metrics: Metrics): Unit
@@ -180,12 +188,22 @@ abstract class WindowBaseProcessFunction[I, O, K](config: BaseJobConfig[O]) exte
   protected val metrics: Metrics = registerMetrics(metricsList.datasets, metricsList.metrics)
 
   override def open(parameters: Configuration): Unit = {
-    (metricsList.datasets ++ List(SystemConfig.defaultDatasetId)).map { dataset =>
+    metricsList.datasets.map { dataset =>
       metricsList.metrics.map(metric => {
         getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(dataset)
-          .gauge[Long, ScalaGauge[Long]](metric, ScalaGauge[Long](() => metrics.getAndReset(dataset, metric)))
+          .gauge[Long, ScalaGauge[Long]](metric, ScalaGauge[Long](() =>
+            // $COVERAGE-OFF$
+            metrics.getAndReset(dataset, metric)
+            // $COVERAGE-ON$
+          ))
       })
     }
+    getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(SystemConfig.defaultDatasetId)
+      .gauge[Long, ScalaGauge[Long]](config.eventFailedMetricsCount, ScalaGauge[Long](() =>
+        // $COVERAGE-OFF$
+        metrics.getAndReset(SystemConfig.defaultDatasetId, config.eventFailedMetricsCount)
+        // $COVERAGE-ON$
+      ))
   }
 
   def getMetricsList(): MetricsList

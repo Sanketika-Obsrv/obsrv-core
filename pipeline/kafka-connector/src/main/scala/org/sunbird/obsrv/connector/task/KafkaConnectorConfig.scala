@@ -1,4 +1,4 @@
-package org.sunbird.obsrv.kafkaconnector.task
+package org.sunbird.obsrv.connector.task
 
 import com.typesafe.config.Config
 import org.apache.flink.api.common.typeinfo.TypeInformation

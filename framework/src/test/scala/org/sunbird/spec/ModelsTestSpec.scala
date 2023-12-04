@@ -109,8 +109,9 @@ class ModelsTestSpec extends FlatSpec with Matchers {
     val dsk = new DatasetKeySelector()
     dsk.getKey(mutable.Map("dataset" -> "d1".asInstanceOf[AnyRef])) should be ("d1")
 
-    JSONUtil.isJSON("""{"test":123}""") should be (true)
-    JSONUtil.isJSON("""{"test":123""") should be (false)
+    JSONUtil.getJsonType("""{"test":123}""") should be ("OBJECT")
+    JSONUtil.getJsonType("""{"test":123""") should be ("NOT_A_JSON")
+    JSONUtil.getJsonType("""123""") should be ("NOT_A_JSON")
 
   }
 

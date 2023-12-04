@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.core.JsonGenerator.Feature
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.json.JsonMapper
+import com.fasterxml.jackson.databind.node.JsonNodeType
 import com.fasterxml.jackson.databind.{DeserializationFeature, JsonNode, SerializationFeature}
 import com.fasterxml.jackson.module.scala.{ClassTagExtensions, DefaultScalaModule}
 
@@ -33,12 +34,16 @@ object JSONUtil {
     mapper.readValue(json, typeReference[T])
   }
 
-  def isJSON(jsonString: String): Boolean = {
+  def getJsonType(jsonString: String): String = {
     try {
-      mapper.readTree(jsonString)
-      true
+      val node = mapper.readTree(jsonString)
+      node.getNodeType match {
+        case JsonNodeType.ARRAY => "ARRAY"
+        case JsonNodeType.OBJECT => "OBJECT"
+        case _ => "NOT_A_JSON"
+      }
     } catch {
-      case _: Exception => false
+      case _: Exception => "NOT_A_JSON"
     }
   }
 

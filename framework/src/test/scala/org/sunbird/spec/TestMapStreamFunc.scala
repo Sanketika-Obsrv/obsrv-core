@@ -5,7 +5,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.sunbird.obsrv.core.cache.{DedupEngine, RedisConnect}
 import org.sunbird.obsrv.core.model.{Constants, ErrorConstants, Producer}
-import org.sunbird.obsrv.core.streaming.{BaseProcessFunction, Metrics, MetricsList}
+import org.sunbird.obsrv.core.streaming.{BaseDeduplication, BaseProcessFunction, Metrics, MetricsList}
 import org.sunbird.obsrv.core.util.JSONUtil
 
 import java.util.concurrent.ConcurrentHashMap
@@ -14,7 +14,7 @@ import scala.collection.mutable
 
 
 class TestMapStreamFunc(config: BaseProcessTestMapConfig)(implicit val stringTypeInfo: TypeInformation[String])
-  extends BaseProcessFunction[Map[String, AnyRef], Map[String, AnyRef]](config) {
+  extends BaseProcessFunction[Map[String, AnyRef], Map[String, AnyRef]](config) with BaseDeduplication {
 
   override def getMetricsList(): MetricsList = {
     MetricsList(List("ALL"), List(config.mapEventCount))
@@ -45,14 +45,14 @@ class TestMapStreamFunc(config: BaseProcessTestMapConfig)(implicit val stringTyp
     val code = JSONUtil.getKey("event.vehicleCode", eventStr).textValue()
     val redisConnection = new RedisConnect(config.redisHost, config.redisPort, config.redisConnectionTimeout)
     implicit val dedupEngine = new DedupEngine(redisConnection, 2, 200)
-    val isDup = super.isDuplicate("D1", Option("event.id"), eventStr, context, config)
+    val isDup = super.isDuplicate("D1", Option("event.id"), eventStr)
     code match {
       case "HYUN-CRE-D6" => assert(!isDup)
       case "HYUN-CRE-D7" => assert(isDup)
     }
 
-    assert(!super.isDuplicate("D1", None, eventStr, context, config))
-    assert(!super.isDuplicate("D1", Option("mid"), eventStr, context, config))
-    assert(!super.isDuplicate("D1", Option("event"), eventStr, context, config))
+    assert(!super.isDuplicate("D1", None, eventStr))
+    assert(!super.isDuplicate("D1", Option("mid"), eventStr))
+    assert(!super.isDuplicate("D1", Option("event"), eventStr))
   }
 }

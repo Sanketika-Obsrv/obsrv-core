@@ -7,7 +7,6 @@ import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.{ErrorConstants, FunctionalError, Producer}
-import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.core.streaming.Metrics
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
@@ -40,29 +39,22 @@ class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends Bas
 
   override def processWindow(dataset: Dataset, context: ProcessWindowFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], String, TimeWindow]#Context, elements: List[mutable.Map[String, AnyRef]], metrics: Metrics): Unit = {
 
-    implicit val jsonFormats: Formats = DefaultFormats.withLong
-
-    implicit class JsonHelper(json: JValue) {
-      def customExtract[T](path: String)(implicit mf: Manifest[T]): T = {
-        path.split('.').foldLeft(json)({ case (acc: JValue, node: String) => acc \ node }).extract[T]
-      }
-    }
-
     metrics.incCounter(dataset.id, config.totalEventCount, elements.size.toLong)
     masterDataCache.open(dataset)
     val eventsMap = elements.map(msg => {
-      val json = parse(JSONUtil.serialize(msg(config.CONST_EVENT)), useBigIntForLong = false)
-      val key = json.customExtract[String](dataset.datasetConfig.key)
-      if (key == null) {
+      val event = JSONUtil.serialize(msg(config.CONST_EVENT))
+      val json = parse(event, useBigIntForLong = false)
+      val node = JSONUtil.getKey(dataset.datasetConfig.key, event)
+      if (node.isMissingNode) {
         markFailure(Some(dataset.id), msg, context, metrics, ErrorConstants.MISSING_DATASET_CONFIG_KEY, Producer.masterdataprocessor, FunctionalError.MissingMasterDatasetKey)
       }
-      (key, json)
+      (node.asText(), json)
     }).toMap
-    val validEventsMap = eventsMap.filter(f => f._1 != null)
+    val validEventsMap = eventsMap.filter(f => f._1.nonEmpty)
     val result = masterDataCache.process(dataset, validEventsMap)
     metrics.incCounter(dataset.id, config.successInsertCount, result._1)
     metrics.incCounter(dataset.id, config.successUpdateCount, result._2)
-    metrics.incCounter(dataset.id, config.successEventCount, elements.size.toLong)
+    metrics.incCounter(dataset.id, config.successEventCount, validEventsMap.size.toLong)
 
     elements.foreach(event => {
       event.remove(config.CONST_EVENT)
@@ -70,21 +62,4 @@ class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends Bas
     })
   }
 
-  /**
-   * Method Mark the event as failure by adding (ex_processed -> false) and metadata.
-   */
-  private def markEventFailed(dataset: String, event: mutable.Map[String, AnyRef], error: Error, obsrvMeta: Map[String, AnyRef]): mutable.Map[String, AnyRef] = {
-    val wrapperEvent = createWrapperEvent(dataset, event)
-    updateEvent(wrapperEvent, obsrvMeta)
-    super.markFailed(wrapperEvent, error, Producer.masterdataprocessor)
-    wrapperEvent
-  }
-
-  private def createWrapperEvent(dataset: String, event: mutable.Map[String, AnyRef]): mutable.Map[String, AnyRef] = {
-    mutable.Map(config.CONST_DATASET -> dataset, config.CONST_EVENT -> JSONUtil.serialize(event.toMap))
-  }
-
-  private def updateEvent(event: mutable.Map[String, AnyRef], obsrvMeta: Map[String, AnyRef]) = {
-    event.put(config.CONST_OBSRV_META, obsrvMeta)
-  }
 }

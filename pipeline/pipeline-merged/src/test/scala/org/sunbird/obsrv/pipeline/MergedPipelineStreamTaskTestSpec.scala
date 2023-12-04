@@ -151,6 +151,9 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val transformerConfig = new TransformerConfig(config)
     transformerConfig.inputTopic() should be(config.getString("kafka.input.topic"))
     transformerConfig.inputConsumer() should be("transformer-consumer")
+
+    mergedPipelineConfig.successTag().getId should be ("processing_stats")
+    mergedPipelineConfig.failedEventsOutputTag().getId should be ("failed-events")
   }
 
 }

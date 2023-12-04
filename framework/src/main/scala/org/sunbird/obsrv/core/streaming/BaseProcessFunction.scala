@@ -75,7 +75,7 @@ trait BaseFunction {
     obsrvMeta.put("flags", obsrvMeta("flags").asInstanceOf[Map[String, AnyRef]] ++ flags)
   }
 
-  def addError(obsrvMeta: mutable.Map[String, AnyRef], error: Map[String, AnyRef]): Option[AnyRef] = {
+  private def addError(obsrvMeta: mutable.Map[String, AnyRef], error: Map[String, AnyRef]): Option[AnyRef] = {
     obsrvMeta.put("error", error)
   }
 
@@ -141,9 +141,8 @@ trait BaseFunction {
   }
 }
 
-abstract class BaseProcessFunction[T, R](config: BaseJobConfig[R]) extends ProcessFunction[T, R] with BaseDeduplication with JobMetrics with BaseFunction {
+abstract class BaseProcessFunction[T, R](config: BaseJobConfig[R]) extends ProcessFunction[T, R] with JobMetrics with BaseFunction {
 
-  private[this] val logger = LoggerFactory.getLogger(this.getClass)
   protected val metricsList: MetricsList = getMetricsList()
   protected val metrics: Metrics = registerMetrics(metricsList.datasets, metricsList.metrics)
 
@@ -171,19 +170,13 @@ abstract class BaseProcessFunction[T, R](config: BaseJobConfig[R]) extends Proce
   def getMetricsList(): MetricsList
 
   override def processElement(event: T, context: ProcessFunction[T, R]#Context, out: Collector[R]): Unit = {
-    try {
-      processElement(event, context, metrics)
-    } catch {
-      case exception: Exception =>
-        logger.error(s"${config.jobName}:processElement - Exception", exception)
-    }
+    processElement(event, context, metrics)
   }
 
 }
 
-abstract class WindowBaseProcessFunction[I, O, K](config: BaseJobConfig[O]) extends ProcessWindowFunction[I, O, K, TimeWindow] with BaseDeduplication with JobMetrics with BaseFunction {
+abstract class WindowBaseProcessFunction[I, O, K](config: BaseJobConfig[O]) extends ProcessWindowFunction[I, O, K, TimeWindow] with JobMetrics with BaseFunction {
 
-  private[this] val logger = LoggerFactory.getLogger(this.getClass)
   protected val metricsList: MetricsList = getMetricsList()
   protected val metrics: Metrics = registerMetrics(metricsList.datasets, metricsList.metrics)
 
@@ -214,11 +207,7 @@ abstract class WindowBaseProcessFunction[I, O, K](config: BaseJobConfig[O]) exte
               metrics: Metrics): Unit
 
   override def process(key: K, context: ProcessWindowFunction[I, O, K, TimeWindow]#Context, elements: lang.Iterable[I], out: Collector[O]): Unit = {
-    try {
-      process(key, context, elements, metrics)
-    } catch {
-      case exception: Exception => logger.error(s"${config.jobName}:processElement - Exception", exception)
-    }
+    process(key, context, elements, metrics)
   }
 
 }

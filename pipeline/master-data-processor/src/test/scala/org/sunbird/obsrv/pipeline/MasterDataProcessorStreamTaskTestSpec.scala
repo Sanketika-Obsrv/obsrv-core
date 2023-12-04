@@ -57,12 +57,14 @@ class MasterDataProcessorStreamTaskTestSpec extends BaseSpecWithDatasetRegistry 
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.VALID_BATCH_EVENT_D3_INSERT_2)
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.VALID_BATCH_EVENT_D4)
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.VALID_BATCH_EVENT_D3_UPDATE)
+    EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.MISSING_DATA_KEY_EVENT_D4)
     flinkCluster.before()
   }
 
   private def insertTestData(postgresConnect: PostgresConnect): Unit = {
     postgresConnect.execute("insert into datasets(id, type, extraction_config, router_config, dataset_config, status, created_by, updated_by, created_date, updated_date) values ('d3', 'master-dataset', '{\"is_batch_event\": true, \"extraction_key\": \"events\"}', '{\"topic\":\"d3-events\"}', '{\"data_key\":\"code\",\"timestamp_key\":\"date\",\"entry_topic\":\"masterdata.ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":"+masterDataConfig.redisPort+",\"redis_db\":3}', 'Live', 'System', 'System', now(), now());")
     postgresConnect.execute("insert into datasets(id, type, router_config, dataset_config, status, created_by, updated_by, created_date, updated_date) values ('d4', 'master-dataset', '{\"topic\":\"d4-events\"}', '{\"data_key\":\"code\",\"timestamp_key\":\"date\",\"entry_topic\":\"masterdata-ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":"+masterDataConfig.redisPort+",\"redis_db\":4}', 'Live', 'System', 'System', now(), now());")
+    postgresConnect.execute("insert into datasets(id, type, router_config, dataset_config, status, created_by, updated_by, created_date, updated_date) values ('d5', 'master-dataset', '{\"topic\":\"d4-events\"}', '{\"data_key\":\"code\",\"timestamp_key\":\"date\",\"entry_topic\":\"masterdata-ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":"+masterDataConfig.redisPort+",\"redis_db\":4}', 'Live', 'System', 'System', now(), now());")
   }
 
   override def afterAll(): Unit = {
@@ -94,8 +96,11 @@ class MasterDataProcessorStreamTaskTestSpec extends BaseSpecWithDatasetRegistry 
       env.execute(masterDataConfig.jobName)
     }
 
-    val input = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.system.event.topic"), 7, timeout = 30.seconds)
-    input.size should be(7)
+    val sysEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.system.event.topic"), 8, timeout = 30.seconds)
+    sysEvents.size should be(8)
+
+    val failedEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](masterDataConfig.kafkaFailedTopic, 1, timeout = 30.seconds)
+    failedEvents.size should be(1)
 
     val mutableMetricsMap = mutable.Map[String, Long]();
     BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
@@ -112,6 +117,9 @@ class MasterDataProcessorStreamTaskTestSpec extends BaseSpecWithDatasetRegistry 
     mutableMetricsMap(s"${masterDataConfig.jobName}.d4.${masterDataConfig.successEventCount}") should be(1)
     mutableMetricsMap(s"${masterDataConfig.jobName}.d4.${masterDataConfig.successInsertCount}") should be(1)
     mutableMetricsMap(s"${masterDataConfig.jobName}.d4.${masterDataConfig.successUpdateCount}") should be(0)
+
+    mutableMetricsMap(s"${masterDataConfig.jobName}.d5.${masterDataConfig.totalEventCount}") should be(1)
+    mutableMetricsMap(s"${masterDataConfig.jobName}.d5.${masterDataConfig.eventFailedMetricsCount}") should be(1)
 
     val redisConnection = new RedisConnect(masterDataConfig.redisHost, masterDataConfig.redisPort, masterDataConfig.redisConnectionTimeout)
     val jedis1 = redisConnection.getConnection(3)

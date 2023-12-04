@@ -126,13 +126,7 @@ abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[Stri
       markFailure(Some(datasetId), event, context, metrics, ErrorConstants.EVENT_MISSING, Producer.validator, FunctionalError.MissingEventData)
       return
     }
-    try {
-      processElement(dataset, event, context, metrics)
-    } catch {
-      case ex: Exception =>
-        logger.error(s"BaseDatasetProcessFunction:processElement() | Unknown Exception | job=${config.jobName} | dataset=${dataset.id}", ex)
-        throw ex
-    }
+    processElement(dataset, event, context, metrics)
   }
 }
 

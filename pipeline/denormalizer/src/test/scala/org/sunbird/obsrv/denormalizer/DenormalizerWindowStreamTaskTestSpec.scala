@@ -65,6 +65,8 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.SKIP_DENORM)
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.DENORM_MISSING_KEYS)
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.DENORM_MISSING_DATA_AND_INVALIDKEY)
+    EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.INVALID_DATASET_ID)
+    EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.MISSING_EVENT_KEY)
   }
 
   private def insertTestData(postgresConnect: PostgresConnect): Unit = {
@@ -102,7 +104,7 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val outputs = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.denormOutputTopic, 4, timeout = 30.seconds)
     validateOutputs(outputs)
 
-    val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.kafkaSystemTopic, 3, timeout = 30.seconds)
+    val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.kafkaSystemTopic, 5, timeout = 30.seconds)
     validateSystemEvents(systemEvents)
 
     val mutableMetricsMap = mutable.Map[String, Long]()
@@ -129,27 +131,47 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
   }
 
   private def validateSystemEvents(systemEvents: List[String]): Unit = {
-    systemEvents.size should be(3)
+    systemEvents.size should be(5)
+    systemEvents.count(f => {
+      val event = JSONUtil.deserialize[SystemEvent](f)
+      Producer.validator.equals(event.ctx.pdata.pid.get)
+    }) should be (2)
+    systemEvents.count(f => {
+      val event = JSONUtil.deserialize[SystemEvent](f)
+      Producer.denorm.equals(event.ctx.pdata.pid.get)
+    }) should be(3)
     systemEvents.foreach(f => {
       val event = JSONUtil.deserialize[SystemEvent](f)
       event.etype should be(EventID.METRIC)
       event.ctx.module should be(ModuleID.processing)
       event.ctx.pdata.id should be(denormConfig.jobName)
       event.ctx.pdata.`type` should be(PDataType.flink)
-      event.ctx.pdata.pid.get should be(Producer.denorm)
       event.data.error.isDefined should be(true)
       val errorLog = event.data.error.get
       errorLog.error_level should be(ErrorLevel.critical)
-      errorLog.pdata_id should be(Producer.denorm)
       errorLog.pdata_status should be(StatusCode.failed)
       errorLog.error_count.get should be(1)
       errorLog.error_code match {
         case ErrorConstants.DENORM_KEY_MISSING.errorCode =>
+          event.ctx.pdata.pid.get should be(Producer.denorm)
+          errorLog.pdata_id should be(Producer.denorm)
           errorLog.error_type should be(FunctionalError.DenormKeyMissing)
         case ErrorConstants.DENORM_KEY_NOT_A_STRING_OR_NUMBER.errorCode =>
+          event.ctx.pdata.pid.get should be(Producer.denorm)
+          errorLog.pdata_id should be(Producer.denorm)
           errorLog.error_type should be(FunctionalError.DenormKeyInvalid)
         case ErrorConstants.DENORM_DATA_NOT_FOUND.errorCode =>
+          event.ctx.pdata.pid.get should be(Producer.denorm)
+          errorLog.pdata_id should be(Producer.denorm)
           errorLog.error_type should be(FunctionalError.DenormDataNotFound)
+        case ErrorConstants.MISSING_DATASET_CONFIGURATION.errorCode =>
+          event.ctx.pdata.pid.get should be(Producer.validator)
+          errorLog.pdata_id should be(Producer.validator)
+          errorLog.error_type should be(FunctionalError.MissingDatasetId)
+        case ErrorConstants.EVENT_MISSING.errorCode =>
+          event.ctx.pdata.pid.get should be(Producer.validator)
+          errorLog.pdata_id should be(Producer.validator)
+          errorLog.error_type should be(FunctionalError.MissingEventData)
       }
     })
   }
@@ -161,6 +183,8 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormPartialSuccess}") should be(1)
     mutableMetricsMap(s"${denormConfig.jobName}.d2.${denormConfig.denormTotal}") should be(1)
     mutableMetricsMap(s"${denormConfig.jobName}.d2.${denormConfig.eventsSkipped}") should be(1)
+    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.eventFailedMetricsCount}") should be(1)
+    mutableMetricsMap(s"${denormConfig.jobName}.dxyz.${denormConfig.eventFailedMetricsCount}") should be(1)
   }
 
 }

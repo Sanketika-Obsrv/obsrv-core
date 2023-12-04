@@ -67,6 +67,7 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.IGNORED_EVENT)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.EVENT_WITH_UNKNOWN_VALIDATION_ERR)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.EVENT_WITH_EMPTY_SCHEMA)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.DEDUP_KEY_MISSING)
 
     flinkCluster.before()
   }
@@ -78,6 +79,7 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, router_config, dataset_config, status, created_by, updated_by, created_date, updated_date) values ('d5', 'dataset', '" + """{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string"},"vehicleCode":{"type":"string"},"date":{"type":"string"},"dealer":{"type":"object","properties":{"dealerCode":{"type":"string"},"locationId":{"type":"string"},"email":{"type":"string"},"phone":{"type":"string"}},"additionalProperties":false,"required":["dealerCode","locationId"]},"metrics":{"type":"object","properties":{"bookingsTaken":{"type":"integer"},"deliveriesPromised":{"type":"integer"},"deliveriesDone":{"type":"integer"}},"additionalProperties":false}},"additionalProperties":false,"required":["id","vehicleCode","date"]}""" + "', '{\"validate\": true, \"mode\": \"IgnoreNewFields\"}', '{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'System', 'System', now(), now());")
     postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, router_config, dataset_config, status, created_by, updated_by, created_date, updated_date) values ('d6', 'dataset', '" + """{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","maxLength":5},"vehicleCode":{"type":"string"},"date":{"type":"string"},"dealer":{"type":"object","properties":{"dealerCode":{"type":"string"},"locationId":{"type":"string"},"email":{"type":"string"},"phone":{"type":"string"}},"additionalProperties":false,"required":["dealerCode","locationId"]},"metrics":{"type":"object","properties":{"bookingsTaken":{"type":"integer"},"deliveriesPromised":{"type":"integer"},"deliveriesDone":{"type":"integer"}},"additionalProperties":false}},"additionalProperties":false,"required":["id","vehicleCode","date"]}""" + "', '{\"validate\": true, \"mode\": \"DiscardNewFields\"}', '{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'System', 'System', now(), now());")
     postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, router_config, dataset_config, status, created_by, updated_by, created_date, updated_date) values ('d7', 'dataset', '"+EventFixtures.INVALID_SCHEMA+"', '{\"validate\": true, \"mode\": \"Strict\"}','{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'System', 'System', now(), now());")
+    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, extraction_config, dedup_config, router_config, dataset_config, status, data_version, created_by, updated_by, created_date, updated_date) values ('d8', 'dataset', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"validate\": false, \"mode\": \"Strict\"}', '{\"is_batch_event\": true, \"extraction_key\": \"events\", \"dedup_config\": {\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}}', '{\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}', '{\"topic\":\"d1-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":"+config.getInt("redis.port")+",\"redis_db\":2}', 'Live', 2, 'System', 'System', now(), now());")
     postgresConnect.closeConnection()
   }
 
@@ -106,13 +108,13 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     }
     val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaUniqueTopic, 5, timeout = 30.seconds)
     val invalidEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaInvalidTopic, 7, timeout = 30.seconds)
-    val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSystemTopic, 7, timeout = 30.seconds)
+    val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSystemTopic, 8, timeout = 30.seconds)
 
     validateOutputEvents(outputEvents)
     validateInvalidEvents(invalidEvents)
     validateSystemEvents(systemEvents)
 
-    val mutableMetricsMap = mutable.Map[String, Long]();
+    val mutableMetricsMap = mutable.Map[String, Long]()
     BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
     Console.println("### PipelinePreprocessorStreamTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
     validateMetrics(mutableMetricsMap)
@@ -145,7 +147,7 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
   }
 
   private def validateSystemEvents(systemEvents: List[String]): Unit = {
-    systemEvents.size should be(7)
+    systemEvents.size should be(8)
     /*
     (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d1"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"RequiredFieldsMissing","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":1}},"ets":1701428460664})
     (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"ALL"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"MissingDatasetId","error_code":"ERR_EXT_1004","error_message":"Dataset Id is missing from the data","error_level":"critical","error_count":1},"pipeline_stats":{"validator_status":"failed","validator_time":874}},"ets":1701428460889})
@@ -190,6 +192,11 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     mutableMetricsMap(s"${pConfig.jobName}.d6.${pConfig.validationFailureMetricsCount}") should be(1)
     mutableMetricsMap(s"${pConfig.jobName}.d6.${pConfig.duplicationTotalMetricsCount}") should be(1)
     mutableMetricsMap(s"${pConfig.jobName}.d6.${pConfig.duplicationSkippedEventMetricsCount}") should be(1)
+
+    mutableMetricsMap(s"${pConfig.jobName}.d8.${pConfig.validationTotalMetricsCount}") should be(1)
+    mutableMetricsMap(s"${pConfig.jobName}.d8.${pConfig.validationSkipMetricsCount}") should be(1)
+    mutableMetricsMap(s"${pConfig.jobName}.d8.${pConfig.duplicationTotalMetricsCount}") should be(1)
+    mutableMetricsMap(s"${pConfig.jobName}.d8.${pConfig.duplicationProcessedEventMetricsCount}") should be(1)
   }
 
 }

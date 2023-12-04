@@ -5,7 +5,9 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.cache._
-import org.sunbird.obsrv.core.model.{ErrorConstants, Producer}
+import org.sunbird.obsrv.core.exception.ObsrvException
+import org.sunbird.obsrv.core.model.Models.{ContextData, EData, ErrorLog, PData, SystemEvent}
+import org.sunbird.obsrv.core.model.{ErrorConstants, ErrorLevel, EventID, FunctionalError, ModuleID, PDataType, Producer, StatusCode}
 import org.sunbird.obsrv.core.streaming._
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
@@ -15,8 +17,9 @@ import org.sunbird.obsrv.streaming.BaseDatasetProcessFunction
 import scala.collection.mutable
 
 class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eventTypeInfo: TypeInformation[mutable.Map[String, AnyRef]])
-  extends BaseDatasetProcessFunction(config) {
+  extends BaseDatasetProcessFunction(config) with BaseDeduplication {
 
+  private[this] val logger = LoggerFactory.getLogger(classOf[DeduplicationFunction])
   @transient private var dedupEngine: DedupEngine = null
 
   override def getMetrics(): List[String] = {
@@ -43,7 +46,7 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
     if (dedupConfig.isDefined && dedupConfig.get.dropDuplicates.get) {
       val event = msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]]
       val eventAsText = JSONUtil.serialize(event)
-      val isDup = isDuplicate(dataset.id, dedupConfig.get.dedupKey, eventAsText, context, config)(dedupEngine)
+      val isDup = isDuplicate(dataset.id, dedupConfig.get.dedupKey, eventAsText, context)
       if (isDup) {
         metrics.incCounter(dataset.id, config.duplicationEventMetricsCount)
         context.output(config.duplicateEventsOutputTag, markFailed(msg, ErrorConstants.DUPLICATE_EVENT_FOUND, Producer.dedup))
@@ -54,6 +57,23 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
     } else {
       metrics.incCounter(dataset.id, config.duplicationSkippedEventMetricsCount)
       context.output(config.uniqueEventsOutputTag, msg)
+    }
+  }
+
+  private def isDuplicate(datasetId: String, dedupKey: Option[String], event: String,
+                          context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Boolean = {
+    try {
+      super.isDuplicate(datasetId, dedupKey, event)(dedupEngine)
+    } catch {
+      case ex: ObsrvException =>
+        val sysEvent = JSONUtil.serialize(SystemEvent(
+          EventID.METRIC,
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.dedup)), dataset = Some(datasetId)),
+          data = EData(error = Some(ErrorLog(pdata_id = Producer.dedup, pdata_status = StatusCode.skipped, error_type = FunctionalError.DedupFailed, error_code = ex.error.errorCode, error_message = ex.error.errorMsg, error_level = ErrorLevel.warn)))
+        ))
+        logger.warn("BaseDeduplication:isDuplicate() | Exception", ex)
+        context.output(config.systemEventsOutputTag, sysEvent)
+        false
     }
   }
 

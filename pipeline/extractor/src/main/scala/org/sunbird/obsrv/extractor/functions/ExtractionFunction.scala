@@ -10,7 +10,7 @@ import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.core.model.FunctionalError.FunctionalError
 import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model._
-import org.sunbird.obsrv.core.streaming.{BaseProcessFunction, Metrics, MetricsList}
+import org.sunbird.obsrv.core.streaming.{BaseDeduplication, BaseProcessFunction, Metrics, MetricsList}
 import org.sunbird.obsrv.core.util.Util.getMutableMap
 import org.sunbird.obsrv.core.util.{JSONUtil, Util}
 import org.sunbird.obsrv.extractor.task.ExtractorConfig
@@ -20,7 +20,7 @@ import org.sunbird.obsrv.registry.DatasetRegistry
 import scala.collection.mutable
 
 class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: DedupEngine = null)
-  extends BaseProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]](config) {
+  extends BaseProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]](config) with BaseDeduplication {
 
   private[this] val logger = LoggerFactory.getLogger(classOf[ExtractionFunction])
 
@@ -67,7 +67,7 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
     val dataset = datasetOpt.get
     if (!containsEvent(batchEvent) && dataset.extractionConfig.isDefined && dataset.extractionConfig.get.isBatchEvent.get) {
       if (dataset.extractionConfig.get.dedupConfig.isDefined && dataset.extractionConfig.get.dedupConfig.get.dropDuplicates.get) {
-        val isDup = isDuplicate(dataset.id, dataset.extractionConfig.get.dedupConfig.get.dedupKey, eventAsText, context, config)(dedupEngine)
+        val isDup = isDuplicate(dataset.id, dataset.extractionConfig.get.dedupConfig.get.dedupKey, eventAsText, context)
         if (isDup) {
           metrics.incCounter(dataset.id, config.duplicateExtractionCount)
           context.output(config.duplicateEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.DUPLICATE_BATCH_EVENT_FOUND))
@@ -77,6 +77,23 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
       extractData(dataset, batchEvent, eventAsText, context, metrics)
     } else {
       skipExtraction(dataset, batchEvent, context, metrics)
+    }
+  }
+
+  private def isDuplicate(datasetId: String, dedupKey: Option[String], event: String,
+                          context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Boolean = {
+    try {
+      super.isDuplicate(datasetId, dedupKey, event)(dedupEngine)
+    } catch {
+      case ex: ObsrvException =>
+        val sysEvent = JSONUtil.serialize(SystemEvent(
+          EventID.METRIC,
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = Some(datasetId)),
+          data = EData(error = Some(ErrorLog(pdata_id = Producer.dedup, pdata_status = StatusCode.skipped, error_type = FunctionalError.DedupFailed, error_code = ex.error.errorCode, error_message = ex.error.errorMsg, error_level = ErrorLevel.warn)))
+        ))
+        logger.warn("BaseDeduplication:isDuplicate() | Exception", ex)
+        context.output(config.systemEventsOutputTag, sysEvent)
+        false
     }
   }
 

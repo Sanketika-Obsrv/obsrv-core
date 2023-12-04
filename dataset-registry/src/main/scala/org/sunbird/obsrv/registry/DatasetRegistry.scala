@@ -43,16 +43,16 @@ object DatasetRegistry {
     DatasetRegistryService.updateDatasourceRef(datasource, datasourceRef)
   }
 
-  def updateConnectorStats(datasetId: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
-    DatasetRegistryService.updateConnectorStats(datasetId, lastFetchTimestamp, records)
+  def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
+    DatasetRegistryService.updateConnectorStats(id, lastFetchTimestamp, records)
   }
 
-  def updateConnectorDisconnections(datasetId: String, disconnections: Int): Int = {
-    DatasetRegistryService.updateConnectorDisconnections(datasetId, disconnections)
+  def updateConnectorDisconnections(id: String, disconnections: Int): Int = {
+    DatasetRegistryService.updateConnectorDisconnections(id, disconnections)
   }
 
-  def updateConnectorAvgBatchReadTime(datasetId: String, avgReadTime: Long): Int = {
-    DatasetRegistryService.updateConnectorAvgBatchReadTime(datasetId, avgReadTime)
+  def updateConnectorAvgBatchReadTime(id: String, avgReadTime: Long): Int = {
+    DatasetRegistryService.updateConnectorAvgBatchReadTime(id, avgReadTime)
   }
 
 }

@@ -11,9 +11,11 @@ import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil}
+import org.sunbird.obsrv.extractor.task.ExtractorConfig
 import org.sunbird.obsrv.fixture.EventFixture
 import org.sunbird.obsrv.pipeline.task.{MergedPipelineConfig, MergedPipelineStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
+import org.sunbird.obsrv.transformer.task.TransformerConfig
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -142,6 +144,13 @@ class MergedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     mutableMetricsMap("DruidRouterJob.d2.router-total-count") should be(1)
     mutableMetricsMap("DruidRouterJob.d2.router-success-count") should be(1)
 
+    val extractorConfig = new ExtractorConfig(config)
+    extractorConfig.inputTopic() should be (config.getString("kafka.input.topic"))
+    extractorConfig.inputConsumer() should be ("extractor-consumer")
+
+    val transformerConfig = new TransformerConfig(config)
+    transformerConfig.inputTopic() should be(config.getString("kafka.input.topic"))
+    transformerConfig.inputConsumer() should be("transformer-consumer")
   }
 
 }

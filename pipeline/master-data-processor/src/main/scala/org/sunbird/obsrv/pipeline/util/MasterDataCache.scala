@@ -21,10 +21,7 @@ class MasterDataCache(val config: MasterDataProcessorConfig) {
 
   def open(datasets: List[Dataset]): Unit = {
     datasets.map(dataset => {
-      val datasetConfig = dataset.datasetConfig
-      val redisConnect = new RedisConnect(datasetConfig.redisDBHost.get, datasetConfig.redisDBPort.get, config.redisConnectionTimeout)
-      val pipeline: Pipeline = redisConnect.getConnection(0).pipelined()
-      datasetPipelineMap.put(dataset.id, pipeline)
+      open(dataset)
     })
   }
 

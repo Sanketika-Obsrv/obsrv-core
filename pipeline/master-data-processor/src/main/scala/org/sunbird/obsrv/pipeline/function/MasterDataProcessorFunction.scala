@@ -66,7 +66,7 @@ class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends Bas
 
     elements.foreach(event => {
       event.remove(config.CONST_EVENT)
-      markCompletion(dataset, super.markComplete(event, dataset.dataVersion), context)
+      markCompletion(dataset, super.markComplete(event, dataset.dataVersion), context, Producer.masterdataprocessor)
     })
   }
 

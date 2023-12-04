@@ -8,6 +8,7 @@ import org.sunbird.obsrv.model.DatasetStatus.DatasetStatus
 import org.sunbird.obsrv.model.TransformMode.TransformMode
 import org.sunbird.obsrv.model.ValidationMode.ValidationMode
 
+import java.sql.Timestamp
 import scala.beans.BeanProperty
 
 object DatasetModels {
@@ -38,7 +39,7 @@ object DatasetModels {
                            @JsonProperty("index_data") indexData: Option[Boolean] = None, @JsonProperty("timestamp_format") tsFormat: Option[String] = None,
                            @JsonProperty("dataset_tz") datasetTimezone: Option[String] = None)
 
-  case class Dataset(@JsonProperty("id") id: String, @JsonProperty("type") datasetType: String , @JsonProperty("extraction_config") extractionConfig: Option[ExtractionConfig],
+  case class Dataset(@JsonProperty("id") id: String, @JsonProperty("type") datasetType: String, @JsonProperty("extraction_config") extractionConfig: Option[ExtractionConfig],
                      @JsonProperty("dedup_config") dedupConfig: Option[DedupConfig], @JsonProperty("validation_config") validationConfig: Option[ValidationConfig],
                      @JsonProperty("data_schema") jsonSchema: Option[String], @JsonProperty("denorm_config") denormConfig: Option[DenormConfig],
                      @JsonProperty("router_config") routerConfig: RouterConfig, datasetConfig: DatasetConfig, @JsonProperty("status") @JsonScalaEnumeration(classOf[DatasetStatusType]) status: DatasetStatus,
@@ -52,7 +53,7 @@ object DatasetModels {
                                    @JsonProperty("field_key") fieldKey: String, @JsonProperty("transformation_function") transformationFunction: TransformationFunction,
                                    @JsonProperty("status") status: String, @JsonProperty("mode") @JsonScalaEnumeration(classOf[TransformModeType]) mode: Option[TransformMode] = Some(TransformMode.Strict))
 
-  case class ConnectorConfig(@JsonProperty("kafkaBrokers") kafkaBrokers: String, @JsonProperty("topic") topic: String,  @JsonProperty("type")databaseType: String,
+  case class ConnectorConfig(@JsonProperty("kafkaBrokers") kafkaBrokers: String, @JsonProperty("topic") topic: String, @JsonProperty("type") databaseType: String,
                              @JsonProperty("connection") connection: Connection, @JsonProperty("tableName") tableName: String, @JsonProperty("databaseName") databaseName: String,
                              @JsonProperty("pollingInterval") pollingInterval: PollingInterval, @JsonProperty("authenticationMechanism") authenticationMechanism: AuthenticationMechanism,
                              @JsonProperty("batchSize") batchSize: Int, @JsonProperty("timestampColumn") timestampColumn: String)
@@ -63,29 +64,33 @@ object DatasetModels {
 
   case class AuthenticationMechanism(@JsonProperty("encrypted") encrypted: Boolean, @JsonProperty("encryptedValues") encryptedValues: String)
 
-  case class ConnectorStats(@JsonProperty("last_fetch_timestamp") lastFetchTimestamp: String, @JsonProperty("records") records: Long, @JsonProperty("avg_batch_read_time") avgBatchReadTime: Long, @JsonProperty("disconnections") disconnections: Int)
+  case class ConnectorStats(@JsonProperty("last_fetch_timestamp") lastFetchTimestamp: Timestamp, @JsonProperty("records") records: Long, @JsonProperty("avg_batch_read_time") avgBatchReadTime: Long, @JsonProperty("disconnections") disconnections: Int)
 
   case class DatasetSourceConfig(@JsonProperty("id") id: String, @JsonProperty("dataset_id") datasetId: String,
                                  @JsonProperty("connector_type") connectorType: String, @JsonProperty("connector_config") connectorConfig: ConnectorConfig,
-                                 @JsonProperty("connector_stats") connectorStats: ConnectorStats, @JsonProperty("status") status: String)
-  case class DataSource(@JsonProperty("datasource") datasource: String, @JsonProperty("dataset_id") datasetId: String,
+                                 @JsonProperty("status") status: String, @JsonProperty("connector_stats") connectorStats: Option[ConnectorStats] = None)
+
+  case class DataSource(@JsonProperty("id") id: String, @JsonProperty("datasource") datasource: String, @JsonProperty("dataset_id") datasetId: String,
                         @JsonProperty("ingestion_spec") ingestionSpec: String, @JsonProperty("datasource_ref") datasourceRef: String)
 
 }
 
 class ValidationModeType extends TypeReference[ValidationMode.type]
+
 object ValidationMode extends Enumeration {
   type ValidationMode = Value
   val Strict, IgnoreNewFields, DiscardNewFields = Value
 }
 
 class TransformModeType extends TypeReference[TransformMode.type]
+
 object TransformMode extends Enumeration {
   type TransformMode = Value
   val Strict, Lenient = Value
 }
 
 class DatasetStatusType extends TypeReference[DatasetStatus.type]
+
 object DatasetStatus extends Enumeration {
   type DatasetStatus = Value
   val Draft, Publish, Live, Retired, Purged = Value

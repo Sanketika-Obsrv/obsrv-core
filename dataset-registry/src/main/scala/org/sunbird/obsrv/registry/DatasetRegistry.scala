@@ -9,8 +9,6 @@ object DatasetRegistry {
 
   private val datasets: Map[String, Dataset] = DatasetRegistryService.readAllDatasets()
   private val datasetTransformations: Map[String, List[DatasetTransformation]] = DatasetRegistryService.readAllDatasetTransformations()
-  private val datasetSourceConfig: Option[List[DatasetSourceConfig]] = DatasetRegistryService.readAllDatasetSourceConfig()
-  private val datasources: Map[String, List[DataSource]] = DatasetRegistryService.readAllDatasources()
 
   def getAllDatasets(datasetType: String): List[Dataset] = {
     val datasetList = DatasetRegistryService.readAllDatasets()
@@ -25,8 +23,8 @@ object DatasetRegistry {
     DatasetRegistryService.readAllDatasetSourceConfig()
   }
 
-  def getDatasetSourceConfigById(datasetId: String): DatasetSourceConfig = {
-    datasetSourceConfig.map(configList => configList.filter(_.datasetId.equalsIgnoreCase(datasetId))).get.head
+  def getDatasetSourceConfigById(datasetId: String): Option[List[DatasetSourceConfig]] = {
+    DatasetRegistryService.readDatasetSourceConfig(datasetId)
   }
 
   def getDatasetTransformations(datasetId: String): Option[List[DatasetTransformation]] = {
@@ -34,26 +32,26 @@ object DatasetRegistry {
   }
 
   def getDatasources(datasetId: String): Option[List[DataSource]] = {
-    datasources.get(datasetId)
+    DatasetRegistryService.readDatasources(datasetId)
   }
 
   def getDataSetIds(datasetType: String): List[String] = {
     datasets.filter(f => f._2.datasetType.equals(datasetType)).keySet.toList
   }
 
-  def updateDatasourceRef(datasource: DataSource, datasourceRef: String): Unit = {
+  def updateDatasourceRef(datasource: DataSource, datasourceRef: String): Int = {
     DatasetRegistryService.updateDatasourceRef(datasource, datasourceRef)
   }
 
-  def updateConnectorStats(datasetId: String, lastFetchTimestamp: Timestamp, records: Long): Unit = {
+  def updateConnectorStats(datasetId: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
     DatasetRegistryService.updateConnectorStats(datasetId, lastFetchTimestamp, records)
   }
 
-  def updateConnectorDisconnections(datasetId: String, disconnections: Int): Unit = {
+  def updateConnectorDisconnections(datasetId: String, disconnections: Int): Int = {
     DatasetRegistryService.updateConnectorDisconnections(datasetId, disconnections)
   }
 
-  def updateConnectorAvgBatchReadTime(datasetId: String, avgReadTime: Long): Unit = {
+  def updateConnectorAvgBatchReadTime(datasetId: String, avgReadTime: Long): Int = {
     DatasetRegistryService.updateConnectorAvgBatchReadTime(datasetId, avgReadTime)
   }
 

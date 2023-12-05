@@ -42,6 +42,21 @@ object DatasetRegistryService {
     }
   }
 
+  def readDataset(id: String): Option[Dataset] = {
+
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    try {
+      val rs = postgresConnect.executeQuery(s"SELECT * FROM datasets where id='$id'")
+      if(rs.next()) {
+        Some(parseDataset(rs))
+      } else {
+        None
+      }
+    } finally {
+      postgresConnect.closeConnection()
+    }
+  }
+
   def readAllDatasetSourceConfig(): Option[List[DatasetSourceConfig]] = {
 
     val postgresConnect = new PostgresConnect(postgresConfig)

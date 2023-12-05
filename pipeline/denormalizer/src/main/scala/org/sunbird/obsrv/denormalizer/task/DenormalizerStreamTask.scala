@@ -22,8 +22,7 @@ class DenormalizerStreamTask(config: DenormalizerConfig, kafkaConnector: FlinkKa
   def process(): Unit = {
 
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
-    val dataStream = getMapDataStream(env, config, kafkaConnector)
-    processStream(dataStream)
+    process(env)
     env.execute(config.jobName)
   }
   // $COVERAGE-ON$

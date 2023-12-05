@@ -22,11 +22,15 @@ class ExtractorStreamTask(config: ExtractorConfig, kafkaConnector: FlinkKafkaCon
   def process(): Unit = {
 
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
-    val dataStream = getMapDataStream(env, config, kafkaConnector)
-    processStream(dataStream)
+    process(env)
     env.execute(config.jobName)
   }
   // $COVERAGE-ON$
+
+  def process(env: StreamExecutionEnvironment): Unit = {
+    val dataStream = getMapDataStream(env, config, kafkaConnector)
+    processStream(dataStream)
+  }
 
   override def processStream(dataStream: DataStream[mutable.Map[String, AnyRef]]): DataStream[mutable.Map[String, AnyRef]] = {
 

@@ -2,7 +2,6 @@ package org.sunbird.obsrv.preprocessor
 
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{FlatSpec, Matchers}
-import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.{Dataset, DatasetConfig, RouterConfig}
 import org.sunbird.obsrv.model.DatasetStatus
@@ -14,7 +13,7 @@ class TestSchemaValidator extends FlatSpec with Matchers {
 
   val config: Config = ConfigFactory.load("test.conf")
   val pipelineProcessorConfig = new PipelinePreprocessorConfig(config)
-  val schemaValidator = new SchemaValidator(pipelineProcessorConfig)
+  val schemaValidator = new SchemaValidator()
 
   "SchemaValidator" should "return a success report for a valid event" in {
 

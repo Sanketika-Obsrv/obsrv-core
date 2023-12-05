@@ -5,7 +5,6 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
-import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.FunctionalError.FunctionalError
 import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model.Producer.Producer
@@ -66,8 +65,6 @@ trait SystemEventHandler {
 
 abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[String, AnyRef]])
   extends BaseProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]](config) with SystemEventHandler {
-
-  private[this] val logger = LoggerFactory.getLogger(classOf[BaseDatasetProcessFunction])
 
   override def open(parameters: Configuration): Unit = {
     super.open(parameters)

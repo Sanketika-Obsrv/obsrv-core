@@ -22,18 +22,29 @@ class TestDatasetRegistrySpec extends BaseSpecWithDatasetRegistry with Matchers 
     d2Opt.get.id should be("d2")
     d2Opt.get.denormConfig should be(None)
 
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    postgresConnect.execute("insert into datasets(id, type, data_schema, router_config, dataset_config, status, created_by, updated_by, created_date, updated_date, tags) values ('d3', 'dataset', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'System', 'System', now(), now(), ARRAY['Tag1','Tag2']);")
+    postgresConnect.closeConnection()
+
+    val d3Opt = DatasetRegistry.getDataset("d3")
+    d3Opt should not be None
+    d3Opt.get.id should be("d3")
+    d3Opt.get.denormConfig should be(None)
+
+    val d4Opt = DatasetRegistry.getDataset("d4")
+    d4Opt should be (None)
+
     val allDatasets = DatasetRegistry.getAllDatasets("dataset")
-    allDatasets.size should be(2)
+    allDatasets.size should be(3)
 
     val d1Tfs = DatasetRegistry.getDatasetTransformations("d1")
     d1Tfs should not be None
     d1Tfs.get.size should be(2)
 
-    val ids = DatasetRegistry.getDataSetIds("dataset")
+    val ids = DatasetRegistry.getDataSetIds("dataset").sortBy(f => f)
     ids.head should be("d1")
-    ids.last should be("d2")
-
-    DatasetRegistry.getAllDatasets("dataset")
+    ids.apply(1) should be("d2")
+    ids.apply(2) should be("d3")
 
     DatasetRegistry.getAllDatasetSourceConfig().get.size should be(2)
     val datasetSourceConfigList = DatasetRegistry.getDatasetSourceConfigById("d1").get

@@ -1,6 +1,5 @@
 package org.sunbird.obsrv.extractor.functions
 
-import org.apache.commons.lang3.StringUtils
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.slf4j.LoggerFactory
@@ -19,9 +18,10 @@ import org.sunbird.obsrv.registry.DatasetRegistry
 
 import scala.collection.mutable
 
-class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: DedupEngine = null)
+class ExtractionFunction(config: ExtractorConfig)
   extends BaseProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]](config) with BaseDeduplication {
 
+  @transient private var dedupEngine: DedupEngine = null
   private[this] val logger = LoggerFactory.getLogger(classOf[ExtractionFunction])
 
   override def getMetricsList(): MetricsList = {
@@ -32,10 +32,8 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
 
   override def open(parameters: Configuration): Unit = {
     super.open(parameters)
-    if (dedupEngine == null) {
-      val redisConnect = new RedisConnect(config.redisHost, config.redisPort, config.redisConnectionTimeout)
-      dedupEngine = new DedupEngine(redisConnect, config.dedupStore, config.cacheExpiryInSeconds)
-    }
+    val redisConnect = new RedisConnect(config.redisHost, config.redisPort, config.redisConnectionTimeout)
+    dedupEngine = new DedupEngine(redisConnect, config.dedupStore, config.cacheExpiryInSeconds)
   }
 
   override def processElement(batchEvent: mutable.Map[String, AnyRef],
@@ -43,15 +41,16 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
                               metrics: Metrics): Unit = {
     metrics.incCounter(config.defaultDatasetID, config.totalEventCount)
     if (batchEvent.contains(Constants.INVALID_JSON)) {
-      context.output(config.failedEventsOutputTag(), markBatchFailed(batchEvent, ErrorConstants.ERR_INVALID_EVENT))
+      context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.ERR_INVALID_EVENT))
       metrics.incCounter(config.defaultDatasetID, config.eventFailedMetricsCount)
+      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), ErrorConstants.ERR_INVALID_EVENT, FunctionalError.InvalidJsonData))
       return
     }
     val eventAsText = JSONUtil.serialize(batchEvent)
     val datasetIdOpt = batchEvent.get(config.CONST_DATASET)
     if (datasetIdOpt.isEmpty) {
       context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_ID))
-      metrics.incCounter(config.defaultDatasetID, config.failedExtractionCount)
+      metrics.incCounter(config.defaultDatasetID, config.eventFailedMetricsCount)
       context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), ErrorConstants.MISSING_DATASET_ID, FunctionalError.MissingDatasetId))
       return
     }
@@ -148,7 +147,6 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
         context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ex.error))
         context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), ex.error, FunctionalError.ExtractionDataFormatInvalid))
         logger.error(s"Extractor | Exception extracting data | dataset=${dataset.id}", ex)
-      case re: Exception => logger.error(s"Extractor | Exception extracting data | dataset=${dataset.id}", re)
     }
 
   }
@@ -216,9 +214,7 @@ class ExtractionFunction(config: ExtractorConfig, @transient var dedupEngine: De
     wrapperEvent
   }
 
-
   private def createWrapperEvent(dataset: String, event: mutable.Map[String, AnyRef]): mutable.Map[String, AnyRef] = {
     mutable.Map(config.CONST_DATASET -> dataset, config.CONST_EVENT -> event.toMap)
   }
 }
-

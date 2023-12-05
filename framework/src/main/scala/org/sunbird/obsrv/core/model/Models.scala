@@ -46,7 +46,7 @@ object FunctionalError extends Enumeration {
   type FunctionalError = Value
   val DedupFailed, RequiredFieldsMissing, DataTypeMismatch, AdditionalFieldsFound, UnknownValidationError, MissingDatasetId, MissingEventData, MissingTimestampKey,
   EventSizeExceeded, ExtractionDataFormatInvalid, DenormKeyMissing, DenormKeyInvalid, DenormDataNotFound,
-  TransformParseError, TransformEvalError, TransformFailedError, MissingMasterDatasetKey = Value
+  TransformParseError, TransformEvalError, TransformFailedError, MissingMasterDatasetKey, InvalidJsonData = Value
 }
 
 class ProducerType extends TypeReference[Producer.type]

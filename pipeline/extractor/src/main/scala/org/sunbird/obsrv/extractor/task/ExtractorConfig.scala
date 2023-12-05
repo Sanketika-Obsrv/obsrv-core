@@ -23,7 +23,7 @@ class ExtractorConfig(override val config: Config) extends BaseJobConfig[mutable
   val kafkaSuccessTopic: String = config.getString("kafka.output.raw.topic")
   val kafkaDuplicateTopic: String = config.getString("kafka.output.extractor.duplicate.topic")
   val kafkaBatchFailedTopic: String = config.getString("kafka.output.batch.failed.topic")
-  val eventMaxSize: Long = SystemConfig.maxEventSize
+  val eventMaxSize: Long = if(config.hasPath("kafka.event.max.size")) config.getInt("kafka.event.max.size") else SystemConfig.maxEventSize
 
   private val RAW_EVENTS_OUTPUT_TAG = "raw-events"
   private val FAILED_BATCH_EVENTS_OUTPUT_TAG = "failed-batch-events"
@@ -48,7 +48,6 @@ class ExtractorConfig(override val config: Config) extends BaseJobConfig[mutable
   val extractorDuplicateProducer = "extractor-duplicate-events-sink"
   val extractorBatchFailedEventsProducer = "extractor-batch-failed-events-sink"
   val extractorRawEventsProducer = "extractor-raw-events-sink"
-  val extractorFailedEventsProducer = "extractor-failed-events-sink"
 
   override def inputTopic(): String = kafkaInputTopic
   override def inputConsumer(): String = "extractor-consumer"

@@ -24,8 +24,7 @@ class DynamicRouterStreamTask(config: DruidRouterConfig, kafkaConnector: FlinkKa
   // $COVERAGE-OFF$ Disabling scoverage as the below code can only be invoked within flink cluster
   def process(): Unit = {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
-    val dataStream = getMapDataStream(env, config, kafkaConnector)
-    processStream(dataStream)
+    process(env)
     env.execute(config.jobName)
   }
   // $COVERAGE-ON$

@@ -9,7 +9,6 @@ import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
-import org.sunbird.obsrv.preprocessor.task.PipelinePreprocessorConfig
 
 import java.io.IOException
 import scala.collection.mutable
@@ -21,30 +20,30 @@ case class Instance(pointer: String)
 case class ValidationMsg(level: String, schema: Schema, instance: Instance, domain: String, keyword: String, message: String, allowed: Option[String],
                          found: Option[String], expected: Option[List[String]], unwanted: Option[List[String]], required: Option[List[String]], missing: Option[List[String]])
 
-class SchemaValidator(config: PipelinePreprocessorConfig) extends java.io.Serializable {
+class SchemaValidator() extends java.io.Serializable {
 
   private val serialVersionUID = 8780940932759659175L
   private[this] val logger = LoggerFactory.getLogger(classOf[SchemaValidator])
   private[this] val schemaMap = mutable.Map[String, (JsonSchema, Boolean)]()
 
-  def loadDataSchemas(datasets: List[Dataset]) = {
+  def loadDataSchemas(datasets: List[Dataset]): Unit = {
     datasets.foreach(dataset => {
       if (dataset.jsonSchema.isDefined) {
         try {
           loadJsonSchema(dataset.id, dataset.jsonSchema.get)
         } catch {
-          case ex: ObsrvException => schemaMap.put(dataset.id, (null, false))
+          case _: ObsrvException => schemaMap.put(dataset.id, (null, false))
         }
       }
     })
   }
 
-  def loadDataSchema(dataset: Dataset) = {
+  def loadDataSchema(dataset: Dataset): Any = {
     if (!schemaMap.contains(dataset.id) && dataset.jsonSchema.isDefined) {
       try {
         loadJsonSchema(dataset.id, dataset.jsonSchema.get)
       } catch {
-        case ex: ObsrvException => schemaMap.put(dataset.id, (null, false))
+        case _: ObsrvException => schemaMap.put(dataset.id, (null, false))
       }
     }
   }

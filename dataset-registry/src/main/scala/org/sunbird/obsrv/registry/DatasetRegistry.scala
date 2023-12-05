@@ -4,10 +4,12 @@ import org.sunbird.obsrv.model.DatasetModels.{DataSource, Dataset, DatasetSource
 import org.sunbird.obsrv.service.DatasetRegistryService
 
 import java.sql.Timestamp
+import scala.collection.mutable
 
 object DatasetRegistry {
 
-  private val datasets: Map[String, Dataset] = DatasetRegistryService.readAllDatasets()
+  private val datasets: mutable.Map[String, Dataset] = mutable.Map[String, Dataset]()
+  datasets ++= DatasetRegistryService.readAllDatasets()
   private val datasetTransformations: Map[String, List[DatasetTransformation]] = DatasetRegistryService.readAllDatasetTransformations()
 
   def getAllDatasets(datasetType: String): List[Dataset] = {
@@ -16,7 +18,12 @@ object DatasetRegistry {
   }
 
   def getDataset(id: String): Option[Dataset] = {
-    datasets.get(id)
+    val datasetFromCache = datasets.get(id)
+    if (datasetFromCache.isDefined) datasetFromCache else {
+      val dataset = DatasetRegistryService.readDataset(id)
+      if (dataset.isDefined) datasets.put(dataset.get.id, dataset.get)
+      dataset
+    }
   }
 
   def getAllDatasetSourceConfig(): Option[List[DatasetSourceConfig]] = {

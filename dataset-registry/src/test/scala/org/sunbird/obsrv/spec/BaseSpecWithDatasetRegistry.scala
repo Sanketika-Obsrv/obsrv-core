@@ -9,7 +9,7 @@ import scala.collection.mutable
 class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
 
   val config: Config = ConfigFactory.load("test.conf")
-  val postgresConfig = PostgresConnectionConfig(
+  val postgresConfig: PostgresConnectionConfig = PostgresConnectionConfig(
     user = config.getString("postgres.user"),
     password = config.getString("postgres.password"),
     database = "postgres",
@@ -18,7 +18,7 @@ class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
     maxConnections = config.getInt("postgres.maxConnections")
   )
 
-  override def beforeAll() {
+  override def beforeAll(): Unit = {
     super.beforeAll()
     val postgresConnect = new PostgresConnect(postgresConfig)
     createSchema(postgresConnect)
@@ -30,7 +30,7 @@ class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
     super.afterAll()
   }
 
-  private def createSchema(postgresConnect: PostgresConnect) {
+  private def createSchema(postgresConnect: PostgresConnect): Unit = {
 
     postgresConnect.execute("CREATE TABLE IF NOT EXISTS datasets ( id text PRIMARY KEY, type text NOT NULL, validation_config json, extraction_config json, dedup_config json, data_schema json, denorm_config json, router_config json NOT NULL, dataset_config json NOT NULL, status text NOT NULL, tags text[], data_version INT, created_by text NOT NULL, updated_by text NOT NULL, created_date timestamp NOT NULL, updated_date timestamp NOT NULL );")
     postgresConnect.execute("CREATE TABLE IF NOT EXISTS datasources ( id text PRIMARY KEY, dataset_id text REFERENCES datasets (id), ingestion_spec json NOT NULL, datasource text NOT NULL, datasource_ref text NOT NULL, retention_period json, archival_policy json, purge_policy json, backup_config json NOT NULL, status text NOT NULL, created_by text NOT NULL, updated_by text NOT NULL, created_date Date NOT NULL, updated_date Date NOT NULL );")

@@ -6,7 +6,6 @@ import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.apache.flink.util.Collector
-import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
@@ -122,7 +121,7 @@ trait BaseFunction {
     event
   }
 
-  def markComplete(event: mutable.Map[String, AnyRef], dataVersion: Option[Int]) : mutable.Map[String, AnyRef] = {
+  def markComplete(event: mutable.Map[String, AnyRef], dataVersion: Option[Int]): mutable.Map[String, AnyRef] = {
     val obsrvMeta = Util.getMutableMap(event("obsrv_meta").asInstanceOf[Map[String, AnyRef]])
     val syncts = obsrvMeta("syncts").asInstanceOf[Long]
     val processingStartTime = obsrvMeta("processingStartTime").asInstanceOf[Long]

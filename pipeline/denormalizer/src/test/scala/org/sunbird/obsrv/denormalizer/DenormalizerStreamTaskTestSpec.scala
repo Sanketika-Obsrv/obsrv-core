@@ -15,7 +15,7 @@ import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, PostgresConnect}
 import org.sunbird.obsrv.denormalizer.task.{DenormalizerConfig, DenormalizerStreamTask}
 import org.sunbird.obsrv.denormalizer.util.DenormCache
-import org.sunbird.obsrv.model.DatasetModels.{Dataset, DatasetConfig, DenormConfig, DenormFieldConfig, RouterConfig}
+import org.sunbird.obsrv.model.DatasetModels._
 import org.sunbird.obsrv.model.DatasetStatus
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 

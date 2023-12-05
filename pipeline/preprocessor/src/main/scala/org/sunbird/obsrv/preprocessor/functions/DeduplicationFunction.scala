@@ -6,8 +6,8 @@ import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.cache._
 import org.sunbird.obsrv.core.exception.ObsrvException
-import org.sunbird.obsrv.core.model.Models.{ContextData, EData, ErrorLog, PData, SystemEvent}
-import org.sunbird.obsrv.core.model.{ErrorConstants, ErrorLevel, EventID, FunctionalError, ModuleID, PDataType, Producer, StatusCode}
+import org.sunbird.obsrv.core.model.Models._
+import org.sunbird.obsrv.core.model._
 import org.sunbird.obsrv.core.streaming._
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset

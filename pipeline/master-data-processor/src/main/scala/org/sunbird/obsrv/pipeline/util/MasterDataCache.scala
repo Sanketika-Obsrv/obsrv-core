@@ -1,12 +1,12 @@
 package org.sunbird.obsrv.pipeline.util
 
-import org.json4s.{DefaultFormats, Formats, JNothing, JValue}
+import org.json4s.native.JsonMethods._
+import org.json4s.{JNothing, JValue}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.cache.RedisConnect
-import org.sunbird.obsrv.model.DatasetModels.{Dataset, DatasetConfig}
+import org.sunbird.obsrv.model.DatasetModels.Dataset
 import org.sunbird.obsrv.pipeline.task.MasterDataProcessorConfig
 import redis.clients.jedis.{Pipeline, Response}
-import org.json4s.native.JsonMethods._
 
 import scala.collection.mutable
 

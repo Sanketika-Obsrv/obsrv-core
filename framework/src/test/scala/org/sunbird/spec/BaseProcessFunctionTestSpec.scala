@@ -13,10 +13,8 @@ import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers
-import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.streaming._
 import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, Util}
-import scala.collection.mutable
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong

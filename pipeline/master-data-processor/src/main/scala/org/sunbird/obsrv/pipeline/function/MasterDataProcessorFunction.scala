@@ -3,7 +3,6 @@ package org.sunbird.obsrv.pipeline.function
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
-import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.{ErrorConstants, FunctionalError, Producer}

@@ -5,8 +5,8 @@ import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.scalatest.{FlatSpec, Matchers}
 import org.sunbird.obsrv.core.model.FunctionalError.FunctionalError
-import org.sunbird.obsrv.core.model.Models.{ContextData, EData, ErrorLog, PData, PipelineStats, SystemEvent}
-import org.sunbird.obsrv.core.model.{ErrorConstants, ErrorLevel, EventID, FunctionalError, FunctionalErrorType, ModuleID, PDataType, Producer, Stats, StatusCode}
+import org.sunbird.obsrv.core.model.Models._
+import org.sunbird.obsrv.core.model._
 import org.sunbird.obsrv.core.util.{DatasetKeySelector, JSONUtil}
 
 import scala.collection.mutable

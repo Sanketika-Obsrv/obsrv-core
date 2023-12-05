@@ -3,12 +3,10 @@ package org.sunbird.spec
 import org.apache.flink.util.Collector
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.record.TimestampType
-import org.mockito.Mockito
-import org.mockito.Mockito.times
 import org.scalamock.matchers.ArgCapture.CaptureAll
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FlatSpec, Matchers}
 import org.sunbird.obsrv.core.serde.{MapDeserializationSchema, StringDeserializationSchema}
-import org.scalamock.scalatest.MockFactory
 
 import java.nio.charset.StandardCharsets
 import scala.collection.mutable

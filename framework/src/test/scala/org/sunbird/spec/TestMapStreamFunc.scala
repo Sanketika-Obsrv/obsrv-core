@@ -1,6 +1,5 @@
 package org.sunbird.spec
 
-import scala.collection.mutable.Map
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.sunbird.obsrv.core.cache.{DedupEngine, RedisConnect}
@@ -11,6 +10,7 @@ import org.sunbird.obsrv.core.util.JSONUtil
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
+import scala.collection.mutable.Map
 
 
 class TestMapStreamFunc(config: BaseProcessTestMapConfig)(implicit val stringTypeInfo: TypeInformation[String])

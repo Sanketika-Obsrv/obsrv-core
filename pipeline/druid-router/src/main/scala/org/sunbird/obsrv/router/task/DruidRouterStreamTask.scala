@@ -1,7 +1,6 @@
 package org.sunbird.obsrv.router.task
 
 import com.typesafe.config.ConfigFactory
-import org.apache.flink.api.common.eventtime.WatermarkStrategy
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 import org.apache.flink.api.java.utils.ParameterTool

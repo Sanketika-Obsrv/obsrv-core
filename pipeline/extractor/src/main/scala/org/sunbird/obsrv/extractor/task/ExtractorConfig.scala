@@ -1,12 +1,13 @@
 package org.sunbird.obsrv.extractor.task
 
-import scala.collection.mutable
 import com.typesafe.config.Config
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 import org.apache.flink.streaming.api.scala.OutputTag
 import org.sunbird.obsrv.core.model.SystemConfig
 import org.sunbird.obsrv.core.streaming.BaseJobConfig
+
+import scala.collection.mutable
 
 class ExtractorConfig(override val config: Config) extends BaseJobConfig[mutable.Map[String, AnyRef]](config, "ExtractorJob") {
 

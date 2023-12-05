@@ -12,7 +12,7 @@ import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.SystemConfig
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
-import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, PostgresConnect}
+import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil}
 import org.sunbird.obsrv.extractor.task.{ExtractorConfig, ExtractorStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 

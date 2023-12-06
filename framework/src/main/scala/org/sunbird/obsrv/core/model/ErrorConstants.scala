@@ -32,5 +32,6 @@ object ErrorConstants extends Enumeration {
   val ERR_EVAL_EXPR_FUNCTION = ErrorInternalValue("ERR_TRANSFORM_1021", "Unable to evaluate the transformation expression function")
   val ERR_UNKNOWN_TRANSFORM_EXCEPTION = ErrorInternalValue("ERR_TRANSFORM_1022", "Unable to evaluate the transformation expression function")
   val ERR_TRANSFORMATION_FAILED = ErrorInternalValue("ERR_TRANSFORM_1023", "Atleast one mandatory transformation has failed")
+  val TRANSFORMATION_FIELD_MISSING = ErrorInternalValue("ERR_TRANSFORM_1024", "Transformation field is either missing or blank")
 
 }

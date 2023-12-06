@@ -92,7 +92,7 @@ trait BaseFunction {
 
   def markFailed(event: mutable.Map[String, AnyRef], error: Error, producer: Producer): mutable.Map[String, AnyRef] = {
     val obsrvMeta = Util.getMutableMap(event(Constants.OBSRV_META).asInstanceOf[Map[String, AnyRef]])
-    addError(obsrvMeta, Map(Constants.SRC -> producer, Constants.ERROR_CODE -> error.errorCode, Constants.ERROR_MSG -> error.errorMsg))
+    addError(obsrvMeta, Map(Constants.SRC -> producer.toString, Constants.ERROR_CODE -> error.errorCode, Constants.ERROR_MSG -> error.errorMsg))
     addFlags(obsrvMeta, Map(producer.toString -> StatusCode.failed.toString))
     addTimespan(obsrvMeta, producer)
     event.remove(Constants.OBSRV_META)

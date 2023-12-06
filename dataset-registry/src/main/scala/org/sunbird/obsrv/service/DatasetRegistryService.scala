@@ -3,7 +3,7 @@ package org.sunbird.obsrv.service
 import com.typesafe.config.{Config, ConfigFactory}
 import org.sunbird.obsrv.core.util.{JSONUtil, PostgresConnect, PostgresConnectionConfig}
 import org.sunbird.obsrv.model.DatasetModels._
-import org.sunbird.obsrv.model.DatasetStatus
+import org.sunbird.obsrv.model.{DatasetStatus, TransformMode}
 
 import java.io.File
 import java.sql.{ResultSet, Timestamp}
@@ -202,8 +202,9 @@ object DatasetRegistryService {
     val fieldKey = rs.getString("field_key")
     val transformationFunction = rs.getString("transformation_function")
     val status = rs.getString("status")
+    val mode = rs.getString("mode")
 
-    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status)
+    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status, Some(if(mode != null) TransformMode.withName(mode) else TransformMode.Strict))
   }
 
 }

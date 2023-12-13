@@ -58,13 +58,7 @@ trait SystemEventHandler {
   }
 
   def getDatasetId(dataset: Option[String], config: BaseJobConfig[_]): String = {
-    // if (dataset.isDefined) dataset.get else config.defaultDatasetID
     dataset.getOrElse(config.defaultDatasetID)
-  }
-
-  def getDatasetType(datasetType: Option[String]): String = {
-    // if (dataset.isDefined) dataset.get else config.defaultDatasetID
-    datasetType.getOrElse("dataset")
   }
 
 }

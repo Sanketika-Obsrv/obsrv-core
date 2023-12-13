@@ -45,7 +45,7 @@ class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends Bas
       val json = parse(event, useBigIntForLong = false)
       val node = JSONUtil.getKey(dataset.datasetConfig.key, event)
       if (node.isMissingNode) {
-        markFailure(Some(dataset.id), msg, context, metrics, ErrorConstants.MISSING_DATASET_CONFIG_KEY, Producer.masterdataprocessor, FunctionalError.MissingMasterDatasetKey)
+        markFailure(Some(dataset.id), msg, context, metrics, ErrorConstants.MISSING_DATASET_CONFIG_KEY, Producer.masterdataprocessor, FunctionalError.MissingMasterDatasetKey, datasetType = Some(dataset.datasetType))
       }
       (node.asText(), json)
     }).toMap

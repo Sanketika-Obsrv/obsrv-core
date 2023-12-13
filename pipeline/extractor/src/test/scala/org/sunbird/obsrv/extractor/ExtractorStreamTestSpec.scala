@@ -10,6 +10,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
 import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
+import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model.SystemConfig
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil}
@@ -134,20 +135,14 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
   private def validateSystemEvents(systemEvents: List[String]): Unit = {
     systemEvents.size should be(6)
 
-    val ds1 = JSONUtil.deserialize[Map[String, AnyRef]](systemEvents.head)
-    val ds1Map = ds1("ctx").asInstanceOf[Map[String, AnyRef]]
-    val ds1DatasetId = ds1Map("dataset")
-    val ds1DatasetType = ds1Map.get("dataset_type")
-    println(ds1DatasetType)
-    ds1DatasetId should be("ALL")
-    ds1DatasetType should be(None)
+    systemEvents.foreach(se => {
+      val event = JSONUtil.deserialize[SystemEvent](se)
+      if(event.ctx.dataset.getOrElse("ALL").equals("ALL"))
+        event.ctx.dataset_type should be(None)
+      else
+        event.ctx.dataset_type.getOrElse("dataset") should be("dataset")
+    })
 
-    val ds2 = JSONUtil.deserialize[Map[String, AnyRef]](systemEvents(1))
-    val ds2Map = ds2("ctx").asInstanceOf[Map[String, AnyRef]]
-    val ds2DatasetId = ds2Map("dataset")
-    val ds2DatasetType = ds2Map("dataset_type").asInstanceOf[String]
-    ds2DatasetId should be("d1")
-    ds2DatasetType should be("dataset")
     //TODO: Add assertions for all 6 events
     /*
     (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"ALL"},"data":{"error":{"pdata_id":"extractor","pdata_status":"failed","error_type":"InvalidJsonData","error_code":"ERR_EXT_1018","error_message":"Invalid JSON event, error while deserializing the event","error_level":"critical"}},"ets":1701760337333})

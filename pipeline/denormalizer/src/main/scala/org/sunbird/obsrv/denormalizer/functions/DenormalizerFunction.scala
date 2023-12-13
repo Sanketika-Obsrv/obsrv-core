@@ -53,7 +53,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
         case StatusCode.success => metrics.incCounter(dataset.id, config.denormSuccess)
         case _ =>
           metrics.incCounter(dataset.id, if (status == StatusCode.partial) config.denormPartialSuccess else config.denormFailed)
-          generateSystemEvent(dataset.id, denormEvent, context)
+          generateSystemEvent(dataset, denormEvent, context)
           logData(dataset.id, denormEvent)
       }
     } else {
@@ -66,7 +66,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
     logger.warn(s"Denormalizer | Denorm operation is not successful | dataset=$datasetId | denormStatus=${JSONUtil.serialize(denormEvent.fieldStatus)}")
   }
 
-  private def generateSystemEvent(datasetId: String, denormEvent: DenormEvent, context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
+  private def generateSystemEvent(dataset: Dataset, denormEvent: DenormEvent, context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
 
     denormEvent.fieldStatus.filter(f => !f._2.success).groupBy(f => f._2.error.get).map(f => (f._1, f._2.size))
       .foreach(f => {
@@ -77,7 +77,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
         }
         context.output(config.systemEventsOutputTag, JSONUtil.serialize(SystemEvent(
           EventID.METRIC,
-          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(datasetId)),
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
           data = EData(error = Some(ErrorLog(pdata_id = Producer.denorm, pdata_status = StatusCode.failed, error_type = functionalError, error_code = f._1.errorCode, error_message = f._1.errorMsg, error_level = ErrorLevel.critical, error_count = Some(f._2))))
         )))
       })

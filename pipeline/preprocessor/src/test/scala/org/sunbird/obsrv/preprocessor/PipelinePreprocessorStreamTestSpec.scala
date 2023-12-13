@@ -147,6 +147,8 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
   private def validateSystemEvents(systemEvents: List[String]): Unit = {
     systemEvents.size should be(8)
+
+    systemEvents.foreach(println)
     /*
     (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d1"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"RequiredFieldsMissing","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":1}},"ets":1701428460664})
     (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"ALL"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"MissingDatasetId","error_code":"ERR_EXT_1004","error_message":"Dataset Id is missing from the data","error_level":"critical","error_count":1},"pipeline_stats":{"validator_status":"failed","validator_time":874}},"ets":1701428460889})

@@ -80,18 +80,6 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.dimafeng</groupId>
-            <artifactId>testcontainers-scala-scalatest_2.12</artifactId>
-            <version>0.41.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.dimafeng</groupId>
-            <artifactId>testcontainers-scala-postgresql_2.12</artifactId>
-            <version>0.41.0</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>

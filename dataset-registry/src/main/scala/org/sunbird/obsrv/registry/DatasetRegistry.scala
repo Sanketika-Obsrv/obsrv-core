@@ -12,8 +12,6 @@ object DatasetRegistry {
   datasets ++= DatasetRegistryService.readAllDatasets()
   private val datasetTransformations: Map[String, List[DatasetTransformation]] = DatasetRegistryService.readAllDatasetTransformations()
 
-  def getAllDatasets(): Map[String, Dataset] = datasets
-
   def getAllDatasets(datasetType: String): List[Dataset] = {
     val datasetList = DatasetRegistryService.readAllDatasets()
     datasetList.filter(f => f._2.datasetType.equals(datasetType)).values.toList

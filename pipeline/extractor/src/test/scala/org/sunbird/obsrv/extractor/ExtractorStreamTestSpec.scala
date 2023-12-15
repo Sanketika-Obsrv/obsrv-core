@@ -10,6 +10,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
 import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
+import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model.SystemConfig
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil}
@@ -96,7 +97,7 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
     val mutableMetricsMap = mutable.Map[String, Long]()
     BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### PipelinePreprocessorStreamTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
+    Console.println("### ExtractorStreamTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
     validateMetrics(mutableMetricsMap)
 
     val config2: Config = ConfigFactory.load("test2.conf")
@@ -133,14 +134,23 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
   private def validateSystemEvents(systemEvents: List[String]): Unit = {
     systemEvents.size should be(6)
+
+    systemEvents.foreach(se => {
+      val event = JSONUtil.deserialize[SystemEvent](se)
+      if(event.ctx.dataset.getOrElse("ALL").equals("ALL"))
+        event.ctx.dataset_type should be(None)
+      else
+        event.ctx.dataset_type.getOrElse("dataset") should be("dataset")
+    })
+
     //TODO: Add assertions for all 6 events
     /*
     (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"ALL"},"data":{"error":{"pdata_id":"extractor","pdata_status":"failed","error_type":"InvalidJsonData","error_code":"ERR_EXT_1018","error_message":"Invalid JSON event, error while deserializing the event","error_level":"critical"}},"ets":1701760337333})
-    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1"},"data":{"error":{"pdata_id":"dedup","pdata_status":"skipped","error_type":"DedupFailed","error_code":"ERR_DEDUP_1007","error_message":"No dedup key found or missing data","error_level":"warn"}},"ets":1701760337474})
-    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1"},"data":{"pipeline_stats":{"extractor_events":1,"extractor_status":"success"}},"ets":1701760337655})
-    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1"},"data":{"error":{"pdata_id":"extractor","pdata_status":"failed","error_type":"EventSizeExceeded","error_code":"ERR_EXT_1003","error_message":"Event size has exceeded max configured size of 1048576","error_level":"critical"}},"ets":1701760337724})
-    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1"},"data":{"error":{"pdata_id":"extractor","pdata_status":"failed","error_type":"EventSizeExceeded","error_code":"ERR_EXT_1003","error_message":"Event size has exceeded max configured size of 1048576","error_level":"critical"}},"ets":1701760337754})
-    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1"},"data":{"pipeline_stats":{"extractor_events":1,"extractor_status":"success"}},"ets":1701760337754})
+    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"dedup","pdata_status":"skipped","error_type":"DedupFailed","error_code":"ERR_DEDUP_1007","error_message":"No dedup key found or missing data","error_level":"warn"}},"ets":1701760337474})
+    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1", "dataset_type": "dataset"},"data":{"pipeline_stats":{"extractor_events":1,"extractor_status":"success"}},"ets":1701760337655})
+    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"extractor","pdata_status":"failed","error_type":"EventSizeExceeded","error_code":"ERR_EXT_1003","error_message":"Event size has exceeded max configured size of 1048576","error_level":"critical"}},"ets":1701760337724})
+    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"extractor","pdata_status":"failed","error_type":"EventSizeExceeded","error_code":"ERR_EXT_1003","error_message":"Event size has exceeded max configured size of 1048576","error_level":"critical"}},"ets":1701760337754})
+    (SysEvent,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"ExtractorJob","type":"flink","pid":"extractor"},"dataset":"d1", "dataset_type": "dataset"},"data":{"pipeline_stats":{"extractor_events":1,"extractor_status":"success"}},"ets":1701760337754})
      */
   }
 

@@ -14,7 +14,7 @@ object Models {
 
   case class PData(id: String,@JsonScalaEnumeration(classOf[PDataTypeType]) `type`: PDataType,@JsonScalaEnumeration(classOf[ProducerType]) pid: Option[Producer])
 
-  case class ContextData(@JsonScalaEnumeration(classOf[ModuleIDType]) module: ModuleID, pdata: PData, dataset: Option[String] = None, eid: Option[String] = None)
+  case class ContextData(@JsonScalaEnumeration(classOf[ModuleIDType]) module: ModuleID, pdata: PData, dataset: Option[String] = None, dataset_type: Option[String] = None, eid: Option[String] = None)
 
   case class ErrorLog(@JsonScalaEnumeration(classOf[ProducerType]) pdata_id: Producer, @JsonScalaEnumeration(classOf[StatusCodeType]) pdata_status: StatusCode, @JsonScalaEnumeration(classOf[FunctionalErrorType]) error_type: FunctionalError, error_code: String, error_message: String,@JsonScalaEnumeration(classOf[ErrorLevelType]) error_level: ErrorLevel, error_count:Option[Int] = None)
 

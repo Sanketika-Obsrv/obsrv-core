@@ -9,6 +9,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
 import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
+import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, PostgresConnect}
 import org.sunbird.obsrv.fixture.EventFixture
@@ -98,6 +99,14 @@ class MasterDataProcessorStreamTaskTestSpec extends BaseSpecWithDatasetRegistry 
 
     val sysEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.system.event.topic"), 8, timeout = 30.seconds)
     sysEvents.size should be(8)
+
+    sysEvents.foreach(se => {
+      val event = JSONUtil.deserialize[SystemEvent](se)
+      if (event.ctx.dataset.getOrElse("ALL").equals("ALL"))
+        event.ctx.dataset_type should be(None)
+      else
+        event.ctx.dataset_type.getOrElse("dataset") should be("master-dataset")
+    })
 
     val failedEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](masterDataConfig.kafkaFailedTopic, 1, timeout = 30.seconds)
     failedEvents.size should be(1)

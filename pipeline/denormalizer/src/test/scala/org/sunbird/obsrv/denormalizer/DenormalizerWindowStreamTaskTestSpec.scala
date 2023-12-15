@@ -145,6 +145,15 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
       val event = JSONUtil.deserialize[SystemEvent](f)
       Producer.denorm.equals(event.ctx.pdata.pid.get)
     }) should be(3)
+
+    systemEvents.foreach(se => {
+      val event = JSONUtil.deserialize[SystemEvent](se)
+      if (event.ctx.dataset.getOrElse("ALL").equals("ALL"))
+        event.ctx.dataset_type should be(None)
+      else
+        event.ctx.dataset_type.getOrElse("dataset") should be("dataset")
+    })
+
     systemEvents.foreach(f => {
       val event = JSONUtil.deserialize[SystemEvent](f)
       event.etype should be(EventID.METRIC)

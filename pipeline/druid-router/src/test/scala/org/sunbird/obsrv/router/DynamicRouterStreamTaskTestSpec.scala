@@ -117,6 +117,15 @@ class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
   private def validateSystemEvents(systemEvents: List[String]): Unit = {
     systemEvents.size should be(2)
+
+    systemEvents.foreach(se => {
+      val event = JSONUtil.deserialize[SystemEvent](se)
+      if (event.ctx.dataset.getOrElse("ALL").equals("ALL"))
+        event.ctx.dataset_type should be(None)
+      else
+        event.ctx.dataset_type.getOrElse("dataset") should be("dataset")
+    })
+
     systemEvents.foreach(f => {
       val event = JSONUtil.deserialize[SystemEvent](f)
       event.etype should be(EventID.METRIC)

@@ -9,6 +9,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
 import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
+import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
 import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, PostgresConnect}
 import org.sunbird.obsrv.preprocessor.fixture.EventFixtures
@@ -147,14 +148,22 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
   private def validateSystemEvents(systemEvents: List[String]): Unit = {
     systemEvents.size should be(8)
+
+    systemEvents.foreach(se => {
+      val event = JSONUtil.deserialize[SystemEvent](se)
+      if (event.ctx.dataset.getOrElse("ALL").equals("ALL"))
+        event.ctx.dataset_type should be(None)
+      else
+        event.ctx.dataset_type.getOrElse("dataset") should be("dataset")
+    })
     /*
-    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d1"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"RequiredFieldsMissing","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":1}},"ets":1701428460664})
+    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d1", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"RequiredFieldsMissing","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":1}},"ets":1701428460664})
     (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"ALL"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"MissingDatasetId","error_code":"ERR_EXT_1004","error_message":"Dataset Id is missing from the data","error_level":"critical","error_count":1},"pipeline_stats":{"validator_status":"failed","validator_time":874}},"ets":1701428460889})
-    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"dX"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"MissingDatasetId","error_code":"ERR_EXT_1005","error_message":"Dataset configuration is missing","error_level":"critical","error_count":1},"pipeline_stats":{"validator_status":"failed","validator_time":924}},"ets":1701428460927})
-    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d2"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"MissingEventData","error_code":"ERR_EXT_1006","error_message":"Event missing in the batch event","error_level":"critical","error_count":1},"pipeline_stats":{"validator_status":"failed","validator_time":925}},"ets":1701428460935})
-    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d4"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"DataTypeMismatch","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":2}},"ets":1701428460987})
-    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d4"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"AdditionalFieldsFound","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":0}},"ets":1701428461010})
-    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d6"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"AdditionalFieldsFound","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":0}},"ets":1701428461064})
+    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"dX", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"MissingDatasetId","error_code":"ERR_EXT_1005","error_message":"Dataset configuration is missing","error_level":"critical","error_count":1},"pipeline_stats":{"validator_status":"failed","validator_time":924}},"ets":1701428460927})
+    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d2", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"MissingEventData","error_code":"ERR_EXT_1006","error_message":"Event missing in the batch event","error_level":"critical","error_count":1},"pipeline_stats":{"validator_status":"failed","validator_time":925}},"ets":1701428460935})
+    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d4", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"DataTypeMismatch","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":2}},"ets":1701428460987})
+    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d4", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"AdditionalFieldsFound","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":0}},"ets":1701428461010})
+    (SysEvent:,{"etype":"METRIC","ctx":{"module":"processing","pdata":{"id":"PipelinePreprocessorJob","type":"flink","pid":"validator"},"dataset":"d6", "dataset_type": "dataset"},"data":{"error":{"pdata_id":"validator","pdata_status":"failed","error_type":"AdditionalFieldsFound","error_code":"ERR_PP_1013","error_message":"Event failed the schema validation","error_level":"warn","error_count":0}},"ets":1701428461064})
      */
   }
 

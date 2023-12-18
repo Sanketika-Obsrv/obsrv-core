@@ -9,6 +9,8 @@ import org.sunbird.obsrv.core.model.ModuleID.ModuleID
 import org.sunbird.obsrv.core.model.PDataType.PDataType
 import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
+import com.fasterxml.jackson.annotation.JsonProperty
+import org.sunbird.obsrv.core.util.JSONUtil
 
 object Models {
 
@@ -27,6 +29,43 @@ object Models {
   case class EData(error: Option[ErrorLog] = None, pipeline_stats: Option[PipelineStats] = None, extra: Option[Map[String, AnyRef]] = None)
 
   case class SystemEvent(@JsonScalaEnumeration(classOf[EventIDType]) etype: EventID, ctx: ContextData, data: EData, ets: Long = System.currentTimeMillis())
+  class SystemSettings(@JsonProperty("key") key: String, @JsonProperty("value") value: String,
+                            @JsonProperty("category") category: String, @JsonProperty("type") valueType: String,
+                            @JsonProperty("label") label: String
+                       ) {
+    def objectKey: String = key
+
+    def intValue(): Int = {
+       valueType match {
+         case "int" => value.toInt
+       }
+    }
+
+    def stringValue(): String = {
+      valueType match {
+        case "string" => value
+      }
+    }
+
+    def booleanValue(): Boolean = {
+      valueType match {
+        case "boolean" => value.toBoolean
+      }
+    }
+
+    def longValue(): Long = {
+      valueType match {
+        case "long" => value.toLong
+      }
+    }
+
+    def jsonValue(): Map[String, AnyRef] = {
+      valueType match {
+        case "json" => JSONUtil.deserialize[Map[String, AnyRef]](value)
+      }
+    }
+  }
+
 }
 
 class EventIDType extends TypeReference[EventID.type]

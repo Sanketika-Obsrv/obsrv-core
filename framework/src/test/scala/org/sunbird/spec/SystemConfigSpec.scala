@@ -94,11 +94,11 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
     }
     exception.getMessage should be("Invalid value type for system setting")
     exception = intercept[Exception] {
-      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", 604810).stringValue()
+      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", "604810").stringValue()
     }
     exception.getMessage should be("Invalid value type for system setting")
     exception = intercept[Exception] {
-      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", 604810).longValue()
+      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", 604810L).longValue()
     }
     exception.getMessage should be("Invalid value type for system setting")
   }

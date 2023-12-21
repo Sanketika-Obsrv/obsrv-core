@@ -30,10 +30,10 @@ object Models {
 
   case class SystemEvent(@JsonScalaEnumeration(classOf[EventIDType]) etype: EventID, ctx: ContextData, data: EData, ets: Long = System.currentTimeMillis())
   class SystemSettings(@JsonProperty("key") key: Option[String] = None, @JsonProperty("value") value: Option[String] = None,
-                            @JsonProperty("category") category: Option[String] = None, @JsonProperty("type") valueType: Option[String] = None,
+                            @JsonProperty("category") category: Option[String] = None, @JsonProperty("valuetype") valueType: Option[String] = None,
                             @JsonProperty("label") label: Option[String] = None
                        )(defaultValue: Any) {
-    def objectKey: String = key.get
+    def objectKey: String = if(key.isDefined && key.get.nonEmpty) key.get else "none"
 
     def intValue(): Int = {
       var result = defaultValue.asInstanceOf[Int]

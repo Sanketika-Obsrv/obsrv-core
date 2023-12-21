@@ -75,14 +75,31 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
   "SystemSettingsService" should "return default value" in {
     val postgresConnect = new PostgresConnect(postgresConfig)
     postgresConnect.execute("TRUNCATE system_settings;")
+    // Get all keys and validate default value
     var systemSettings = SystemConfig.getSystemConfig("defaultDedupPeriodInSeconds", 604810)
     systemSettings.intValue() should be(604810)
-    // GEt all keys and validate default value
     systemSettings = SystemConfig.getSystemConfig("maxEventSize", 1048671L)
     systemSettings.longValue() should be(1048671)
     systemSettings = SystemConfig.getSystemConfig("defaultDatasetId", "new")
     systemSettings.stringValue() should be("new")
     systemSettings = SystemConfig.getSystemConfig("encryptionSecretKey", "test")
     systemSettings.stringValue() should be("test")
+  }
+
+  "SystemSettingsService" should "throw exception for invalid valueType" in {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    postgresConnect.execute("insert into system_settings values('defaultDedupPeriodInSecondsNew', '604801', 'system', 'double', now(),  now(), 'Dedup Period in Seconds');")
+    var exception = intercept[Exception] {
+      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", 604810).intValue()
+    }
+    exception.getMessage should be("Invalid value type for system setting")
+    exception = intercept[Exception] {
+      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", 604810).stringValue()
+    }
+    exception.getMessage should be("Invalid value type for system setting")
+    exception = intercept[Exception] {
+      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", 604810).longValue()
+    }
+    exception.getMessage should be("Invalid value type for system setting")
   }
 }

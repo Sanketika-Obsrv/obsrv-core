@@ -35,10 +35,54 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
     SystemConfig.getSystemConfig("encryptionSecretKey", "test").stringValue() should be("ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
   }
 
-  "SystemConfig" should "throw ObsrvException if key is not found in database" in {
+  "SystemSettingsService" should "throw ObsrvException when no default value provided" in {
     val thrown = intercept[Exception] {
-      SystemSettingsService.getSystemSetting("invalidKey", 604800).intValue()
+      SystemSettingsService.getAllSystemSettings(Map.empty)
     }
-    thrown.getMessage should be("System setting not found for requested key")
+    thrown.getMessage should be("Default value not found for requested key")
+  }
+
+  "SystemSettingsService" should "return list of System settings with values from database" in {
+    val systemSettings = SystemSettingsService.getAllSystemSettings(Map(
+      "defaultDedupPeriodInSeconds" -> 604810,
+      "maxEventSize" -> 1048671L,
+      "defaultDatasetId" -> "new",
+      "encryptionSecretKey" -> "test"
+    ))
+    systemSettings.size should be(4)
+    systemSettings.map(f => {
+      f.objectKey match {
+        case "defaultDedupPeriodInSeconds" => f.intValue() should be(604801)
+        case "maxEventSize" => f.longValue() should be(1048676)
+        case "defaultDatasetId" => f.stringValue() should be("ALL")
+        case "encryptionSecretKey" => f.stringValue() should be("ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
+      }
+    })
+  }
+
+  "SystemSettingsService with empty table" should "return empty list of System settings without throwing error" in {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    postgresConnect.execute("TRUNCATE system_settings;")
+    val systemSettings = SystemSettingsService.getAllSystemSettings(Map(
+      "defaultDedupPeriodInSeconds" -> 604810,
+      "maxEventSize" -> 1048671L,
+      "defaultDatasetId" -> "new",
+"     encryptionSecretKey" -> "test"
+    ))
+    systemSettings.size should be(0)
+  }
+
+  "SystemSettingsService" should "return default value" in {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    postgresConnect.execute("TRUNCATE system_settings;")
+    var systemSettings = SystemConfig.getSystemConfig("defaultDedupPeriodInSeconds", 604810)
+    systemSettings.intValue() should be(604810)
+    // GEt all keys and validate default value
+    systemSettings = SystemConfig.getSystemConfig("maxEventSize", 1048671L)
+    systemSettings.longValue() should be(1048671)
+    systemSettings = SystemConfig.getSystemConfig("defaultDatasetId", "new")
+    systemSettings.stringValue() should be("new")
+    systemSettings = SystemConfig.getSystemConfig("encryptionSecretKey", "test")
+    systemSettings.stringValue() should be("test")
   }
 }

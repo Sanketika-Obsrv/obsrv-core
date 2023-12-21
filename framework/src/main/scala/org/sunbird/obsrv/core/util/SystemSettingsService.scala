@@ -30,26 +30,37 @@ object SystemSettingsService {
     config.getInt("postgres.maxConnections"))
 
   @throws[Exception]
+  def getAllSystemSettings(defaultValues: Map[String, Any], postgresConfig: PostgresConnectionConfig = postgresConfiguration): List[SystemSettings] = {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    val rs = postgresConnect.executeQuery("SELECT * FROM system_settings")
+    val result = Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {
+      val key = rs.getString("key")
+      parseSystemSettings(result, defaultValues.getOrElse(key, throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_DEFAULT_VALUE_NOT_FOUND)))
+    }).toList
+    postgresConnect.closeConnection()
+    result
+  }
+
+  @throws[Exception]
   def getSystemSetting(key: String, defaultValue: Any, postgresConfig: PostgresConnectionConfig = postgresConfiguration): SystemSettings = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     val rs = postgresConnect.executeQuery(s"SELECT * FROM system_settings WHERE key = '${key}'")
-    val result = Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {
-      val systemSettings = parseSystemSettings(result, defaultValue)
-      systemSettings
+    var result = Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {
+      parseSystemSettings(result, defaultValue)
     }).toList
     postgresConnect.closeConnection()
-    if (result.isEmpty) {
-      throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_NOT_FOUND)
+    if(result.isEmpty) {
+      result = List(new SystemSettings()(defaultValue))
     }
     result.head
   }
 
   private def parseSystemSettings(rs: ResultSet, defaultValue: Any): SystemSettings = {
-    val key = rs.getString("key")
-    val value = rs.getString("value")
-    val category = rs.getString("category")
-    val valueType = rs.getString("valuetype")
-    val label = rs.getString("label")
+    val key = Option(rs.getString("key"))
+    val value = Option(rs.getString("value"))
+    val category = Option(rs.getString("category"))
+    val valueType = Option(rs.getString("valuetype"))
+    val label = Option(rs.getString("label"))
 
     new SystemSettings(key, value, category, valueType, label)(defaultValue)
   }

@@ -35,5 +35,6 @@ object ErrorConstants extends Enumeration {
   val TRANSFORMATION_FIELD_MISSING = ErrorInternalValue("ERR_TRANSFORM_1024", "Transformation field is either missing or blank")
   val SYSTEM_SETTING_INVALID_TYPE = ErrorInternalValue("ERR_SYSTEM_SETTING_1025", "Invalid value type for system setting")
   val SYSTEM_SETTING_NOT_FOUND = ErrorInternalValue("ERR_SYSTEM_SETTING_1026", "System setting not found for requested key")
+  val SYSTEM_SETTING_DEFAULT_VALUE_NOT_FOUND = ErrorInternalValue("ERR_SYSTEM_SETTING_1027", "Default value not found for requested key")
 
 }

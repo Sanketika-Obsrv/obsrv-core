@@ -29,46 +29,59 @@ object Models {
   case class EData(error: Option[ErrorLog] = None, pipeline_stats: Option[PipelineStats] = None, extra: Option[Map[String, AnyRef]] = None)
 
   case class SystemEvent(@JsonScalaEnumeration(classOf[EventIDType]) etype: EventID, ctx: ContextData, data: EData, ets: Long = System.currentTimeMillis())
-  class SystemSettings(@JsonProperty("key") key: String, @JsonProperty("value") value: String,
-                            @JsonProperty("category") category: String, @JsonProperty("type") valueType: String,
-                            @JsonProperty("label") label: String
+  class SystemSettings(@JsonProperty("key") key: Option[String] = None, @JsonProperty("value") value: Option[String] = None,
+                            @JsonProperty("category") category: Option[String] = None, @JsonProperty("type") valueType: Option[String] = None,
+                            @JsonProperty("label") label: Option[String] = None
                        )(defaultValue: Any) {
-    def objectKey: String = key
+    def objectKey: String = key.get
 
     def intValue(): Int = {
-      valueType match {
-        case "int" => {
-          if(value.isEmpty)
-            defaultValue.asInstanceOf[Int]
-          else
-            value.toInt
+      var result = defaultValue.asInstanceOf[Int]
+      valueType.foreach(f => {
+        if (f.nonEmpty) {
+          f match {
+            case "int" => {
+              if (value.isDefined && value.get.nonEmpty)
+                result = value.get.toInt
+            }
+            case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
+          }
         }
-        case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
-      }
+      })
+      result
     }
 
+
     def stringValue(): String = {
-      valueType match {
-        case "string" => {
-          if (value.isEmpty)
-            defaultValue.asInstanceOf[String]
-          else
-            value
+      var result = defaultValue.asInstanceOf[String]
+      valueType.foreach(f => {
+        if (f.nonEmpty) {
+          f match {
+            case "string" => {
+              if (value.isDefined && value.get.nonEmpty)
+                result = value.get
+            }
+            case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
+          }
         }
-        case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
-      }
+      })
+      result
     }
 
     def longValue(): Long = {
-      valueType match {
-        case "long" => {
-          if (value.isEmpty)
-            defaultValue.asInstanceOf[Long]
-          else
-            value.toLong
+      var result = defaultValue.asInstanceOf[Long]
+      valueType.foreach(f => {
+        if (f.nonEmpty) {
+          f match {
+            case "long" => {
+              if (value.isDefined && value.get.nonEmpty)
+                result = value.get.toLong
+            }
+            case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
+          }
         }
-        case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
-      }
+      })
+      result
     }
   }
 

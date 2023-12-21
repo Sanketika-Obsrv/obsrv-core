@@ -32,7 +32,7 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
     SystemSettingsService.getSystemSetting("defaultDedupPeriodInSeconds", 604800).intValue() should be(604801)
     SystemConfig.getSystemConfig("maxEventSize", 100L).longValue() should be(1048676)
     SystemConfig.getSystemConfig("defaultDatasetId", "NEW").stringValue() should be("ALL")
-    SystemConfig.getSystemConfig("encryptionSecretKey", "test").stringValue() should be("akW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
+    SystemConfig.getSystemConfig("encryptionSecretKey", "test").stringValue() should be("ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
   }
 
   "SystemConfig" should "throw ObsrvException if key is not found in database" in {

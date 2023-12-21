@@ -3,11 +3,8 @@ package org.sunbird.obsrv.core.model
 import org.sunbird.obsrv.core.util.SystemConfigSelector
 import org.sunbird.obsrv.core.model.Models.SystemSettings
 object SystemConfig {
-
-  private val configurations: List[SystemSettings] = SystemConfigSelector.getSystemConfigurations
-
-  private def getSystemConfig(key: String): Option[SystemSettings] = {
-    configurations.find(config => config.objectKey == key)
+  def getSystemConfig(key: String): Option[SystemSettings] = {
+    SystemConfigSelector.getSystemConfigurations().find(config => config.objectKey == key)
   }
 
   val defaultDedupPeriodInSeconds: Int = getSystemConfig("defaultDedupPeriodInSeconds").map(_.intValue()).getOrElse(604800) // 7 days

@@ -41,8 +41,9 @@ class DynamicRouterFunction(config: DruidRouterConfig) extends BaseDatasetProces
 
     metrics.incCounter(dataset.id, config.routerTotalCount)
     val event = Util.getMutableMap(msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]])
+    event.put(config.CONST_OBSRV_META, msg(config.CONST_OBSRV_META).asInstanceOf[Map[String, AnyRef]])
     val tsKeyData = TimestampKeyParser.parseTimestampKey(dataset.datasetConfig, event)
-    event.put(config.CONST_OBSRV_META, msg(config.CONST_OBSRV_META).asInstanceOf[Map[String, AnyRef]] ++ Map("indexTS" -> tsKeyData.value))
+    event.asInstanceOf[Map[String, AnyRef]] ++ Map("indexTS" -> tsKeyData.value)
     if (tsKeyData.isValid) {
       val routerConfig = dataset.routerConfig
       val topicEventMap = mutable.Map(Constants.TOPIC -> routerConfig.topic, Constants.MESSAGE -> event)

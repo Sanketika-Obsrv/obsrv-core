@@ -47,21 +47,9 @@ object Models {
       }
     }
 
-    def booleanValue(): Boolean = {
-      valueType match {
-        case "boolean" => value.toBoolean
-      }
-    }
-
     def longValue(): Long = {
       valueType match {
         case "long" => value.toLong
-      }
-    }
-
-    def jsonValue(): Map[String, AnyRef] = {
-      valueType match {
-        case "json" => JSONUtil.deserialize[Map[String, AnyRef]](value)
       }
     }
   }

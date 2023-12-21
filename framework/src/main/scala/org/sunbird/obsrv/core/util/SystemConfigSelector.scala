@@ -2,13 +2,15 @@ package org.sunbird.obsrv.core.util
 
 import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.LoggerFactory
+import org.sunbird.obsrv.core.exception.ObsrvException
+import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.model.Models.SystemSettings
 
 import java.io.File
 import java.sql.ResultSet
 
-object SystemConfigSelector {
-  private[this] val logger = LoggerFactory.getLogger(SystemConfigSelector.getClass)
+object SystemSettingsService {
+  private[this] val logger = LoggerFactory.getLogger(SystemSettingsService.getClass)
   private val configFile = new File("/data/flink/conf/baseconfig.conf")
   // $COVERAGE-OFF$
   val config: Config = if (configFile.exists()) {
@@ -27,30 +29,28 @@ object SystemConfigSelector {
     config.getInt("postgres.port"),
     config.getInt("postgres.maxConnections"))
 
-  def getSystemConfigurations(postgresConfig: PostgresConnectionConfig = postgresConfiguration): List[SystemSettings] = {
-    try {
-      val postgresConnect = new PostgresConnect(postgresConfig)
-      val rs = postgresConnect.executeQuery("SELECT * FROM system_settings")
-      val result = Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {
-        val systemSettings = parseSystemSettings(result)
-        systemSettings
-      }).toList
-      postgresConnect.closeConnection()
-      result
-    } catch {
-      case ex: Exception =>
-        logger.error("Exception while reading system settings from Postgres", ex)
-        List()
+  @throws[Exception]
+  def getSystemSetting(key: String, defaultValue: Any, postgresConfig: PostgresConnectionConfig = postgresConfiguration): SystemSettings = {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    val rs = postgresConnect.executeQuery(s"SELECT * FROM system_settings WHERE key = '${key}'")
+    val result = Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {
+      val systemSettings = parseSystemSettings(result, defaultValue)
+      systemSettings
+    }).toList
+    postgresConnect.closeConnection()
+    if(result.isEmpty) {
+      throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_NOT_FOUND)
     }
+    result.head
   }
 
-  private def parseSystemSettings(rs: ResultSet): SystemSettings = {
+  private def parseSystemSettings(rs: ResultSet, defaultValue: Any): SystemSettings = {
     val key = rs.getString("key")
     val value = rs.getString("value")
     val category = rs.getString("category")
     val valueType = rs.getString("valuetype")
     val label = rs.getString("label")
 
-    new SystemSettings(key, value, category, valueType, label)
+    new SystemSettings(key, value, category, valueType, label)(defaultValue)
   }
 }

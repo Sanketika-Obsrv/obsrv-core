@@ -3,7 +3,7 @@ package org.sunbird.spec
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
-import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig, SystemConfigSelector}
+import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig, SystemSettingsService}
 import org.sunbird.obsrv.core.model.SystemConfig
 
 class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFactory {
@@ -39,20 +39,9 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
   }
 
   "SystemConfig" should "populate configurations with values from database" in {
-    val postgresConnect = new PostgresConnect(postgresConfig)
-    val result = SystemConfigSelector.getSystemConfigurations(postgresConfig)
-    SystemConfig.getSystemConfig("defaultDedupPeriodInSeconds").map(_.intValue()).get should be(604801)
-    SystemConfig.getSystemConfig("maxEventSize").map(_.longValue()).get should be(1048676)
-    SystemConfig.getSystemConfig("defaultDatasetId").map(_.stringValue()).get should be("DATASETS")
-    SystemConfig.getSystemConfig("encryptionSecretKey").map(_.stringValue()).get should be("akW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
-  }
-
-"SystemConfigSelector" should "return empty list when table does not exist" in {
-    val postgresConnect = new PostgresConnect(postgresConfig)
-    postgresConnect.execute("DROP TABLE IF EXISTS system_settings;")
-    val result = SystemConfigSelector.getSystemConfigurations(postgresConfig)
-    result.size should be(0)
-    createSchema(postgresConnect)
-    insertTestData(postgresConnect)
+    SystemSettingsService.getSystemSetting("defaultDedupPeriodInSeconds", 604800).intValue() should be(604801)
+    SystemConfig.getSystemConfig("maxEventSize", 100L).longValue() should be(1048676)
+    SystemConfig.getSystemConfig("defaultDatasetId", "ALL").stringValue() should be("DATASETS")
+    SystemConfig.getSystemConfig("encryptionSecretKey", "test").stringValue() should be("akW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
   }
 }

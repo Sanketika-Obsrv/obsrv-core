@@ -20,7 +20,7 @@ object DatasetModels {
 
   case class DedupConfig(@JsonProperty("drop_duplicates") dropDuplicates: Option[Boolean] = Some(false),
                          @JsonProperty("dedup_key") dedupKey: Option[String],
-                         @JsonProperty("dedup_period") dedupPeriod: Option[Integer] = Some(SystemConfig.defaultDedupPeriodInSeconds))
+                         @JsonProperty("dedup_period") dedupPeriod: Option[Integer] = Some(SystemConfig.getSystemConfig("defaultDedupPeriodInSeconds", 604800).intValue()))
 
   case class ValidationConfig(@JsonProperty("validate") validate: Option[Boolean] = Some(true),
                               @JsonProperty("mode") @JsonScalaEnumeration(classOf[ValidationModeType]) mode: Option[ValidationMode])

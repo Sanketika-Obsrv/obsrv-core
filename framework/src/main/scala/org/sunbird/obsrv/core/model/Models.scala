@@ -10,7 +10,7 @@ import org.sunbird.obsrv.core.model.PDataType.PDataType
 import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
 import com.fasterxml.jackson.annotation.JsonProperty
-import org.sunbird.obsrv.core.util.JSONUtil
+import org.sunbird.obsrv.core.exception.ObsrvException
 
 object Models {
 
@@ -32,24 +32,42 @@ object Models {
   class SystemSettings(@JsonProperty("key") key: String, @JsonProperty("value") value: String,
                             @JsonProperty("category") category: String, @JsonProperty("type") valueType: String,
                             @JsonProperty("label") label: String
-                       ) {
+                       )(defaultValue: Any) {
     def objectKey: String = key
 
     def intValue(): Int = {
-       valueType match {
-         case "int" => value.toInt
-       }
+      valueType match {
+        case "int" => {
+          if(value.isEmpty)
+            defaultValue.asInstanceOf[Int]
+          else
+            value.toInt
+        }
+        case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
+      }
     }
 
     def stringValue(): String = {
       valueType match {
-        case "string" => value
+        case "string" => {
+          if (value.isEmpty)
+            defaultValue.asInstanceOf[String]
+          else
+            value
+        }
+        case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
       }
     }
 
     def longValue(): Long = {
       valueType match {
-        case "long" => value.toLong
+        case "long" => {
+          if (value.isEmpty)
+            defaultValue.asInstanceOf[Long]
+          else
+            value.toLong
+        }
+        case _ => throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_INVALID_TYPE)
       }
     }
   }

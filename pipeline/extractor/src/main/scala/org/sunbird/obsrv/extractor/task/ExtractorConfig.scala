@@ -17,14 +17,14 @@ class ExtractorConfig(override val config: Config) extends BaseJobConfig[mutable
   implicit val stringTypeInfo: TypeInformation[String] = TypeExtractor.getForClass(classOf[String])
 
   val dedupStore: Int = config.getInt("redis.database.extractor.duplication.store.id")
-  val cacheExpiryInSeconds: Int = SystemConfig.getSystemConfig("defaultDedupPeriodInSeconds", 604800).intValue()
+  def cacheExpiryInSeconds: Int = SystemConfig.getSystemConfig("defaultDedupPeriodInSeconds", 604800).intValue()
 
   // Kafka Topics Configuration
   val kafkaInputTopic: String = config.getString("kafka.input.topic")
   val kafkaSuccessTopic: String = config.getString("kafka.output.raw.topic")
   val kafkaDuplicateTopic: String = config.getString("kafka.output.extractor.duplicate.topic")
   val kafkaBatchFailedTopic: String = config.getString("kafka.output.batch.failed.topic")
-  val eventMaxSize: Long = if(config.hasPath("kafka.event.max.size")) config.getInt("kafka.event.max.size") else SystemConfig.getSystemConfig("maxEventSize", 1048576).longValue()
+  def eventMaxSize: Long = if(config.hasPath("kafka.event.max.size")) config.getInt("kafka.event.max.size") else SystemConfig.getSystemConfig("maxEventSize", 1048576).longValue()
 
   private val RAW_EVENTS_OUTPUT_TAG = "raw-events"
   private val FAILED_BATCH_EVENTS_OUTPUT_TAG = "failed-batch-events"

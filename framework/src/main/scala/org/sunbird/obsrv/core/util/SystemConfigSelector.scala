@@ -38,7 +38,7 @@ object SystemSettingsService {
       systemSettings
     }).toList
     postgresConnect.closeConnection()
-    if(result.isEmpty) {
+    if (result.isEmpty) {
       throw new ObsrvException(ErrorConstants.SYSTEM_SETTING_NOT_FOUND)
     }
     result.head

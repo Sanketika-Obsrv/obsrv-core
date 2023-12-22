@@ -3,8 +3,8 @@ package org.sunbird.spec
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
-import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig, SystemSettingsService}
 import org.sunbird.obsrv.core.model.SystemConfig
+import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 
 class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFactory {
   val configFile: Config = ConfigFactory.load("base-test.conf")

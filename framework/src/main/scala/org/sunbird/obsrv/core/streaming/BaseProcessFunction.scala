@@ -56,7 +56,7 @@ case class Metrics(metrics: mutable.Map[String, ConcurrentHashMap[String, Atomic
 trait JobMetrics {
   def registerMetrics(datasets: List[String], metrics: List[String]): Metrics = {
 
-    val allDatasets = datasets ++ List(SystemConfig.getSystemConfig("defaultDatasetId", "ALL").stringValue())
+    val allDatasets = datasets ++ List(SystemConfig.getString("defaultDatasetId", "ALL"))
     val datasetMetricMap: Map[String, ConcurrentHashMap[String, AtomicLong]] = allDatasets.map(dataset => {
       val metricMap = new ConcurrentHashMap[String, AtomicLong]()
       metrics.foreach { metric => metricMap.put(metric, new AtomicLong(0L)) }
@@ -156,7 +156,7 @@ abstract class BaseProcessFunction[T, R](config: BaseJobConfig[R]) extends Proce
           ))
       })
     }
-    val defaultDatasetId = SystemConfig.getSystemConfig("defaultDatasetId", "ALL").stringValue()
+    val defaultDatasetId = SystemConfig.getString("defaultDatasetId", "ALL")
     getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(defaultDatasetId)
       .gauge[Long, ScalaGauge[Long]](config.eventFailedMetricsCount, ScalaGauge[Long](() =>
         // $COVERAGE-OFF$
@@ -191,7 +191,7 @@ abstract class WindowBaseProcessFunction[I, O, K](config: BaseJobConfig[O]) exte
           ))
       })
     }
-    val defaultDatasetId = SystemConfig.getSystemConfig("defaultDatasetId", "ALL").stringValue()
+    val defaultDatasetId = SystemConfig.getString("defaultDatasetId", "ALL")
     getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(defaultDatasetId)
       .gauge[Long, ScalaGauge[Long]](config.eventFailedMetricsCount, ScalaGauge[Long](() =>
         // $COVERAGE-OFF$

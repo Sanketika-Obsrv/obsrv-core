@@ -86,7 +86,7 @@ object SystemConfigService {
     config.getInt("postgres.maxConnections"))
 
   @throws[Exception]
-  def getAllSystemSettings(): List[SystemSetting] = {
+  def getAllSystemSettings: List[SystemSetting] = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     val rs = postgresConnect.executeQuery("SELECT * FROM system_settings")
     val result = Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {

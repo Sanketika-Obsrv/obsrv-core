@@ -33,6 +33,7 @@ class BaseSpecWithPostgres extends FlatSpec with BeforeAndAfterAll {
     postgresConnect.execute("insert into system_settings values('maxEventSize', '1048676', 'system', 'long', now(),  now(), 'Max Event Size');")
     postgresConnect.execute("insert into system_settings values('defaultDatasetId', 'ALL', 'system', 'string', now(),  now(), 'Default Dataset Id');")
     postgresConnect.execute("insert into system_settings values('encryptionSecretKey', 'ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f', 'system', 'string', now(),  now(), 'Encryption Secret Key');")
+    postgresConnect.execute("insert into system_settings values('enable', 'true', 'system', 'boolean', now(),  now(), 'Enable flag');")
   }
 
   def clearSystemSettings(postgresConnect: PostgresConnect): Unit = {

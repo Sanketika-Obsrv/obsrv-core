@@ -3,7 +3,7 @@ package org.sunbird.spec
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
-import org.sunbird.obsrv.core.model.SystemConfig
+import org.sunbird.obsrv.core.model.{SystemConfig, SystemConfigService}
 import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 
 class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFactory {
@@ -28,78 +28,87 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
     super.afterAll()
   }
 
+  def createInvalidSystemSettings(postgresConnect: PostgresConnect): Unit = {
+    postgresConnect.execute("CREATE TABLE IF NOT EXISTS system_settings ( key text NOT NULL, value text NOT NULL, category text NOT NULL DEFAULT 'SYSTEM'::text, valuetype text NOT NULL, created_date timestamp NOT NULL DEFAULT now(), updated_date timestamp, label text, PRIMARY KEY (\"key\"));")
+    postgresConnect.execute("insert into system_settings values('defaultDedupPeriodInSeconds', '604801', 'system', 'double', now(),  now(), 'Dedup Period in Seconds');")
+    postgresConnect.execute("insert into system_settings values('maxEventSize', '1048676', 'system', 'inv', now(),  now(), 'Max Event Size');")
+    postgresConnect.execute("insert into system_settings values('defaultDatasetId', 'ALL', 'system', 'random', now(),  now(), 'Default Dataset Id');")
+    postgresConnect.execute("insert into system_settings values('encryptionSecretKey', 'ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f', 'system', 'text', now(),  now(), 'Encryption Secret Key');")
+  }
+
   "SystemConfig" should "populate configurations with values from database" in {
-    SystemSettingsService.getSystemSetting("defaultDedupPeriodInSeconds", 604800).intValue() should be(604801)
-    SystemConfig.getSystemConfig("maxEventSize", 100L).longValue() should be(1048676)
-    SystemConfig.getSystemConfig("defaultDatasetId", "NEW").stringValue() should be("ALL")
-    SystemConfig.getSystemConfig("encryptionSecretKey", "test").stringValue() should be("ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
+    SystemConfig.getInt("defaultDedupPeriodInSeconds") should be(604801)
+    SystemConfig.getInt("defaultDedupPeriodInSeconds", 604800) should be(604801)
+    SystemConfig.getLong("maxEventSize", 100L) should be(1048676L)
+    SystemConfig.getString("defaultDatasetId", "NEW") should be("ALL")
+    SystemConfig.getString("encryptionSecretKey", "test") should be("ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
+    SystemConfig.getBoolean("enable", false) should be(true)
   }
 
-  "SystemSettingsService" should "throw ObsrvException when no default value provided" in {
+  "SystemConfig" should "return default values when keys are not present in db" in {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    postgresConnect.execute("TRUNCATE TABLE system_settings;")
+    SystemConfig.getInt("defaultDedupPeriodInSeconds", 604800) should be(604800)
+    SystemConfig.getLong("maxEventSize", 100L) should be(100L)
+    SystemConfig.getString("defaultDatasetId", "NEW") should be("NEW")
+    SystemConfig.getString("encryptionSecretKey", "test") should be("test")
+    SystemConfig.getBoolean("enable", false) should be(false)
+  }
+
+  "SystemConfig" should "throw exception when valueType doesn't match" in {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    clearSystemSettings(postgresConnect)
+    createInvalidSystemSettings(postgresConnect)
     val thrown = intercept[Exception] {
-      SystemSettingsService.getAllSystemSettings(Map.empty)
+      SystemConfig.getInt("defaultDedupPeriodInSeconds", 604800)
     }
-    thrown.getMessage should be("Default value not found for requested key")
+    thrown.getMessage should be("Invalid value type for system setting")
   }
 
-  "SystemSettingsService" should "return list of System settings with values from database" in {
-    val systemSettings = SystemSettingsService.getAllSystemSettings(Map(
-      "defaultDedupPeriodInSeconds" -> 604810,
-      "maxEventSize" -> 1048671L,
-      "defaultDatasetId" -> "new",
-      "encryptionSecretKey" -> "test"
-    ))
+  "SystemConfig" should "throw exception when valueType doesn't match without default value" in {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    clearSystemSettings(postgresConnect)
+    createInvalidSystemSettings(postgresConnect)
+    val thrown = intercept[Exception] {
+      SystemConfig.getInt("defaultDedupPeriodInSeconds")
+    }
+    thrown.getMessage should be("Invalid value type for system setting")
+  }
+
+  "SystemConfigService" should "return all system settings" in {
+    val systemSettings = SystemConfigService.getAllSystemSettings
     systemSettings.size should be(4)
     systemSettings.map(f => {
-      f.objectKey match {
-        case "defaultDedupPeriodInSeconds" => f.intValue() should be(604801)
-        case "maxEventSize" => f.longValue() should be(1048676)
-        case "defaultDatasetId" => f.stringValue() should be("ALL")
-        case "encryptionSecretKey" => f.stringValue() should be("ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
+      f.key match {
+        case "defaultDedupPeriodInSeconds" => f.value should be("604801")
+        case "maxEventSize" => f.value should be("1048676")
+        case "defaultDatasetId" => f.value should be("ALL")
+        case "encryptionSecretKey" => f.value should be("ckW5GFkTtMDNGEr5k67YpQMEBJNX3x2f")
+        case "enable" => f.value should be("true")
       }
     })
   }
 
-  "SystemSettingsService with empty table" should "return empty list of System settings without throwing error" in {
-    val postgresConnect = new PostgresConnect(postgresConfig)
-    postgresConnect.execute("TRUNCATE system_settings;")
-    val systemSettings = SystemSettingsService.getAllSystemSettings(Map(
-      "defaultDedupPeriodInSeconds" -> 604810,
-      "maxEventSize" -> 1048671L,
-      "defaultDatasetId" -> "new",
-"     encryptionSecretKey" -> "test"
-    ))
-    systemSettings.size should be(0)
+  "SystemConfig" should "throw exception when the key is not present in db" in {
+    var thrown = intercept[Exception] {
+      SystemConfig.getInt("invalidKey")
+    }
+    thrown.getMessage should be("System setting not found for requested key")
+
+    thrown = intercept[Exception] {
+      SystemConfig.getString("invalidKey")
+    }
+    thrown.getMessage should be("System setting not found for requested key")
+
+    thrown = intercept[Exception] {
+      SystemConfig.getBoolean("invalidKey")
+    }
+    thrown.getMessage should be("System setting not found for requested key")
+
+    thrown = intercept[Exception] {
+      SystemConfig.getLong("invalidKey")
+    }
+    thrown.getMessage should be("System setting not found for requested key")
   }
 
-  "SystemSettingsService" should "return default value" in {
-    val postgresConnect = new PostgresConnect(postgresConfig)
-    postgresConnect.execute("TRUNCATE system_settings;")
-    // Get all keys and validate default value
-    var systemSettings = SystemConfig.getSystemConfig("defaultDedupPeriodInSeconds", 604810)
-    systemSettings.intValue() should be(604810)
-    systemSettings = SystemConfig.getSystemConfig("maxEventSize", 1048671L)
-    systemSettings.longValue() should be(1048671)
-    systemSettings = SystemConfig.getSystemConfig("defaultDatasetId", "new")
-    systemSettings.stringValue() should be("new")
-    systemSettings = SystemConfig.getSystemConfig("encryptionSecretKey", "test")
-    systemSettings.stringValue() should be("test")
-  }
-
-  "SystemSettingsService" should "throw exception for invalid valueType" in {
-    val postgresConnect = new PostgresConnect(postgresConfig)
-    postgresConnect.execute("insert into system_settings values('defaultDedupPeriodInSecondsNew', '604801', 'system', 'double', now(),  now(), 'Dedup Period in Seconds');")
-    var exception = intercept[Exception] {
-      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", 604810).intValue()
-    }
-    exception.getMessage should be("Invalid value type for system setting")
-    exception = intercept[Exception] {
-      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", "604810").stringValue()
-    }
-    exception.getMessage should be("Invalid value type for system setting")
-    exception = intercept[Exception] {
-      SystemConfig.getSystemConfig("defaultDedupPeriodInSecondsNew", 604810L).longValue()
-    }
-    exception.getMessage should be("Invalid value type for system setting")
-  }
 }

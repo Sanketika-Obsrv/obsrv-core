@@ -24,7 +24,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
-import org.sunbird.obsrv.dataproducts.util.{CommonUtils, StorageUtil}
+import org.sunbird.obsrv.dataproducts.util.{CommonUtil, StorageUtil}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -148,7 +148,7 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
     val datasources = DatasetRegistry.getDatasources("md1")
     val provider = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"/${pwd}/obsrv-data"))
     MasterDataProcessorIndexer.processDatasets(provider)
-    val (timetaken, result) = CommonUtils.getExecutionTime(MasterDataProcessorIndexer.indexDataset(provider, dataset.get, datasources.get.head, mockMetrics, spark, sc))
+    val (timetaken, result) = CommonUtil.time(MasterDataProcessorIndexer.processDatasets(provider, dataset.get, datasources.get.head, mockMetrics, spark, sc))
     result.metric.put(mockMetrics.getMetricName("total_time_taken"), timetaken)
     verify(mockMetrics).generate(dataset.get.id, Edata(mutable.Map(mockMetrics.getMetricName("failure_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${jobConfig.getString("cloudStorage.provider")}")), "Failed to index dataset.,", ""))
   }
@@ -241,7 +241,7 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   it should "return null when datasource is empty" in {
     val dataset = DatasetRegistry.getDataset("md5")
     val provider = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
-    assert(CommonUtils.fetchDatasource(dataset.get) == null)
+    assert(CommonUtil.fetchDatasource(dataset.get) == null)
     MasterDataProcessorIndexer.processDatasets(provider)
     verify(mockMetrics).generate(dataset.get.id, Edata(metric = mutable.Map(mockMetrics.getMetricName("failure_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${jobConfig.getString("cloudStorage.provider")}")), err = "Failed to index dataset.", errMsg = "Datastet cannot be indexed. Please make sure that dataset should have singlr datasouce"))
   }

@@ -3,7 +3,7 @@ package org.sunbird.obsrv.dataproducts.helper
 import com.typesafe.config.Config
 import org.joda.time.{DateTime, DateTimeZone}
 import org.sunbird.obsrv.core.util.JSONUtil
-import org.sunbird.obsrv.dataproducts.model.{Actor, Context, Edata, IJobMetric, JobMetric, MetricObject, Pdata}
+import org.sunbird.obsrv.dataproducts.model._
 
 case class BaseMetricHelper(config: Config) {
 
@@ -15,22 +15,22 @@ case class BaseMetricHelper(config: Config) {
     "total_time_taken" -> "total_time_taken"
   )
 
-  val metricsProducer = KafkaMessageProducer(config)
+  private val metricsProducer = KafkaMessageProducer(config)
 
-  def sync(metric: IJobMetric): Unit = {
+  private def sync(metric: IJobMetric): Unit = {
     val metricStr = JSONUtil.serialize(metric)
     metricsProducer.sendMessage(message = metricStr)
   }
 
-  def getMetricName(name: String) = {
-    metrics.get(name).getOrElse("")
+  def getMetricName(name: String): String = {
+    metrics.getOrElse(name, "")
   }
 
-  def getObject(datasetId: String) = {
+  private def getObject(datasetId: String) = {
     MetricObject(id = datasetId, `type` = "Dataset", ver = "1.0.0")
   }
 
-  def generate(datasetId: String, edata: Edata) = {
+  def generate(datasetId: String, edata: Edata): Unit = {
     val `object` = getObject(datasetId)
     val actor = Actor(id = "MasterDataProcessorIndexerJob", `type` = "SYSTEM")
     val pdata = Pdata(id = "DataProducts", pid = "MasterDataProcessorIndexerJob", ver = "1.0.0")

@@ -1,15 +1,16 @@
 package org.sunbird.obsrv.service
 
 import com.typesafe.config.{Config, ConfigFactory}
+import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.util.{JSONUtil, PostgresConnect, PostgresConnectionConfig}
-import org.sunbird.obsrv.model.DatasetModels._
+import org.sunbird.obsrv.model.DatasetModels.{ConnectorConfig, ConnectorStats, DataSource, DataSourceMetadata, Dataset, DatasetConfig, DatasetSourceConfig, DatasetTransformation, DedupConfig, DenormConfig, ExtractionConfig, RouterConfig, TransformationFunction, ValidationConfig}
 import org.sunbird.obsrv.model.{DatasetStatus, TransformMode}
 
 import java.io.File
 import java.sql.{ResultSet, Timestamp}
 
 object DatasetRegistryService {
-
+  private[this] val logger = LoggerFactory.getLogger(DatasetRegistryService.getClass)
   private val configFile = new File("/data/flink/conf/baseconfig.conf")
   // $COVERAGE-OFF$ This code only executes within a flink cluster
   val config: Config = if (configFile.exists()) {
@@ -137,7 +138,12 @@ object DatasetRegistryService {
   private def updateRegistry(query: String): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     try {
+      // TODO: Check if the udpate is successful. Else throw an Exception
       postgresConnect.executeUpdate(query)
+    } catch {
+      case ex: Exception =>
+        logger.error("Exception while reading dataset transformations from Postgres", ex)
+        ex.hashCode()
     } finally {
       postgresConnect.closeConnection()
     }
@@ -192,8 +198,10 @@ object DatasetRegistryService {
     val datasetId = rs.getString("dataset_id")
     val ingestionSpec = rs.getString("ingestion_spec")
     val datasourceRef = rs.getString("datasource_ref")
+    val metaData = rs.getString("metadata")
 
-    DataSource(id, datasource, datasetId, ingestionSpec, datasourceRef)
+    DataSource(id, datasource, datasetId, ingestionSpec, datasourceRef,
+      if(metaData != null) Some(JSONUtil.deserialize[DataSourceMetadata](metaData)) else None)
   }
 
   private def parseDatasetTransformation(rs: ResultSet): DatasetTransformation = {

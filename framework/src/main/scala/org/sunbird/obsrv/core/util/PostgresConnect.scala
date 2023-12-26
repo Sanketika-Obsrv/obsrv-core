@@ -72,6 +72,7 @@ class PostgresConnect(config: PostgresConnectionConfig) {
   }
 
   def executeQuery(query:String):ResultSet = statement.executeQuery(query)
+
 }
 
 

@@ -1,4 +1,4 @@
-# OBSRV - CORE
+# Obsrv core
 
 
 ## Overview 

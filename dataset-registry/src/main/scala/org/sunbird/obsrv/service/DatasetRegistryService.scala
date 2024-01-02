@@ -3,7 +3,7 @@ package org.sunbird.obsrv.service
 import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.util.{JSONUtil, PostgresConnect, PostgresConnectionConfig}
-import org.sunbird.obsrv.model.DatasetModels.{ConnectorConfig, ConnectorStats, DataSource, DataSourceMetadata, Dataset, DatasetConfig, DatasetSourceConfig, DatasetTransformation, DedupConfig, DenormConfig, ExtractionConfig, RouterConfig, TransformationFunction, ValidationConfig}
+import org.sunbird.obsrv.model.DatasetModels.{ConnectorConfig, ConnectorStats, DataSource, Dataset, DatasetConfig, DatasetSourceConfig, DatasetTransformation, DedupConfig, DenormConfig, ExtractionConfig, RouterConfig, TransformationFunction, ValidationConfig}
 import org.sunbird.obsrv.model.{DatasetStatus, TransformMode}
 
 import java.io.File
@@ -198,10 +198,8 @@ object DatasetRegistryService {
     val datasetId = rs.getString("dataset_id")
     val ingestionSpec = rs.getString("ingestion_spec")
     val datasourceRef = rs.getString("datasource_ref")
-    val metaData = rs.getString("metadata")
 
-    DataSource(id, datasource, datasetId, ingestionSpec, datasourceRef,
-      if(metaData != null) Some(JSONUtil.deserialize[DataSourceMetadata](metaData)) else None)
+    DataSource(id, datasource, datasetId, ingestionSpec, datasourceRef)
   }
 
   private def parseDatasetTransformation(rs: ResultSet): DatasetTransformation = {

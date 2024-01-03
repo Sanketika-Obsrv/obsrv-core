@@ -14,14 +14,18 @@ import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 import org.sunbird.obsrv.dataproducts.helper.BaseMetricHelper
 import org.sunbird.obsrv.dataproducts.model.{Edata, MetricLabel}
 import redis.embedded.RedisServer
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import org.mockito.Mockito
+import org.sunbird.obsrv.core.exception.ObsrvException
+import org.sunbird.obsrv.core.model
+import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
-import org.sunbird.obsrv.dataproducts.util.{HttpUtil}
+import org.sunbird.obsrv.dataproducts.util.HttpUtil
 
 import scala.collection.mutable.ListBuffer
 
@@ -140,6 +144,7 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
     val provider = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
     val dataset = DatasetRegistry.getDataset("md1")
     MasterDataProcessorIndexer.processDatasets(provider, spark)
+
   }
 
   it should "index datasets for aws" in {
@@ -186,14 +191,9 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
 
   it should "throw exception when datasource is null" in {
     val provider = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
-    val datasource = DatasetRegistry.getDatasources("md5")
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
-    assert(datasource.get.size == 0)
-  }
-
-  it should "throw exception when submitting ingestion spec" in {
-    val provider = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
-    val ingestionSpec = s"""{"type":"index_parallel","spec":{"dataSchema":{"dataSource":"datasource1-${date}"},"ioConfig":{"type":"index_parallel","inputSource":{"type":"local","baseDir":"/home/sankethika/obsrv-data","filter":"**.json.gz"}},"tuningConfig":{"type":"index_parallel","maxRowsInMemory":500000,"forceExtendableShardSpecs":false,"logParseExceptions":true}}}"""
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
+    val dataset = DatasetRegistry.getDataset("md5")
+    the[ObsrvException] thrownBy {
+      MasterDataProcessorIndexer.fetchDatasource(dataset.get)
+    } should have message ErrorConstants.ERR_DATASOURCE_NOT_FOUND.errorMsg
   }
 }

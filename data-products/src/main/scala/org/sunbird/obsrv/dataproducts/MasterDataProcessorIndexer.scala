@@ -6,9 +6,11 @@ import org.apache.logging.log4j.{LogManager, Logger}
 import org.apache.spark.sql.SparkSession
 import org.joda.time.{DateTime, DateTimeZone}
 import org.json4s.native.JsonMethods._
+import org.sunbird.obsrv.core.exception.ObsrvException
+import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.dataproducts.helper.BaseMetricHelper
 import org.sunbird.obsrv.dataproducts.model.{Edata, MetricLabel}
-import org.sunbird.obsrv.dataproducts.util.{CommonUtil, StorageUtil, HttpUtil}
+import org.sunbird.obsrv.dataproducts.util.{CommonUtil, HttpUtil, StorageUtil}
 import org.sunbird.obsrv.model.DatasetModels.{DataSource, Dataset}
 import org.sunbird.obsrv.model.DatasetStatus
 import org.sunbird.obsrv.registry.DatasetRegistry
@@ -16,7 +18,8 @@ import org.sunbird.obsrv.registry.DatasetRegistry
 object MasterDataProcessorIndexer {
   private final val logger: Logger = LogManager.getLogger(MasterDataProcessorIndexer.getClass)
   val httpUtil = new HttpUtil()
-  @throws[Exception]
+
+  @throws[ObsrvException]
   def processDataset(config: Config, dataset: Dataset, spark: SparkSession): Map[String, Long] = {
 
     val result = CommonUtil.time {
@@ -59,20 +62,26 @@ object MasterDataProcessorIndexer {
   }
 
   def createDataFile(dataset: Dataset, outputFilePath: String, spark: SparkSession, config: Config): Long = {
-    logger.info(s"createDataFile() | START | dataset=${dataset.id} ")
-    import spark.implicits._
-    val readWriteConf = ReadWriteConfig(scanCount = config.getInt("redis_scan_count"), maxPipelineSize = config.getInt("redis_maxPipelineSize"))
-    val redisConfig = new RedisConfig(initialHost = RedisEndpoint(host = dataset.datasetConfig.redisDBHost.get, port = dataset.datasetConfig.redisDBPort.get, dbNum = dataset.datasetConfig.redisDB.get))
-    val ts = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
-    val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
-      f => CommonUtil.processEvent(f._2, ts)
-    )
-    val noOfRecords = rdd.count()
-    if (noOfRecords > 0) {
-      rdd.toDF().write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
+    try {
+      logger.info(s"createDataFile() | START | dataset=${dataset.id} ")
+      import spark.implicits._
+      val readWriteConf = ReadWriteConfig(scanCount = config.getInt("redis_scan_count"), maxPipelineSize = config.getInt("redis_maxPipelineSize"))
+      val redisConfig = new RedisConfig(initialHost = RedisEndpoint(host = dataset.datasetConfig.redisDBHost.get, port = dataset.datasetConfig.redisDBPort.get, dbNum = dataset.datasetConfig.redisDB.get))
+      val ts = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
+      val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
+        f => CommonUtil.processEvent(f._2, ts)
+      )
+      val noOfRecords = rdd.count()
+      if (noOfRecords > 0) {
+        rdd.toDF().write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
+      }
+      logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
+      noOfRecords
+    } catch {
+      case ex: Exception =>
+        logger.error(s"createDataset() | FAILED | datasetId=${dataset.id} | Error=${ex.getMessage}", ex)
+        throw new ObsrvException(ErrorConstants.PROVIDER_CONFIG_ERR)
     }
-    logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
-    noOfRecords
   }
 
   private def getDatasets(): List[Dataset] = {
@@ -84,8 +93,13 @@ object MasterDataProcessorIndexer {
   }
 
   def fetchDatasource(dataset: Dataset): DataSource = {
-    val datasources = DatasetRegistry.getDatasources(dataset.id)
-    datasources.get.head
+    try {
+      val datasources = DatasetRegistry.getDatasources(dataset.id)
+      datasources.get.head
+    } catch {
+      case ex: Exception =>
+        throw new ObsrvException(ErrorConstants.ERR_DATASOURCE_NOT_FOUND)
+    }
   }
 
   def processDatasets(config: Config, spark: SparkSession): Unit = {
@@ -99,9 +113,9 @@ object MasterDataProcessorIndexer {
         logger.info(s"processDataset() | SUCCESS | datasetId=${dataset.id} | Metrics=$metrics")
         Edata(metric = metrics, labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}")))
       } catch {
-        case ex: Exception =>
-          logger.error(s"processDataset() | FAILED | datasetId=${dataset.id} | Error=${ex.getMessage}", ex)
-          Edata(metric = Map(metricHelper.getMetricName("failure_dataset_count") -> 1, metricHelper.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}")), err = "Failed to index dataset.", errMsg = ex.getMessage)
+        case ex: ObsrvException =>
+          logger.error(s"processDataset() | FAILED | datasetId=${dataset.id} | Error=${ex.error}", ex)
+          Edata(metric = Map(metricHelper.getMetricName("failure_dataset_count") -> 1, "total_dataset_count" -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}")), err = ex.error.errorCode, errMsg = ex.error.errorMsg)
       }
       metricHelper.generate(datasetId = dataset.id, edata = metricData)
     })

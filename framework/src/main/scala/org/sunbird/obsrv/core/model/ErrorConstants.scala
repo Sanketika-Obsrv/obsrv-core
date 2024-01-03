@@ -36,5 +36,9 @@ object ErrorConstants extends Enumeration {
   val SYSTEM_SETTING_INVALID_TYPE = ErrorInternalValue("ERR_SYSTEM_SETTING_1025", "Invalid value type for system setting")
   val SYSTEM_SETTING_NOT_FOUND = ErrorInternalValue("ERR_SYSTEM_SETTING_1026", "System setting not found for requested key")
   val SYSTEM_SETTING_DEFAULT_VALUE_NOT_FOUND = ErrorInternalValue("ERR_SYSTEM_SETTING_1027", "Default value not found for requested key")
+  val HTTP_SERVER_ERR = ErrorInternalValue("ERR_SERVER_CONNECTION_1028", "Connection refused.")
+  val ERR_DATASOURCE_NOT_FOUND = ErrorInternalValue("ERR_MDP_1029", "Datasource not found")
+  val UNSUPPORTED_PROVIDER = ErrorInternalValue("ERR_UNSUPPORTED_PROVIDER_1030", "Unsupported provider")
+  val PROVIDER_CONFIG_ERR = ErrorInternalValue("ERR_PROVIDER_CONFIG_1031", "No configuration found.")
 
 }

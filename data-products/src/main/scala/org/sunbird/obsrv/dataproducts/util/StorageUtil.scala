@@ -4,6 +4,8 @@ import com.typesafe.config.Config
 import org.apache.logging.log4j.{LogManager, Logger}
 import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 import org.joda.time.{DateTime, DateTimeZone}
+import org.sunbird.obsrv.core.exception.ObsrvException
+import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
 import org.sunbird.obsrv.model.DatasetModels.DataSource
 
@@ -23,7 +25,7 @@ object StorageUtil {
       case "gcloud" => BlobProvider("gs", "google", "gs")
       case "cephs3" => BlobProvider("s3a", "s3", "s3") // TODO: Have to check Druid compatibility
       case "oci" => BlobProvider("s3a", "s3", "s3") // TODO: Have to check Druid compatibility
-      case _ => throw new Exception("Unsupported provider")
+      case _ => throw new ObsrvException(ErrorConstants.UNSUPPORTED_PROVIDER)
     }
   }
 

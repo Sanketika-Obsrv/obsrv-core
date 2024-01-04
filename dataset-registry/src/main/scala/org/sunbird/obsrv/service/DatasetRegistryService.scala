@@ -118,9 +118,10 @@ object DatasetRegistryService {
   }
 
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
-    val query = s"UPDATE dataset_source_config SET connector_stats = jsonb_set(jsonb_set(coalesce(connector_stats, '{}')::jsonb, '{records}'," +
+    val query = s"UPDATE dataset_source_config SET connector_stats = jsonb_set(jsonb_set(jsonb_set(coalesce(connector_stats, '{}')::jsonb, '{records}'," +
       s" ((COALESCE(connector_stats->>'records', '0')::int + $records)::text)::jsonb, true), '{last_fetch_timestamp}', " +
-      s"to_jsonb('$lastFetchTimestamp'::timestamp), true) WHERE id = '$id'"
+      s"to_jsonb('$lastFetchTimestamp'::timestamp), true), '{last_run_timestamp}', " +
+      s"to_jsonb('${new Timestamp(System.currentTimeMillis())}'::timestamp), true) WHERE id = '$id'"
     updateRegistry(query)
   }
 

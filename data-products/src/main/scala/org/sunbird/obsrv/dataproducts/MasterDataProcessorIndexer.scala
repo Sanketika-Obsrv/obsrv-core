@@ -80,26 +80,23 @@ object MasterDataProcessorIndexer {
     } catch {
       case ex: Exception =>
         logger.error(s"createDataset() | FAILED | datasetId=${dataset.id} | Error=${ex.getMessage}", ex)
-        throw new ObsrvException(ErrorConstants.PROVIDER_CONFIG_ERR)
+        throw new ObsrvException(ErrorConstants.CLOUD_PROVIDER_CONFIG_ERR)
     }
   }
 
   private def getDatasets(): List[Dataset] = {
     val datasets = DatasetRegistry.getAllDatasets("master-dataset")
     datasets.filter(dataset => {
-      logger.debug("Checking dataset status for id - " + dataset.id)
       dataset.datasetConfig.indexData.nonEmpty && dataset.datasetConfig.indexData.get && dataset.status == DatasetStatus.Live
     })
   }
 
   def fetchDatasource(dataset: Dataset): DataSource = {
-    try {
-      val datasources = DatasetRegistry.getDatasources(dataset.id)
-      datasources.get.head
-    } catch {
-      case ex: Exception =>
+      val datasources = DatasetRegistry.getDatasources(dataset.id).get
+      if(datasources.isEmpty) {
         throw new ObsrvException(ErrorConstants.ERR_DATASOURCE_NOT_FOUND)
-    }
+      }
+      datasources.head
   }
 
   def processDatasets(config: Config, spark: SparkSession): Unit = {

@@ -26,7 +26,6 @@ object CommonUtil {
     JSONUtil.serialize(json)
   }
 
-  // $COVERAGE-OFF$ Disabling scoverage as the below code cannot be covered as they depend on environment variables
   private def getSafeConfigString(config: Config, key: String): String = {
     if (config.hasPath(key)) config.getString(key) else ""
   }
@@ -35,12 +34,12 @@ object CommonUtil {
 
     val conf = new SparkConf().setAppName(appName)
     val master = getSafeConfigString(config, "spark.master")
+
     if (master.isEmpty) {
       logger.info("Master not found. Setting it to local[*]")
       conf.setMaster("local[*]")
     }
     SparkSession.builder().appName(appName).config(conf).getOrCreate()
   }
-  // $SCOVERAGE-ON$
 
 }

@@ -35,7 +35,7 @@ case class BaseMetricHelper(config: Config) {
     val actor = Actor(id = "MasterDataProcessorIndexerJob", `type` = "SYSTEM")
     val pdata = Pdata(id = "DataProducts", pid = "MasterDataProcessorIndexerJob", ver = "1.0.0")
     val context = Context(env = config.getString("env"), pdata = pdata)
-    val metric = JobMetric(ets = new DateTime(DateTimeZone.UTC).getMillis, actor = actor, context = context, `object` = `object`, edata = edata)
+    val metric = JobMetric(ets = System.currentTimeMillis(), actor = actor, context = context, `object` = `object`, edata = edata)
     this.sync(metric)
   }
 }

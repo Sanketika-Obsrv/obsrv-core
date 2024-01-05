@@ -3,7 +3,7 @@ package org.sunbird.obsrv.service
 import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.util.{JSONUtil, PostgresConnect, PostgresConnectionConfig}
-import org.sunbird.obsrv.model.DatasetModels.{ConnectorConfig, ConnectorStats, DataSource, Dataset, DatasetConfig, DatasetSourceConfig, DatasetTransformation, DedupConfig, DenormConfig, ExtractionConfig, RouterConfig, TransformationFunction, ValidationConfig}
+import org.sunbird.obsrv.model.DatasetModels._
 import org.sunbird.obsrv.model.{DatasetStatus, TransformMode}
 
 import java.io.File

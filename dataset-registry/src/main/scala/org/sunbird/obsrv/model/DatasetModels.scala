@@ -92,5 +92,5 @@ class DatasetStatusType extends TypeReference[DatasetStatus.type]
 
 object DatasetStatus extends Enumeration {
   type DatasetStatus = Value
-  val Draft, Publish, Live, Retired, Purged, ACTIVE = Value
+  val Draft, Publish, Live, Retired, Purged= Value
 }

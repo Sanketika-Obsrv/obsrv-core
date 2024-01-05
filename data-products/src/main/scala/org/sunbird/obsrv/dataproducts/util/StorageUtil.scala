@@ -15,9 +15,9 @@ object StorageUtil {
 
   case class Paths(datasourceRef: String, ingestionPath: String, outputFilePath: String, timestamp: Long)
 
-  case class BlobProvider(sparkProviderURIFormat: String, druidProvider: String, druidProviderPrefix: String)
+  private case class BlobProvider(sparkURIFormat: String, ingestionSourceType: String, druidURIFormat: String)
 
-  def providerFormat(cloudProvider: String): BlobProvider = {
+  private def providerFormat(cloudProvider: String): BlobProvider = {
     cloudProvider match {
       case "local" => BlobProvider("file", "local", "file")
       case "aws" => BlobProvider("s3a", "s3", "s3")
@@ -35,23 +35,22 @@ object StorageUtil {
     val date = dayPeriodFormat.print(dt)
     val provider = providerFormat(config.getString("cloudStorage.provider"))
     val cloudPrefix = if (config.getString("cloudStorage.provider") == "azure") {
-      provider.sparkProviderURIFormat + config.getString("azure_cloud_prefix")
+      provider.sparkURIFormat + config.getString("azure_cloud_prefix")
     } else {
-      provider.sparkProviderURIFormat + config.getString("cloud_prefix")
+      provider.sparkURIFormat + config.getString("cloud_prefix")
     }
     val pathSuffix = s"""masterdata-indexer/${datasource.datasetId}/$date/"""
-    val ingestionPath = cloudPrefix.replace(provider.sparkProviderURIFormat, provider.druidProviderPrefix) + pathSuffix
+    val ingestionPath = cloudPrefix.replace(provider.sparkURIFormat, provider.druidURIFormat) + pathSuffix
     val datasourceRef = datasource.datasource + '-' + date
     val outputFilePath = cloudPrefix + pathSuffix
     Paths(datasourceRef, ingestionPath, outputFilePath, timestamp)
   }
 
   def inputSourceSpecProvider(filePath: String, config: Config): String = {
-    logger.info("File path -> " + filePath)
     val provider = StorageUtil.providerFormat(config.getString("cloudStorage.provider"))
-    val inputSourceSpec = if (provider.druidProvider == "local")
-      config.getString("local_inputSource_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.druidProvider)
-    else config.getString("cloud_inputSource_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.druidProvider)
+    val inputSourceSpec = if (provider.ingestionSourceType.equalsIgnoreCase("LOCAL"))
+      config.getString("local_inputSource_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.ingestionSourceType)
+    else config.getString("cloud_inputSource_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.ingestionSourceType)
     inputSourceSpec
   }
 

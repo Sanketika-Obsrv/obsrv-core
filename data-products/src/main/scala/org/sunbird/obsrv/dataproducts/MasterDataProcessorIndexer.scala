@@ -17,7 +17,6 @@ import org.sunbird.obsrv.registry.DatasetRegistry
 
 object MasterDataProcessorIndexer {
   private final val logger: Logger = LogManager.getLogger(MasterDataProcessorIndexer.getClass)
-  val httpUtil = new HttpUtil()
 
   @throws[ObsrvException]
   def processDataset(config: Config, dataset: Dataset, spark: SparkSession): Map[String, Long] = {
@@ -51,37 +50,33 @@ object MasterDataProcessorIndexer {
     compact(render(modIngestionSpec))
   }
 
-  private def submitIngestionTask(datasetId: String, ingestionSpec: String, config: Config) = {
+  def submitIngestionTask(datasetId: String, ingestionSpec: String, config: Config): Unit = {
     logger.debug(s"submitIngestionTask() | datasetId=$datasetId")
-    httpUtil.post(config.getString("druid.indexer.url"), ingestionSpec)
+    val response = HttpUtil.post(config.getString("druid.indexer.url"), ingestionSpec)
+    response.ifFailure(throw new ObsrvException(ErrorConstants.ERR_SUBMIT_INGESTION_FAILED))
   }
 
   private def deleteDataSource(datasetID: String, datasourceRef: String, config: Config): Unit = {
-    logger.debug(s"deleteDataSourc() | datasetId=$datasetID")
-    httpUtil.delete(config.getString("druid.datasource.delete.url") + datasourceRef)
+    logger.debug(s"deleteDataSource() | datasetId=$datasetID")
+    val response = HttpUtil.delete(config.getString("druid.datasource.delete.url") + datasourceRef)
+    response.ifFailure(throw new ObsrvException(ErrorConstants.ERR_DELETE_DATASOURCE_FAILED))
   }
 
-  def createDataFile(dataset: Dataset, outputFilePath: String, spark: SparkSession, config: Config): Long = {
-    try {
-      logger.info(s"createDataFile() | START | dataset=${dataset.id} ")
-      import spark.implicits._
-      val readWriteConf = ReadWriteConfig(scanCount = config.getInt("redis_scan_count"), maxPipelineSize = config.getInt("redis_maxPipelineSize"))
-      val redisConfig = new RedisConfig(initialHost = RedisEndpoint(host = dataset.datasetConfig.redisDBHost.get, port = dataset.datasetConfig.redisDBPort.get, dbNum = dataset.datasetConfig.redisDB.get))
-      val ts = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
-      val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
-        f => CommonUtil.processEvent(f._2, ts)
-      )
-      val noOfRecords = rdd.count()
-      if (noOfRecords > 0) {
-        rdd.toDF().write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
-      }
-      logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
-      noOfRecords
-    } catch {
-      case ex: Exception =>
-        logger.error(s"createDataset() | FAILED | datasetId=${dataset.id} | Error=${ex.getMessage}", ex)
-        throw new ObsrvException(ErrorConstants.CLOUD_PROVIDER_CONFIG_ERR)
+  private def createDataFile(dataset: Dataset, outputFilePath: String, spark: SparkSession, config: Config): Long = {
+    logger.info(s"createDataFile() | START | dataset=${dataset.id} ")
+    import spark.implicits._
+    val readWriteConf = ReadWriteConfig(scanCount = config.getInt("redis_scan_count"), maxPipelineSize = config.getInt("redis_maxPipelineSize"))
+    val redisConfig = new RedisConfig(initialHost = RedisEndpoint(host = dataset.datasetConfig.redisDBHost.get, port = dataset.datasetConfig.redisDBPort.get, dbNum = dataset.datasetConfig.redisDB.get))
+    val ts = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
+    val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
+      f => CommonUtil.processEvent(f._2, ts)
+    )
+    val noOfRecords = rdd.count()
+    if (noOfRecords > 0) {
+      rdd.toDF().write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
     }
+    logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
+    noOfRecords
   }
 
   private def getDatasets(): List[Dataset] = {
@@ -92,11 +87,11 @@ object MasterDataProcessorIndexer {
   }
 
   def fetchDatasource(dataset: Dataset): DataSource = {
-      val datasources = DatasetRegistry.getDatasources(dataset.id).get
-      if(datasources.isEmpty) {
-        throw new ObsrvException(ErrorConstants.ERR_DATASOURCE_NOT_FOUND)
-      }
-      datasources.head
+    val datasources = DatasetRegistry.getDatasources(dataset.id).get
+    if (datasources.isEmpty) {
+      throw new ObsrvException(ErrorConstants.ERR_DATASOURCE_NOT_FOUND)
+    }
+    datasources.head
   }
 
   def processDatasets(config: Config, spark: SparkSession): Unit = {

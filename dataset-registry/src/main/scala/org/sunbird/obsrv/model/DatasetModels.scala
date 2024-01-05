@@ -69,6 +69,7 @@ object DatasetModels {
   case class DatasetSourceConfig(@JsonProperty("id") id: String, @JsonProperty("dataset_id") datasetId: String,
                                  @JsonProperty("connector_type") connectorType: String, @JsonProperty("connector_config") connectorConfig: ConnectorConfig,
                                  @JsonProperty("status") status: String, @JsonProperty("connector_stats") connectorStats: Option[ConnectorStats] = None)
+
   case class DataSource(@JsonProperty("id") id: String, @JsonProperty("datasource") datasource: String, @JsonProperty("dataset_id") datasetId: String,
                         @JsonProperty("ingestion_spec") ingestionSpec: String, @JsonProperty("datasource_ref") datasourceRef: String)
 
@@ -92,5 +93,5 @@ class DatasetStatusType extends TypeReference[DatasetStatus.type]
 
 object DatasetStatus extends Enumeration {
   type DatasetStatus = Value
-  val Draft, Publish, Live, Retired, Purged= Value
+  val Draft, Publish, Live, Retired, Purged = Value
 }

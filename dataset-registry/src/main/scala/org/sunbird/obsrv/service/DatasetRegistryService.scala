@@ -1,7 +1,6 @@
 package org.sunbird.obsrv.service
 
 import com.typesafe.config.{Config, ConfigFactory}
-import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.util.{JSONUtil, PostgresConnect, PostgresConnectionConfig}
 import org.sunbird.obsrv.model.DatasetModels._
 import org.sunbird.obsrv.model.{DatasetStatus, TransformMode}
@@ -10,7 +9,6 @@ import java.io.File
 import java.sql.{ResultSet, Timestamp}
 
 object DatasetRegistryService {
-  private[this] val logger = LoggerFactory.getLogger(DatasetRegistryService.getClass)
   private val configFile = new File("/data/flink/conf/baseconfig.conf")
   // $COVERAGE-OFF$ This code only executes within a flink cluster
   val config: Config = if (configFile.exists()) {
@@ -38,7 +36,7 @@ object DatasetRegistryService {
         val dataset = parseDataset(result)
         (dataset.id, dataset)
       }).toMap
-    }  finally {
+    } finally {
       postgresConnect.closeConnection()
     }
   }
@@ -48,7 +46,7 @@ object DatasetRegistryService {
     val postgresConnect = new PostgresConnect(postgresConfig)
     try {
       val rs = postgresConnect.executeQuery(s"SELECT * FROM datasets where id='$id'")
-      if(rs.next()) {
+      if (rs.next()) {
         Some(parseDataset(rs))
       } else {
         None
@@ -138,12 +136,7 @@ object DatasetRegistryService {
   private def updateRegistry(query: String): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     try {
-      // TODO: Check if the udpate is successful. Else throw an Exception
       postgresConnect.executeUpdate(query)
-    } catch {
-      case ex: Exception =>
-        logger.error("Exception while reading dataset transformations from Postgres", ex)
-        ex.hashCode()
     } finally {
       postgresConnect.closeConnection()
     }
@@ -161,7 +154,7 @@ object DatasetRegistryService {
     val datasetConfig = rs.getString("dataset_config")
     val status = rs.getString("status")
     val tagArray = rs.getArray("tags")
-    val tags = if(tagArray != null) tagArray.getArray.asInstanceOf[Array[String]] else null
+    val tags = if (tagArray != null) tagArray.getArray.asInstanceOf[Array[String]] else null
     val dataVersion = rs.getInt("data_version")
 
     Dataset(datasetId, datasetType,
@@ -188,7 +181,7 @@ object DatasetRegistryService {
 
     DatasetSourceConfig(id = id, datasetId = datasetId, connectorType = connectorType,
       JSONUtil.deserialize[ConnectorConfig](connectorConfig), status,
-      if(connectorStats != null) Some(JSONUtil.deserialize[ConnectorStats](connectorStats)) else None
+      if (connectorStats != null) Some(JSONUtil.deserialize[ConnectorStats](connectorStats)) else None
     )
   }
 
@@ -210,7 +203,7 @@ object DatasetRegistryService {
     val status = rs.getString("status")
     val mode = rs.getString("mode")
 
-    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status, Some(if(mode != null) TransformMode.withName(mode) else TransformMode.Strict))
+    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status, Some(if (mode != null) TransformMode.withName(mode) else TransformMode.Strict))
   }
 
 }

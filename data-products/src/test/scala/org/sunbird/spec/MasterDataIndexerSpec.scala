@@ -3,9 +3,10 @@ package org.sunbird.obsrv.spec
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig, duration2JavaDuration}
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
+import kong.unirest.{HttpResponse, JsonNode}
 import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 import org.joda.time.{DateTime, DateTimeZone}
-import org.mockito.MockitoSugar.mock
+import org.mockito.MockitoSugar.{mock, when}
 import org.sunbird.obsrv.registry.DatasetRegistry
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import org.sunbird.fixture.EventFixture
@@ -24,6 +25,7 @@ import org.mockito.Mockito
 import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.model
 import org.sunbird.obsrv.core.model.ErrorConstants
+import org.sunbird.obsrv.dataproducts
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
 import org.sunbird.obsrv.dataproducts.util.{CommonUtil, HttpUtil}
 
@@ -32,7 +34,6 @@ import scala.collection.mutable.ListBuffer
 class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
   private val jobConfig: Config = ConfigFactory.load("masterdata-indexer-test.conf").withFallback(ConfigFactory.systemEnvironment())
-  implicit val httpUtil: HttpUtil = mock[HttpUtil](Mockito.withSettings().serializable())
   val mockMetrics = mock[BaseMetricHelper]
   val pwd = System.getProperty("user.dir")
 
@@ -89,6 +90,7 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   override def afterAll(): Unit = {
     super.afterAll()
     redisServer.stop()
+    embeddedPostgres.close()
     EmbeddedKafka.stop()
     spark.stop()
   }
@@ -141,52 +143,52 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   }
 
   it should "index datasets for single datasource and generate metrics for local storage" in {
-    val provider = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
-    val dataset = DatasetRegistry.getDataset("md1")
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
-
+    val config = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
+    assertThrows[Exception](
+      MasterDataProcessorIndexer.processDatasets(config, spark)
+    )
   }
 
   it should "index datasets for aws" in {
-    val provider = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("aws"))
-    val dataset = DatasetRegistry.getDataset("md1")
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
-    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${provider.getString("cloudStorage.provider")}")), err = "FAILED", errMsg = " The bucketName parameter must be specified.")
+    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("aws"))
+    assertThrows[Exception](
+      MasterDataProcessorIndexer.processDatasets(config, spark)
+    )
   }
 
   it should "index datasets for azure" in {
-    val provider = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("azure"))
-    val dataset = DatasetRegistry.getDataset("md1")
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
-    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${provider.getString("cloudStorage.provider")}")), err = "FAILED", errMsg = "No FileSystem for scheme: wasbs")
+    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("azure"))
+    assertThrows[Exception](
+      MasterDataProcessorIndexer.processDatasets(config, spark)
+    )
   }
 
   it should "index datasets for gcloud" in {
-    val provider = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("gcloud"))
-    val dataset = DatasetRegistry.getDataset("md1")
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
-    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${provider.getString("cloudStorage.provider")}")), err = "FAILED", errMsg = " The bucketName parameter must be specified.")
+    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("gcloud"))
+    assertThrows[Exception](
+      MasterDataProcessorIndexer.processDatasets(config, spark)
+    )
   }
 
   it should "index datasets for cephs3" in {
-    val provider = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("cephs3"))
-    val dataset = DatasetRegistry.getDataset("md1")
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
-    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${provider.getString("cloudStorage.provider")}")), err = "FAILED", errMsg = " The bucketName parameter must be specified.")
+    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("cephs3"))
+    assertThrows[Exception](
+      MasterDataProcessorIndexer.processDatasets(config, spark)
+    )
   }
 
   it should "index datasets for oci" in {
-    val provider = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("oci"))
-    val dataset = DatasetRegistry.getDataset("md1")
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
-    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${provider.getString("cloudStorage.provider")}")), err = "FAILED", errMsg = " The bucketName parameter must be specified.")
+    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("oci"))
+    assertThrows[Exception](
+      MasterDataProcessorIndexer.processDatasets(config, spark)
+    )
   }
 
   it should "not index datasets for unknown provider" in {
-    val provider = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("ibm"))
+    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("ibm"))
     val dataset = DatasetRegistry.getDataset("md1")
-    MasterDataProcessorIndexer.processDatasets(provider, spark)
-    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${provider.getString("cloudStorage.provider")}")), err = "FAILED", errMsg = "Unsupported provider")
+    MasterDataProcessorIndexer.processDatasets(config, spark)
+    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}")), err = "FAILED", errMsg = "Unsupported provider")
   }
 
   it should "throw exception when datasource is null" in {
@@ -206,16 +208,25 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
     sparkSession.conf.get("spark.app.name") shouldEqual appName
   }
 
-   it should "create a SparkSession with provided app name and master" in {
-     val appName = "TestApp"
-     val master = "local[2]"
-     val configString =
-       s"""
-          |spark.master = "$master"
+  it should "create a SparkSession with provided app name and master" in {
+    val appName = "TestApp"
+    val master = "local[2]"
+    val configString =
+      s"""
+         |spark.master = "$master"
          """.stripMargin
-     val config = ConfigFactory.parseString(configString)
-     val sparkSession = CommonUtil.getSparkSession(appName, config)
-     sparkSession should not be null
-     sparkSession.conf.get("spark.app.name") shouldEqual appName
-   }
+    val config = ConfigFactory.parseString(configString)
+    val sparkSession = CommonUtil.getSparkSession(appName, config)
+    sparkSession should not be null
+    sparkSession.conf.get("spark.app.name") shouldEqual appName
+  }
+
+  it should "throw exception while submitting ingestion" in {
+    val config = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
+    val dataset = DatasetRegistry.getDataset("md1")
+    assertThrows[Exception](
+      MasterDataProcessorIndexer.processDataset(config, dataset.get, spark)
+    )
+  }
+
 }

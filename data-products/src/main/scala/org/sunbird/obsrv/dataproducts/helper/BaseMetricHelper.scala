@@ -1,7 +1,6 @@
 package org.sunbird.obsrv.dataproducts.helper
 
 import com.typesafe.config.Config
-import org.joda.time.{DateTime, DateTimeZone}
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.dataproducts.model._
 

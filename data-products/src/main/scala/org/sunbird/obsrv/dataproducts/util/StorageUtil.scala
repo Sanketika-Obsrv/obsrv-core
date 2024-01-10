@@ -17,6 +17,7 @@ object StorageUtil {
 
   private case class BlobProvider(sparkURIFormat: String, ingestionSourceType: String, druidURIFormat: String)
 
+  // This method returns a BlobProvider object based on cloud storage provider
   private def providerFormat(cloudProvider: String): BlobProvider = {
     cloudProvider match {
       case "local" => BlobProvider("file", "local", "file")
@@ -46,11 +47,12 @@ object StorageUtil {
     Paths(datasourceRef, ingestionPath, outputFilePath, timestamp)
   }
 
+  //This method provides appropriate input source spec depending on the cloud storage provider
   def inputSourceSpecProvider(filePath: String, config: Config): String = {
     val provider = StorageUtil.providerFormat(config.getString("cloudStorage.provider"))
-    val inputSourceSpec = if (provider.ingestionSourceType.equalsIgnoreCase("LOCAL"))
-      config.getString("local_inputSource_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.ingestionSourceType)
-    else config.getString("cloud_inputSource_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.ingestionSourceType)
+    val inputSourceSpec = if (provider.ingestionSourceType == "local")
+      config.getString("local_input_source_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.ingestionSourceType)
+    else config.getString("cloud_input_source_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.ingestionSourceType)
     inputSourceSpec
   }
 

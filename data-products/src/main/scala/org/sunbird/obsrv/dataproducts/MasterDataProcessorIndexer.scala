@@ -20,12 +20,11 @@ object MasterDataProcessorIndexer {
 
   @throws[ObsrvException]
   def processDataset(config: Config, dataset: Dataset, spark: SparkSession): Map[String, Long] = {
-
     val result = CommonUtil.time {
       val datasource = fetchDatasource(dataset)
       val paths = StorageUtil.getPaths(datasource, config)
-      val eventsCount = createDataFile(dataset, paths.outputFilePath, spark, config)
-      val ingestionSpec = updateIngestionSpec(datasource, paths.datasourceRef, paths.ingestionPath, config)
+      val eventsCount: Long = createDataFile(dataset, paths.outputFilePath, spark, config)
+      val ingestionSpec: String = updateIngestionSpec(datasource, paths.datasourceRef, paths.ingestionPath, config)
       if (eventsCount > 0L) {
         submitIngestionTask(dataset.id, ingestionSpec, config)
       }
@@ -35,14 +34,14 @@ object MasterDataProcessorIndexer {
       }
       Map("success_dataset_count" -> 1, "total_dataset_count" -> 1, "total_events_processed" -> eventsCount)
     }
-
     val metricMap = result._2 ++ Map("total_time_taken" -> result._1)
     metricMap.asInstanceOf[Map[String, Long]]
   }
 
+  // This method is used to update the ingestion spec based on datasource and storage path
   private def updateIngestionSpec(datasource: DataSource, datasourceRef: String, filePath: String, config: Config): String = {
-    val deltaIngestionSpec = config.getString("delta_ingestion_spec").replace("DATASOURCE_REF", datasourceRef)
-    val inputSourceSpec = StorageUtil.inputSourceSpecProvider(filePath, config)
+    val deltaIngestionSpec: String = config.getString("delta_ingestion_spec").replace("DATASOURCE_REF", datasourceRef)
+    val inputSourceSpec: String = StorageUtil.inputSourceSpecProvider(filePath, config)
     val deltaJson = parse(deltaIngestionSpec)
     val inputSourceJson = parse(inputSourceSpec)
     val ingestionSpec = parse(datasource.ingestionSpec)
@@ -50,28 +49,32 @@ object MasterDataProcessorIndexer {
     compact(render(modIngestionSpec))
   }
 
+  // This method is used to submit the ingestion task to Druid for indexing data
   def submitIngestionTask(datasetId: String, ingestionSpec: String, config: Config): Unit = {
     logger.debug(s"submitIngestionTask() | datasetId=$datasetId")
     val response = HttpUtil.post(config.getString("druid.indexer.url"), ingestionSpec)
     response.ifFailure(throw new ObsrvException(ErrorConstants.ERR_SUBMIT_INGESTION_FAILED))
   }
 
+  // This method is used for deleting a datasource from druid
   private def deleteDataSource(datasetID: String, datasourceRef: String, config: Config): Unit = {
     logger.debug(s"deleteDataSource() | datasetId=$datasetID")
     val response = HttpUtil.delete(config.getString("druid.datasource.delete.url") + datasourceRef)
     response.ifFailure(throw new ObsrvException(ErrorConstants.ERR_DELETE_DATASOURCE_FAILED))
   }
 
+  // This method will fetch the data from redis based on dataset config
+  // then write the data as a compressed JSON to the respective cloud provider
   private def createDataFile(dataset: Dataset, outputFilePath: String, spark: SparkSession, config: Config): Long = {
     logger.info(s"createDataFile() | START | dataset=${dataset.id} ")
     import spark.implicits._
     val readWriteConf = ReadWriteConfig(scanCount = config.getInt("redis_scan_count"), maxPipelineSize = config.getInt("redis_maxPipelineSize"))
     val redisConfig = new RedisConfig(initialHost = RedisEndpoint(host = dataset.datasetConfig.redisDBHost.get, port = dataset.datasetConfig.redisDBPort.get, dbNum = dataset.datasetConfig.redisDB.get))
-    val ts = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
+    val ts: Long = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
     val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
       f => CommonUtil.processEvent(f._2, ts)
     )
-    val noOfRecords = rdd.count()
+    val noOfRecords: Long = rdd.count()
     if (noOfRecords > 0) {
       rdd.toDF().write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
     }
@@ -80,24 +83,25 @@ object MasterDataProcessorIndexer {
   }
 
   private def getDatasets(): List[Dataset] = {
-    val datasets = DatasetRegistry.getAllDatasets("master-dataset")
+    val datasets: List[Dataset] = DatasetRegistry.getAllDatasets("master-dataset")
     datasets.filter(dataset => {
       dataset.datasetConfig.indexData.nonEmpty && dataset.datasetConfig.indexData.get && dataset.status == DatasetStatus.Live
     })
   }
 
   def fetchDatasource(dataset: Dataset): DataSource = {
-    val datasources = DatasetRegistry.getDatasources(dataset.id).get
+    val datasources: List[DataSource] = DatasetRegistry.getDatasources(dataset.id).get
     if (datasources.isEmpty) {
       throw new ObsrvException(ErrorConstants.ERR_DATASOURCE_NOT_FOUND)
     }
     datasources.head
   }
 
+  // This method will fetch the dataset from database and processes the dataset
+  // then generates required metrics
   def processDatasets(config: Config, spark: SparkSession): Unit = {
-
-    val datasets = getDatasets()
-    val metricHelper = BaseMetricHelper(config)
+    val datasets: List[Dataset] = getDatasets()
+    val metricHelper: BaseMetricHelper = BaseMetricHelper(config)
     datasets.foreach(dataset => {
       logger.info(s"processDataset() | START | datasetId=${dataset.id}")
       val metricData = try {

@@ -4,6 +4,12 @@ on:
   push:
     tags:
      - '*'
+  workflow_dispatch:
+    inputs:
+      aws-deploy:
+        type: boolean
+        required: true
+        default: false
 
 jobs:
   check-tag:
@@ -93,7 +99,8 @@ jobs:
 
   aws-deploy:
     needs: [check-tag, docker-build]
-    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True'
+    # if: needs.check-tag.outputs.ALLOWED_TAG ==  'True'
+    if: needs.check-tag.outputs.ALLOWED_TAG == 'True' && github.event.inputs.aws-deploy == 'True'
     runs-on: ubuntu-latest
     environment: aws-dev
     steps:

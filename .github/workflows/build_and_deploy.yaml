@@ -57,7 +57,49 @@ jobs:
       - name: Maven Build
         run: |
           mvn clean install
-          
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to docker hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build merged-pipeline image and push
+        uses: docker/build-push-action@v4
+        with:
+          platforms: linux/amd64
+          target: merged-image
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/merged-pipeline:${{ github.ref_name }}
+
+      - name: Build merged-pipeline image and push
+        uses: docker/build-push-action@v4
+        with:
+          platforms: linux/amd64
+          target: master-data-processor-image
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/master-data-processor:${{ github.ref_name }}
+
+      - name: Build merged-pipeline image and push
+        uses: docker/build-push-action@v4
+        with:
+          platforms: linux/amd64
+          target: kafka-connector-image
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/kafka-connector:${{ github.ref_name }}
+
+      - name: Build ${{matrix.image}} image and push
+        uses: docker/build-push-action@v4
+        with:
+          platforms: linux/amd64
+          target: ${{matrix.target}}
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
+
+
   docker-build:
     needs: check-tag
     if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && github.event_name != 'pull_request'

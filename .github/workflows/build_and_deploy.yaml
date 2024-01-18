@@ -44,13 +44,10 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
-          format: table
+          format: 'table'
           exit-code: 1
-          severity: CRITICAL, HIGH
-          vulnerability:
-            type:
-              - os
-              - library
+          severity: 'CRITICAL, HIGH'
+          vuln-type: 'os,library'
 
   docker-build:
     needs: check-tag

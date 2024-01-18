@@ -37,7 +37,7 @@ jobs:
 
       - name: Maven Build
         run: |
-          mvn clean install -DskipTests
+          mvn clean install
 
       - name: Run-vulnerability-check
         uses: aquasecurity/trivy-action@master

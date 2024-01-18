@@ -40,13 +40,16 @@ jobs:
           mvn clean install
 
   run vulnerability check:
-    uses: aquasecurity/trivy-action@master
-    with:
-      format: 'table'
-      exit-code: '1'
-      ignore-unfixed: true
-      vuln-type: 'os,library'
-      severity: 'CRITICAL,HIGH'
+    runs-on: ubuntu-latest
+    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && github.event_name == 'pull_request'
+    steps:
+     - uses: aquasecurity/trivy-action@master
+       with:
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
   docker-build:
     needs: check-tag

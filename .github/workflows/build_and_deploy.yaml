@@ -40,7 +40,7 @@ jobs:
           mvn clean install -DskipTests
 
       - name: run-vulnerability-check
-      - uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@master
         with:
           format: 'table'
           exit-code: '1'

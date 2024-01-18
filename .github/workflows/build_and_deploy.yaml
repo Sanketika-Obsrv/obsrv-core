@@ -42,11 +42,15 @@ jobs:
       - name: run-vulnerability-check
         uses: aquasecurity/trivy-action@master
         with:
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: table
+          exit-code: 1
+          severity: CRITICAL, HIGH
+          vulnerability:
+            type:
+              - os
+              - library
 
   docker-build:
     needs: check-tag

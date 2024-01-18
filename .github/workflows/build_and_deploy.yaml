@@ -39,14 +39,14 @@ jobs:
         run: |
           mvn clean install
 
-      - name: Run vulnerability check
-        uses: aquasecurity/trivy-action@master
-        with:
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+  run vulnerability check:
+    uses: aquasecurity/trivy-action@master
+    with:
+      format: 'table'
+      exit-code: '1'
+      ignore-unfixed: true
+      vuln-type: 'os,library'
+      severity: 'CRITICAL,HIGH'
 
   docker-build:
     needs: check-tag

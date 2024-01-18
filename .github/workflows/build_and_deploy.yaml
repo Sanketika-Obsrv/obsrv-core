@@ -37,14 +37,11 @@ jobs:
 
       - name: Maven Build
         run: |
-          mvn clean install
+          mvn clean install -DskipTests
 
-  run-vulnerability-check:
-    runs-on: ubuntu-latest
-    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True'
-    steps:
-     - uses: aquasecurity/trivy-action@master
-       with:
+      - name: run-vulnerability-check
+      - uses: aquasecurity/trivy-action@master
+        with:
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true

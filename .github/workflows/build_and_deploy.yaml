@@ -39,9 +39,9 @@ jobs:
         run: |
           mvn clean install
 
-  run vulnerability check:
+  run-vulnerability-check:
     runs-on: ubuntu-latest
-    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && github.event_name == 'pull_request'
+    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True'
     steps:
      - uses: aquasecurity/trivy-action@master
        with:

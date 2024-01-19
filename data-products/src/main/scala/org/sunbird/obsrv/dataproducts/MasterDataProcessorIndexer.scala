@@ -41,7 +41,7 @@ object MasterDataProcessorIndexer {
   // This method is used to update the ingestion spec based on datasource and storage path
   private def updateIngestionSpec(datasource: DataSource, datasourceRef: String, filePath: String, config: Config): String = {
     val deltaIngestionSpec: String = config.getString("delta_ingestion_spec").replace("DATASOURCE_REF", datasourceRef)
-    val inputSourceSpec: String = StorageUtil.getInputSourceSpecProvider(filePath, config)
+    val inputSourceSpec: String = StorageUtil.getInputSourceSpec(filePath, config)
     val deltaJson = parse(deltaIngestionSpec)
     val inputSourceJson = parse(inputSourceSpec)
     val ingestionSpec = parse(datasource.ingestionSpec)

@@ -48,7 +48,7 @@ object StorageUtil {
   }
 
   // This method provides appropriate input source spec depending on the cloud storage provider
-  def getInputSourceSpecProvider(filePath: String, config: Config): String = {
+  def getInputSourceSpec(filePath: String, config: Config): String = {
     config.getString("source_spec").replace("FILE_PATH", filePath)
   }
 

@@ -40,7 +40,7 @@ object MasterDataProcessorIndexer {
 
   // This method is used to update the ingestion spec based on datasource and storage path
   private def updateIngestionSpec(datasource: DataSource, datasourceRef: String, filePath: String, config: Config): String = {
-    val deltaIngestionSpec: String = config.getString("delta_ingestion_spec").replace("DATASOURCE_REF", datasourceRef)
+    val deltaIngestionSpec: String = config.getString("delta.ingestion.spec").replace("DATASOURCE_REF", datasourceRef)
     val inputSourceSpec: String = StorageUtil.getInputSourceSpec(filePath, config)
     val deltaJson = parse(deltaIngestionSpec)
     val inputSourceJson = parse(inputSourceSpec)
@@ -68,7 +68,7 @@ object MasterDataProcessorIndexer {
   private def createDataFile(dataset: Dataset, outputFilePath: String, spark: SparkSession, config: Config): Long = {
     logger.info(s"createDataFile() | START | dataset=${dataset.id} ")
     import spark.implicits._
-    val readWriteConf = ReadWriteConfig(scanCount = config.getInt("redis_scan_count"), maxPipelineSize = config.getInt("redis_maxPipelineSize"))
+    val readWriteConf = ReadWriteConfig(scanCount = config.getInt("redis.scan.count"), maxPipelineSize = config.getInt("redis.max.pipeline.size"))
     val redisConfig = new RedisConfig(initialHost = RedisEndpoint(host = dataset.datasetConfig.redisDBHost.get, port = dataset.datasetConfig.redisDBPort.get, dbNum = dataset.datasetConfig.redisDB.get))
     val ts: Long = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
     val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
@@ -107,11 +107,11 @@ object MasterDataProcessorIndexer {
       val metricData = try {
         val metrics = processDataset(config, dataset, spark)
         logger.info(s"processDataset() | SUCCESS | datasetId=${dataset.id} | Metrics=$metrics")
-        Edata(metric = metrics, labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}")))
+        Edata(metric = metrics, labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloud.storage.provider")}")))
       } catch {
         case ex: ObsrvException =>
           logger.error(s"processDataset() | FAILED | datasetId=${dataset.id} | Error=${ex.error}", ex)
-          Edata(metric = Map(metricHelper.getMetricName("failure_dataset_count") -> 1, "total_dataset_count" -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}")), err = ex.error.errorCode, errMsg = ex.error.errorMsg)
+          Edata(metric = Map(metricHelper.getMetricName("failure_dataset_count") -> 1, "total_dataset_count" -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.id), MetricLabel("cloud", s"${config.getString("cloud.storage.provider")}")), err = ex.error.errorCode, errMsg = ex.error.errorMsg)
       }
       metricHelper.generate(datasetId = dataset.id, edata = metricData)
     })

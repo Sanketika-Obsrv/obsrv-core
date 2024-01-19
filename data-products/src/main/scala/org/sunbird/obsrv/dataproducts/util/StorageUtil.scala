@@ -15,10 +15,10 @@ object StorageUtil {
 
   case class Paths(datasourceRef: String, ingestionPath: String, outputFilePath: String, timestamp: Long)
 
-  private case class BlobProvider(sparkURIFormat: String, ingestionSourceType: String, druidURIFormat: String)
+  case class BlobProvider(sparkURIFormat: String, ingestionSourceType: String, druidURIFormat: String)
 
   // This method returns a BlobProvider object based on cloud storage provider
-  private def providerFormat(cloudProvider: String): BlobProvider = {
+  def providerFormat(cloudProvider: String): BlobProvider = {
     cloudProvider match {
       case "local" => BlobProvider("file", "local", "file")
       case "aws" => BlobProvider("s3a", "s3", "s3")
@@ -34,12 +34,8 @@ object StorageUtil {
     val dt = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay()
     val timestamp = dt.getMillis
     val date = dayPeriodFormat.print(dt)
-    val provider = providerFormat(config.getString("cloudStorage.provider"))
-    val cloudPrefix = if (config.getString("cloudStorage.provider").equalsIgnoreCase("azure")) {
-      provider.sparkURIFormat + config.getString("azure_cloud_prefix")
-    } else {
-      provider.sparkURIFormat + config.getString("cloud_prefix")
-    }
+    val provider = providerFormat(config.getString("cloud.storage.provider"))
+    val cloudPrefix = provider.sparkURIFormat + config.getString("cloud.storage.container")
     val pathSuffix = s"""masterdata-indexer/${datasource.datasetId}/$date/"""
     val ingestionPath = cloudPrefix.replace(provider.sparkURIFormat, provider.druidURIFormat) + pathSuffix
     val datasourceRef = datasource.datasource + '-' + date
@@ -49,7 +45,7 @@ object StorageUtil {
 
   // This method provides appropriate input source spec depending on the cloud storage provider
   def getInputSourceSpec(filePath: String, config: Config): String = {
-    config.getString("source_spec").replace("FILE_PATH", filePath)
+    config.getString("source.spec").replace("FILE_PATH", filePath)
   }
 
 }

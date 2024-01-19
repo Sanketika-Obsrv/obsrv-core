@@ -27,7 +27,8 @@ import org.sunbird.obsrv.core.model
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.dataproducts
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
-import org.sunbird.obsrv.dataproducts.util.{CommonUtil, HttpUtil}
+import org.sunbird.obsrv.dataproducts.util.StorageUtil.BlobProvider
+import org.sunbird.obsrv.dataproducts.util.{CommonUtil, HttpUtil, StorageUtil}
 
 import scala.collection.mutable.ListBuffer
 
@@ -143,52 +144,53 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   }
 
   it should "index datasets for single datasource and generate metrics for local storage" in {
-    val config = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
+    val config = jobConfig.withValue("cloud.storage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
+    println("Path -> " + config.getString("cloud.storage.container"))
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for aws" in {
-    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("aws"))
+    val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("aws"))
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for azure" in {
-    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("azure"))
+    val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("azure"))
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for gcloud" in {
-    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("gcloud"))
+    val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("gcloud"))
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for cephs3" in {
-    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("cephs3"))
+    val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("cephs3"))
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for oci" in {
-    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("oci"))
+    val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("oci"))
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "not index datasets for unknown provider" in {
-    val config = jobConfig.withValue("cloudStorage.provider", ConfigValueFactory.fromAnyRef("ibm"))
+    val provider = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("ibm"))
     val dataset = DatasetRegistry.getDataset("md1")
-    MasterDataProcessorIndexer.processDatasets(config, spark)
-    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${config.getString("cloudStorage.provider")}")), err = "FAILED", errMsg = "Unsupported provider")
+    MasterDataProcessorIndexer.processDatasets(provider, spark)
+    val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${provider.getString("cloud.storage.provider")}")), err = "FAILED", errMsg = "Unsupported provider")
   }
 
   it should "throw exception when datasource is null" in {
@@ -222,11 +224,19 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   }
 
   it should "throw exception while submitting ingestion" in {
-    val config = jobConfig.withValue("cloudStorage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
+    val config = jobConfig.withValue("cloud.storage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
     val dataset = DatasetRegistry.getDataset("md1")
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDataset(config, dataset.get, spark)
     )
+  }
+
+  it should "return proper provider format for each cloud provider" in {
+    StorageUtil.providerFormat("aws") shouldEqual BlobProvider("s3a", "s3", "s3")
+    StorageUtil.providerFormat("azure") shouldEqual BlobProvider("wasbs", "azure", "azure")
+    StorageUtil.providerFormat("gcloud") shouldEqual BlobProvider("gs", "google", "gs")
+    StorageUtil.providerFormat("cephs3") shouldEqual BlobProvider("s3a", "s3", "s3")
+    StorageUtil.providerFormat("oci") shouldEqual BlobProvider("s3a", "s3", "s3")
   }
 
 }

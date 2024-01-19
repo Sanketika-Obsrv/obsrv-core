@@ -51,8 +51,8 @@ object StorageUtil {
   def inputSourceSpecProvider(filePath: String, config: Config): String = {
     val provider = StorageUtil.providerFormat(config.getString("cloudStorage.provider"))
     val inputSourceSpec = if (provider.ingestionSourceType == "local")
-      config.getString("local_input_source_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.ingestionSourceType)
-    else config.getString("cloud_input_source_spec").replace("FILE_PATH", filePath).replace("CLOUDSTORAGE_PROVIDER", provider.ingestionSourceType)
+      config.getString("local_input_source_spec").replace("FILE_PATH", filePath)
+    else config.getString("cloud_input_source_spec").replace("FILE_PATH", filePath)
     inputSourceSpec
   }
 

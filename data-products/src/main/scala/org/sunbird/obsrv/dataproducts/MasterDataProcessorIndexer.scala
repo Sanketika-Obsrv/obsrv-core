@@ -101,7 +101,7 @@ object MasterDataProcessorIndexer {
   // then generates required metrics
   def processDatasets(config: Config, spark: SparkSession): Unit = {
     val datasets: List[Dataset] = getDatasets()
-    val metricHelper: BaseMetricHelper = BaseMetricHelper(config)
+    val metricHelper = new BaseMetricHelper(config)
     datasets.foreach(dataset => {
       logger.info(s"processDataset() | START | datasetId=${dataset.id}")
       val metricData = try {

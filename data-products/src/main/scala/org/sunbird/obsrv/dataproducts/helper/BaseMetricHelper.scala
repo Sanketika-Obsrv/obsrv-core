@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.dataproducts.model._
 
-case class BaseMetricHelper(config: Config) {
+class BaseMetricHelper(config: Config) {
 
   val metrics: Map[String, String] = Map(
     "total_dataset_count" -> "total_dataset_count",
@@ -14,7 +14,7 @@ case class BaseMetricHelper(config: Config) {
     "total_time_taken" -> "total_time_taken"
   )
 
-  private val metricsProducer = KafkaMessageProducer(config)
+  private val metricsProducer = new KafkaMessageProducer(config)
 
   private def sync(metric: IJobMetric): Unit = {
     val metricStr = JSONUtil.serialize(metric)

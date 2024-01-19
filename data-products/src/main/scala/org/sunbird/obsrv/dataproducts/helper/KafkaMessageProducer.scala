@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory
 
 import java.util.Properties
 
-case class KafkaMessageProducer(config: Config) {
+class KafkaMessageProducer(config: Config) {
 
   private[this] val logger = LoggerFactory.getLogger(classOf[KafkaMessageProducer])
   private val kafkaProperties = new Properties();
@@ -16,7 +16,6 @@ case class KafkaMessageProducer(config: Config) {
   kafkaProperties.put("bootstrap.servers", config.getString("kafka.bootstrap.servers"))
   kafkaProperties.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
   kafkaProperties.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-
   val producer = new KafkaProducer[String, String](kafkaProperties)
 
   def sendMessage(topic: String = defaultTopicName, key: String = defaultKey, message: String): Unit = {

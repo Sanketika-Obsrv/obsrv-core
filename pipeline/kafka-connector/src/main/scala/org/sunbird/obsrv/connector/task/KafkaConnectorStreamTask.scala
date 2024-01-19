@@ -18,6 +18,7 @@ class KafkaConnectorStreamTask(config: KafkaConnectorConfig, kafkaConnector: Fli
   // $COVERAGE-OFF$ Disabling scoverage as the below code can only be invoked within flink cluster
   def process(): Unit = {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
+    process(env)
     env.execute(config.jobName)
   }
 

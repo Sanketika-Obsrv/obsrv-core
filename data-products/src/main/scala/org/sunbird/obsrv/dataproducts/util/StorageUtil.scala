@@ -35,7 +35,7 @@ object StorageUtil {
     val timestamp = dt.getMillis
     val date = dayPeriodFormat.print(dt)
     val provider = providerFormat(config.getString("cloudStorage.provider"))
-    val cloudPrefix = if (config.getString("cloudStorage.provider") == "azure") {
+    val cloudPrefix = if (config.getString("cloudStorage.provider").equalsIgnoreCase("azure")) {
       provider.sparkURIFormat + config.getString("azure_cloud_prefix")
     } else {
       provider.sparkURIFormat + config.getString("cloud_prefix")
@@ -47,13 +47,9 @@ object StorageUtil {
     Paths(datasourceRef, ingestionPath, outputFilePath, timestamp)
   }
 
-  //This method provides appropriate input source spec depending on the cloud storage provider
-  def inputSourceSpecProvider(filePath: String, config: Config): String = {
-    val provider = StorageUtil.providerFormat(config.getString("cloudStorage.provider"))
-    val inputSourceSpec = if (provider.ingestionSourceType == "local")
-      config.getString("local_input_source_spec").replace("FILE_PATH", filePath)
-    else config.getString("cloud_input_source_spec").replace("FILE_PATH", filePath)
-    inputSourceSpec
+  // This method provides appropriate input source spec depending on the cloud storage provider
+  def getInputSourceSpecProvider(filePath: String, config: Config): String = {
+    config.getString("source_spec").replace("FILE_PATH", filePath)
   }
 
 }

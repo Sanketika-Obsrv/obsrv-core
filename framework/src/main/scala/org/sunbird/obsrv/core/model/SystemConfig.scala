@@ -7,6 +7,7 @@ import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 
 import java.io.File
 import java.sql.ResultSet
+import scala.collection.mutable
 
 object SystemConfig {
 
@@ -68,6 +69,8 @@ object SystemConfig {
 object SystemConfigService {
 
   private val configFile = new File("/data/flink/conf/baseconfig.conf")
+
+  private val settingsCache = mutable.HashMap[String, SystemSetting]()
   // $COVERAGE-OFF$
   val config: Config = if (configFile.exists()) {
     println("Loading configuration file cluster baseconfig.conf...")
@@ -98,12 +101,11 @@ object SystemConfigService {
 
   @throws[Exception]
   def getSystemSetting(key: String): Option[SystemSetting] = {
-    val postgresConnect = new PostgresConnect(postgresConfig)
-    val rs = postgresConnect.executeQuery(s"SELECT * FROM system_settings WHERE key = '$key'")
-    val setting = if (rs.next) {
-      Option(parseSystemSetting(rs))
-    } else None
-    postgresConnect.closeConnection()
+    if (settingsCache.isEmpty) {
+      val result = getAllSystemSettings
+      result.map(setting => settingsCache.put(setting.key.toLowerCase(), setting))
+    }
+    val setting = settingsCache.get(key.toLowerCase())
     setting
   }
 

@@ -102,8 +102,7 @@ object SystemConfigService {
   @throws[Exception]
   def getSystemSetting(key: String): Option[SystemSetting] = {
     if (settingsCache.isEmpty) {
-      val result = getAllSystemSettings
-      result.map(setting => settingsCache.put(setting.key.toLowerCase(), setting))
+      getAllSystemSettings.map(setting => settingsCache.put(setting.key.toLowerCase(), setting))
     }
     val setting = settingsCache.get(key.toLowerCase())
     setting

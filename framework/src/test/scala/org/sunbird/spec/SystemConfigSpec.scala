@@ -45,14 +45,14 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
     SystemConfig.getBoolean("enable", false) should be(true)
   }
 
-  "SystemConfig" should "return default values when keys are not present in db" in {
+  "SystemConfig" should "return default values when keys are not present in cache" in {
     val postgresConnect = new PostgresConnect(postgresConfig)
     postgresConnect.execute("TRUNCATE TABLE system_settings;")
-    SystemConfig.getInt("defaultDedupPeriodInSeconds", 604800) should be(604800)
-    SystemConfig.getLong("maxEventSize", 100L) should be(100L)
-    SystemConfig.getString("defaultDatasetId", "NEW") should be("NEW")
-    SystemConfig.getString("encryptionSecretKey", "test") should be("test")
-    SystemConfig.getBoolean("enable", false) should be(false)
+    SystemConfig.getInt("defaultDedupPeraiodInSeconds", 604800) should be(604800)
+    SystemConfig.getLong("maxEventSaize", 100L) should be(100L)
+    SystemConfig.getString("defaultDaatasetId", "NEW") should be("NEW")
+    SystemConfig.getString("encryptiaonSecretKey", "test") should be("test")
+    SystemConfig.getBoolean("enaable", false) should be(false)
   }
 
   "SystemConfig" should "throw exception when valueType doesn't match" in {
@@ -60,7 +60,7 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
     clearSystemSettings(postgresConnect)
     createInvalidSystemSettings(postgresConnect)
     val thrown = intercept[Exception] {
-      SystemConfig.getInt("defaultDedupPeriodInSeconds", 604800)
+      SystemConfig.getLong("defaultDedupPeriodInSeconds", 604800)
     }
     thrown.getMessage should be("Invalid value type for system setting")
   }
@@ -70,7 +70,7 @@ class SystemConfigSpec extends BaseSpecWithPostgres with Matchers with MockFacto
     clearSystemSettings(postgresConnect)
     createInvalidSystemSettings(postgresConnect)
     val thrown = intercept[Exception] {
-      SystemConfig.getInt("defaultDedupPeriodInSeconds")
+      SystemConfig.getLong("defaultDedupPeriodInSeconds")
     }
     thrown.getMessage should be("Invalid value type for system setting")
   }

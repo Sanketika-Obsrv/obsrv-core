@@ -100,9 +100,11 @@ object SystemConfigService {
   def getSystemSetting(key: String): Option[SystemSetting] = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     val rs = postgresConnect.executeQuery(s"SELECT * FROM system_settings WHERE key = '$key'")
-    if (rs.next) {
+    val setting = if (rs.next) {
       Option(parseSystemSetting(rs))
     } else None
+    postgresConnect.closeConnection()
+    setting
   }
 
   private def parseSystemSetting(rs: ResultSet): SystemSetting = {

@@ -44,13 +44,7 @@ jobs:
 
     steps:
 
-      - run: mkdir -p ./1.0.1-GA/artifact
-      - run: echo hello > ./1.0.1-GA/artifact/world.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: my-artifact
-          path: ./1.0.1-GA/artifact/world.txt
-
+       
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -58,46 +52,51 @@ jobs:
         run: |
           mvn clean install -DskipTests
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: obsrv-core-${{ github.ref }}-framework-1.0.0.jar
+          path: ./framework/target/framework-1.0.0.jar    
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Login to docker hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Login to docker hub
+      #   uses: docker/login-action@v2
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build merged-pipeline image and push
-        uses: docker/build-push-action@v4
-        with:
-          platforms: linux/amd64
-          target: merged-image
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/merged-pipeline:${{ github.ref_name }}
+      # - name: Build merged-pipeline image and push
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     platforms: linux/amd64
+      #     target: merged-image
+      #     push: true
+      #     tags: ${{ secrets.DOCKERHUB_USERNAME }}/merged-pipeline:${{ github.ref_name }}
       
-      - name: Build merged-pipeline image and push
-        uses: docker/build-push-action@v4
-        with:
-          platforms: linux/amd64
-          target: master-data-processor-image
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/master-data-processor:${{ github.ref_name }}
+      # - name: Build merged-pipeline image and push
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     platforms: linux/amd64
+      #     target: master-data-processor-image
+      #     push: true
+      #     tags: ${{ secrets.DOCKERHUB_USERNAME }}/master-data-processor:${{ github.ref_name }}
       
-      - name: Build merged-pipeline image and push
-        uses: docker/build-push-action@v4
-        with:
-          platforms: linux/amd64
-          target: kafka-connector-image
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/kafka-connector:${{ github.ref_name }}
+      # - name: Build merged-pipeline image and push
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     platforms: linux/amd64
+      #     target: kafka-connector-image
+      #     push: true
+      #     tags: ${{ secrets.DOCKERHUB_USERNAME }}/kafka-connector:${{ github.ref_name }}
 
-      - name: Build ${{matrix.image}} image and push
-        uses: docker/build-push-action@v4
-        with:
-          platforms: linux/amd64
-          target: ${{matrix.target}}
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
+      # - name: Build ${{matrix.image}} image and push
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     platforms: linux/amd64
+      #     target: ${{matrix.target}}
+      #     push: true
+      #     tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
 
   aws-deploy:
     needs: [check-tag, docker-build]

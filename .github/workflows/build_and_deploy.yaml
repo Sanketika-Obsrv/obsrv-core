@@ -52,9 +52,14 @@ jobs:
         run: |
           mvn clean install -DskipTests
 
-      - uses: actions/upload-artifact@v4
+      - name: Get Tag Name
+        id: get-tag
+        run: echo "::set-output name=tag::${GITHUB_REF/refs\/tags\//}"  
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: obsrv-core-framework-1.0.0.jar
+          name: obsrv-core--framework-${{ steps.get-tag.outputs.tag }}.jar
           path: ./framework/target/framework-1.0.0.jar    
 
       - name: Set up Docker Buildx

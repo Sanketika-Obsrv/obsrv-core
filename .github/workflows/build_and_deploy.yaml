@@ -81,29 +81,6 @@ jobs:
         run: |
           mvn clean install -DskipTests
 
-      - name: Get Tag Name
-        id: get-tag
-        run: echo "::set-output name=tag::${GITHUB_REF/refs\/tags\//}"  
-
-      - name: Upload Framework Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: framework-${{ steps.get-tag.outputs.tag }}.jar
-          path: ./framework/target/framework-1.0.0.jar 
-
-      - name: Upload Dataset Registry Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dataset-registry-${{ steps.get-tag.outputs.tag }}.jar
-          path: ./framework/target/framework-1.0.0.jar
-
-      - name: Upload Data Pipeline Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: data-pipeline-${{ steps.get-tag.outputs.tag }}.jar
-          path: | 
-            ./pipeline/extractor/target/extractor-1.0.0.jar
-            ./pipeline/denormalizer/target/de-normalization-1.0.0.jar            
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -144,6 +121,35 @@ jobs:
           target: ${{matrix.target}}
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
+
+  artifacts-upload:
+   needs: [docker-build]
+   runs-on: ubuntu-latest
+   if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
+   steps:
+    - name: Get Tag Name
+      id: get-tag
+      run: echo "::set-output name=tag::${GITHUB_REF/refs\/tags\//}"  
+
+    - name: Upload Framework Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: framework-${{ steps.get-tag.outputs.tag }}.jar
+        path: ./framework/target/framework-1.0.0.jar 
+
+    - name: Upload Dataset Registry Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dataset-registry-${{ steps.get-tag.outputs.tag }}.jar
+        path: ./framework/target/framework-1.0.0.jar
+
+    - name: Upload Data Pipeline Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: data-pipeline-${{ steps.get-tag.outputs.tag }}.jar
+        path: | 
+          ./pipeline/extractor/target/extractor-1.0.0.jar
+          ./pipeline/denormalizer/target/de-normalization-1.0.0.jar 
 
   aws-deploy:
     needs: [ check-tag, docker-build ]

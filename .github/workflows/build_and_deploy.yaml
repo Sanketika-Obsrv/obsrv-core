@@ -43,6 +43,14 @@ jobs:
 
 
     steps:
+
+      - run: mkdir -p ./1.0.1-GA/artifact
+      - run: echo hello > ./1.0.1-GA/artifact/world.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: my-artifact
+          path: ./1.0.1-GA/artifact/world.txt
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0

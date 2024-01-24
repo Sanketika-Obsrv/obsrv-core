@@ -9,6 +9,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.table.data.{GenericRowData, RowData, StringData}
 import org.apache.hudi.common.model.HoodieTableType
 import org.apache.hudi.configuration.FlinkOptions
+import org.apache.hudi.index.HoodieIndex
 import org.apache.hudi.util.HoodiePipeline
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
@@ -35,10 +36,10 @@ class HudiWriterStreamTask (config: HudiWriterConfig, kafkaConnector: FlinkKafka
   def process(env: StreamExecutionEnvironment): Unit = {
     val targetTable = "financial_txns";
 //    val basePath = s"file:///tmp/$targetTable"
-//    val basePath = s"s3a://obsrv/data/$targetTable"
-    val basePath = s"file:///tmp/hudi/obsrv/data/$targetTable"
-//    val options = setHMSConfig(getOptions(basePath))
-    val options = getOptions(basePath)
+    val basePath = s"s3a://obsrv/data/$targetTable"
+//    val basePath = s"file:///tmp/hudi/obsrv/data/$targetTable"
+    val options = setHMSConfig(getOptions(basePath))
+//    val options = getOptions(basePath)
     val dataStream = getMapDataStream(env, config, kafkaConnector)
 
     val rowDataStream = dataStream.map(new MapFunction[mutable.Map[String, AnyRef], RowData] {
@@ -51,7 +52,7 @@ class HudiWriterStreamTask (config: HudiWriterConfig, kafkaConnector: FlinkKafka
         rowData.setField(4, StringData.fromString(t.getOrElse("receiver_account_number", "").toString))
         rowData.setField(5, StringData.fromString(t.getOrElse("sender_contact_email", "").toString))
         rowData.setField(6, StringData.fromString(t.getOrElse("txn_type", "").toString))
-        rowData.setField(7, t.getOrElse("txn_amount", "").asInstanceOf[Integer])
+        rowData.setField(7, t.getOrElse("txn_amount", "0").asInstanceOf[Integer])
         rowData.setField(8, StringData.fromString(t.getOrElse("txn_status", "").toString))
         rowData.setField(9, StringData.fromString(t.getOrElse("currency", "").toString))
         rowData.setField(10, org.apache.flink.table.data.TimestampData.fromTimestamp(HudiWriterStreamTask.getTimestamp(t.getOrElse("txn_date","").toString)))
@@ -60,16 +61,16 @@ class HudiWriterStreamTask (config: HudiWriterConfig, kafkaConnector: FlinkKafka
     })
 
     val builder = HoodiePipeline.builder(targetTable)
-      .column("txn_id VARCHAR(20)")
-      .column("sender_ifsc_code VARCHAR(20)")
-      .column("sender_account_number VARCHAR(20)")
-      .column("receiver_ifsc_code VARCHAR(20)")
-      .column("receiver_account_number VARCHAR(20)")
-      .column("sender_contact_email VARCHAR(40)")
-      .column("txn_type VARCHAR(10)")
+      .column("txn_id STRING")
+      .column("sender_ifsc_code STRING")
+      .column("sender_account_number STRING")
+      .column("receiver_ifsc_code STRING")
+      .column("receiver_account_number STRING")
+      .column("sender_contact_email STRING")
+      .column("txn_type STRING")
       .column("txn_amount INT")
-      .column("txn_status VARCHAR(10)")
-      .column("currency VARCHAR(10)")
+      .column("txn_status STRING")
+      .column("currency STRING")
       .column("txn_date timestamp(3)")
       .pk("txn_id")
       .options(options)
@@ -81,11 +82,12 @@ class HudiWriterStreamTask (config: HudiWriterConfig, kafkaConnector: FlinkKafka
     val options = new util.HashMap[String, String]()
     options.put(FlinkOptions.PATH.key, basePath)
     options.put(FlinkOptions.TABLE_TYPE.key, HoodieTableType.MERGE_ON_READ.name())
-    options.put(FlinkOptions.METADATA_ENABLED.key(), "true")
     options.put(FlinkOptions.PRECOMBINE_FIELD.key, "txn_date")
     options.put(FlinkOptions.WRITE_BATCH_SIZE.key(), "0.1")
     options.put(FlinkOptions.PARTITION_PATH_FIELD.key(), "sender_ifsc_code")
     options.put(FlinkOptions.COMPACTION_DELTA_COMMITS.key(), "0")
+//    options.put(FlinkOptions.RECORD_KEY_FIELD.key(), "txn_id")
+
 
 //    options.put("hoodie.compaction.strategy", "org.apache.hudi.table.action.compact.strategy.LogFileNumBasedCompactionStrategy")
 //    options.put("hoodie.compaction.logfile.num.threshold", "1")
@@ -98,7 +100,7 @@ class HudiWriterStreamTask (config: HudiWriterConfig, kafkaConnector: FlinkKafka
 
     options.put("hoodie.compaction.strategy", "org.apache.hudi.table.action.compact.strategy.UnBoundedCompactionStrategy")
     options.put("hoodie.parquet.block.size", "500")
-    options.put("hoodie.parquet.max.file.size", "500")
+//    options.put("hoodie.parquet.max.file.size", "500")
 
     options.put("write.tasks", "1")
     options.put("compaction.tasks", "1")
@@ -125,11 +127,13 @@ class HudiWriterStreamTask (config: HudiWriterConfig, kafkaConnector: FlinkKafka
   private def setUnBoundedCompaction(options: util.Map[String, String]) = {
     options.put("hoodie.compaction.strategy", "org.apache.hudi.table.action.compact.strategy.UnBoundedCompactionStrategy")
     options.put("hoodie.parquet.block.size", "500")
-    options.put("hoodie.parquet.max.file.size", "500")
+    options.put("hoodie.parquet.max.file.size", "10240")
     options
   }
 
   private def setHMSConfig(options: util.Map[String, String]) = {
+    options.put(FlinkOptions.METADATA_ENABLED.key(), "false")
+    options.put("hoodie.fs.atomic_creation.support", "s3a")
     options.put("hive_sync.enabled", "true")
     options.put(FlinkOptions.HIVE_SYNC_DB.key(), "obsrv")
     options.put("hive_sync.table", "financial_txns")

@@ -38,7 +38,7 @@ object StorageUtil {
     val cloudPrefix = provider.sparkURIFormat + config.getString("cloud.storage.container")
     val pathSuffix = s"""masterdata-indexer/${datasource.datasetId}/$date/"""
     val ingestionPath = cloudPrefix.replace(provider.sparkURIFormat, provider.druidURIFormat) + pathSuffix
-    val datasourceRef = datasource.datasource + '-' + date
+    val datasourceRef = datasource.datasource + '-' + date + '-' + System.currentTimeMillis()
     val outputFilePath = cloudPrefix + pathSuffix
     Paths(datasourceRef, ingestionPath, outputFilePath, timestamp)
   }

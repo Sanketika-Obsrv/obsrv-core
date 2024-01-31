@@ -29,9 +29,7 @@ object MasterDataProcessorIndexer {
         submitIngestionTask(dataset.id, ingestionSpec, config)
       }
       DatasetRegistry.updateDatasourceRef(datasource, paths.datasourceRef)
-      if (!datasource.datasourceRef.equals(paths.datasourceRef)) {
-        deleteDataSource(dataset.id, datasource.datasourceRef, config)
-      }
+      deleteDataSource(dataset.id, datasource.datasourceRef, config)
       Map("success_dataset_count" -> 1, "total_dataset_count" -> 1, "total_events_processed" -> eventsCount)
     }
     val metricMap = result._2 ++ Map("total_time_taken" -> result._1)
@@ -52,15 +50,17 @@ object MasterDataProcessorIndexer {
   // This method is used to submit the ingestion task to Druid for indexing data
   def submitIngestionTask(datasetId: String, ingestionSpec: String, config: Config): Unit = {
     logger.debug(s"submitIngestionTask() | datasetId=$datasetId")
-    val response = HttpUtil.post(config.getString("druid.indexer.url"), ingestionSpec)
-    response.ifFailure(throw new ObsrvException(ErrorConstants.ERR_SUBMIT_INGESTION_FAILED))
+    HttpUtil.post(config.getString("druid.indexer.url"), ingestionSpec)
+      .ifSuccess(success => logger.info(s"Ingestion Spec is submitted successfully() | datasetId=$datasetId | ${success.getBody}"))
+      .ifFailure(error => throw new Exception(s"Failed to submit task - ${error.getBody} with status ${error.getStatus}"))
   }
 
   // This method is used for deleting a datasource from druid
   private def deleteDataSource(datasetID: String, datasourceRef: String, config: Config): Unit = {
-    logger.debug(s"deleteDataSource() | datasetId=$datasetID")
-    val response = HttpUtil.delete(config.getString("druid.datasource.delete.url") + datasourceRef)
-    response.ifFailure(throw new ObsrvException(ErrorConstants.ERR_DELETE_DATASOURCE_FAILED))
+    logger.debug(s"deleteDataSource() | datasetId=$datasetID | datasourceRef=$datasourceRef")
+    HttpUtil.delete(config.getString("druid.datasource.delete.url") + '/' + datasourceRef)
+      .ifSuccess(success => logger.info(s"Deleted datasource with datasourceRef ${datasourceRef}"))
+      .ifFailure(error => throw new Exception(s"Failed to delete datasource with response ${error.getStatus}"))
   }
 
   // This method will fetch the data from redis based on dataset config
@@ -74,9 +74,12 @@ object MasterDataProcessorIndexer {
     val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
       f => CommonUtil.processEvent(f._2, ts)
     )
-    val noOfRecords: Long = rdd.count()
-    if (noOfRecords > 0) {
-      rdd.toDF().write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
+    var noOfRecords = 0L
+    if (!rdd.isEmpty()) {
+      val df = spark.read.json(rdd)
+      noOfRecords = df.count()
+      logger.info("Dataset - " + dataset.id + " No. of records - " + noOfRecords)
+      df.coalesce(20).write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
     }
     logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
     noOfRecords

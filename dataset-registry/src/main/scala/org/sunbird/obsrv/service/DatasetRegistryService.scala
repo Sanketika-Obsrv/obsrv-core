@@ -36,7 +36,7 @@ object DatasetRegistryService {
         val dataset = parseDataset(result)
         (dataset.id, dataset)
       }).toMap
-    } finally {
+    }  finally {
       postgresConnect.closeConnection()
     }
   }
@@ -46,7 +46,7 @@ object DatasetRegistryService {
     val postgresConnect = new PostgresConnect(postgresConfig)
     try {
       val rs = postgresConnect.executeQuery(s"SELECT * FROM datasets where id='$id'")
-      if (rs.next()) {
+      if(rs.next()) {
         Some(parseDataset(rs))
       } else {
         None
@@ -181,7 +181,7 @@ object DatasetRegistryService {
 
     DatasetSourceConfig(id = id, datasetId = datasetId, connectorType = connectorType,
       JSONUtil.deserialize[ConnectorConfig](connectorConfig), status,
-      if (connectorStats != null) Some(JSONUtil.deserialize[ConnectorStats](connectorStats)) else None
+      if(connectorStats != null) Some(JSONUtil.deserialize[ConnectorStats](connectorStats)) else None
     )
   }
 
@@ -203,7 +203,7 @@ object DatasetRegistryService {
     val status = rs.getString("status")
     val mode = rs.getString("mode")
 
-    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status, Some(if (mode != null) TransformMode.withName(mode) else TransformMode.Strict))
+    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status, Some(if(mode != null) TransformMode.withName(mode) else TransformMode.Strict))
   }
 
 }

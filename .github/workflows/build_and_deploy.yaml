@@ -23,7 +23,7 @@ jobs:
           (echo -n TRIGGER_ALLOWED= && echo 'print("${{ github.ref_name }}".split("_")[0]
           not in ${{ vars.CURRENT_RELEASE }})' | python3) >> "$GITHUB_OUTPUT"
 
-  docker-build:
+  build-image:
     needs: check-tag
     if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -47,15 +47,15 @@ jobs:
           - image: "kafka-connector"
             target: "kafka-connector-image"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to docker hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -94,13 +94,12 @@ jobs:
 
   aws-deploy:
     needs: [ check-tag, docker-build ]
-    # if: needs.check-tag.outputs.ALLOWED_TAG ==  'True'
     if: needs.check-tag.outputs.ALLOWED_TAG == 'True' && github.event.inputs.aws-deploy == 'True'
     runs-on: ubuntu-latest
     environment: aws-dev
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Terragrunt
         uses: autero1/action-terragrunt@v1.1.0
         with:
@@ -109,7 +108,7 @@ jobs:
         run: terragrunt --version
 
       - name: Clone the terraform deployment repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ vars.DEPLOY_REPO }}
           path: deploy
@@ -143,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone the terraform deployment repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ vars.DEPLOY_REPO }}
           path: deploy

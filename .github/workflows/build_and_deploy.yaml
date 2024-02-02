@@ -93,7 +93,7 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
 
   aws-deploy:
-    needs: [ check-tag, docker-build ]
+    needs: [ check-tag, build-image ]
     if: needs.check-tag.outputs.ALLOWED_TAG == 'True' && github.event.inputs.aws-deploy == 'True'
     runs-on: ubuntu-latest
     environment: aws-dev
@@ -137,7 +137,7 @@ jobs:
           -var flink_image_tag=${{ github.ref_name }}
 
   azure-deploy:
-    needs: [ check-tag, docker-build ]
+    needs: [ check-tag, build-image ]
     if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && vars.CLOUD_PROVIDER == 'azure'
     runs-on: ubuntu-latest
     steps:

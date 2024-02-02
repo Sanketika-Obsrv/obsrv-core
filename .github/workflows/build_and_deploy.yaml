@@ -1,4 +1,4 @@
-name: Obsrv Core service build and deploy workflow
+name: Build and Deployment
 run-name: Workflow run for ${{ github.ref }}
 on:
   push:
@@ -10,10 +10,6 @@ on:
         type: boolean
         required: true
         default: false
-  pull_request:
-    types:
-      - opened
-      - synchronize
 
 jobs:
   check-tag:
@@ -26,28 +22,6 @@ jobs:
         run: |
           (echo -n TRIGGER_ALLOWED= && echo 'print("${{ github.ref_name }}".split("_")[0]
           not in ${{ vars.CURRENT_RELEASE }})' | python3) >> "$GITHUB_OUTPUT"
-  docker-mvn-build:
-    needs: check-tag
-    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Maven Build
-        run: |
-          mvn clean install
-
-      - name: Run-vulnerability-check
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'table'
-          exit-code: 1
-          severity: 'CRITICAL, HIGH'
-          vuln-type: 'os,library'
 
   docker-build:
     needs: check-tag
@@ -76,10 +50,6 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      
-      # - name: Maven Build
-      #   run: |
-      #     mvn clean install -DskipTests
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2

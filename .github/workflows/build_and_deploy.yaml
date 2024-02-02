@@ -17,7 +17,7 @@ jobs:
     outputs:
       ALLOWED_TAG: ${{ steps.tag-checker.outputs.TRIGGER_ALLOWED }}
     steps:
-      - name: Check if tag is one in list of current releases
+      - name: Check if tag is one in list of current releases.
         id: tag-checker
         run: |
           (echo -n TRIGGER_ALLOWED= && echo 'print("${{ github.ref_name }}".split("_")[0]

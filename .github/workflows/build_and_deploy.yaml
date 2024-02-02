@@ -44,8 +44,6 @@ jobs:
             target: "merged-image"
           - image: "master-data-processor"
             target: "master-data-processor-image"
-          - image: "kafka-connector"
-            target: "kafka-connector-image"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,14 +73,6 @@ jobs:
           target: master-data-processor-image
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/master-data-processor:${{ github.ref_name }}
-
-      - name: Build merged-pipeline image and push
-        uses: docker/build-push-action@v4
-        with:
-          platforms: linux/amd64
-          target: kafka-connector-image
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/kafka-connector:${{ github.ref_name }}
 
       - name: Build ${{matrix.image}} image and push
         uses: docker/build-push-action@v4

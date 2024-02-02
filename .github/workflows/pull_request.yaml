@@ -1,5 +1,4 @@
 name: Pull Request
-run-name: Workflow run for pull request - ${{ github.event.pull_request.title }}
 on:
   pull_request:
     types:
@@ -21,4 +20,6 @@ jobs:
 
       - name: Maven Build
         run: |
-          mvn clean install
+          mvn clean test
+
+#run-name: Workflow run for pull request - ${{ github.event.pull_request.title }}

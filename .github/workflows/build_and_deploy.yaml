@@ -101,47 +101,45 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build framework artifact
-        id: upload-framework-artifact
+      - name: Build Framework Artifacts
         run: |
           cd ./framework
           mvn clean install -DskipTests
 
-      - name: Upload framework artifact
+      - name: Upload Framework Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: framework-1.0.0.jar
           path: ./framework/target/framework-1.0.0.jar
           if-no-files-found: error
-      - run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'
 
-      - name: Build dataset-registry artifact
-        id: upload-dataset-registry-artifact
+      - name: Build Dataset Registry Artifacts
         run: |
           cd ./dataset-registry
           mvn clean install -DskipTests
 
-      - name: Upload dataset-registry artifact
+      - name: Upload Dataset Registry Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dataset-registry-1.0.0.jar
           path: ./dataset-registry/target/dataset-registry-1.0.0.jar
           if-no-files-found: error
-      - run: echo 'Artifact ID is ${{ steps.upload-dataset-registry-artifact.outputs.artifact-id }}'
-##
-#      - name: Upload Dataset Registry Artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: dataset-registry-${{ steps.get-tag.outputs.tag }}.jar
-#          path: ./framework/target/framework-1.0.0.jar
-#
-#      - name: Upload Data Pipeline Artifacts
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: data-pipeline-${{ steps.get-tag.outputs.tag }}.jar
-#          path: |
-#            ./pipeline/extractor/target/extractor-1.0.0.jar
-#            ./pipeline/denormalizer/target/de-normalization-1.0.0.jar
+
+      - name: Build Data Pipeline Artifacts
+        run: |
+          cd ./pipeline
+          mvn clean install -DskipTests
+
+      - name: Upload Data Pipeline Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          path: |
+            ./pipeline/extractor/target/extractor-1.0.0.jar
+            ./pipeline/preprocessor/target/preprocessor-1.0.0.jar
+            ./pipeline/denormalizer/target/denormalizer-1.0.0.jar
+            ./pipeline/transformer/target/transformer-1.0.0.jar
+            ./pipeline/druid-router/target/druid-router-1.0.0.jar
+            ./pipeline/pipeline-merged/target/pipeline-merged-1.0.0.jar
+            ./pipeline/master-data-processor/target/master-data-processor-1.0.0.jar
+          if-no-files-found: error
 
 #  aws-deploy:
 #    needs: [ check-tag, build-image ]

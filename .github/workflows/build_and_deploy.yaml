@@ -133,19 +133,12 @@ jobs:
       matrix:
         include:
           - image: "extractor"
-            target: "extractor"
           - image: "preprocessor"
-            target: "preprocessor"
           - image: "denormalizer"
-            target: "denormalizer"
           - image: "transformer"
-            target: "transformer"
           - image: "druid-router"
-            target: "druid-router"
           - image: "pipeline-merged"
-            target: "pipeline-merged"
           - image: "master-data-processor"
-            target: "master-data-processor"
     steps:
       - name: Get Tag Name
         id: get-tag

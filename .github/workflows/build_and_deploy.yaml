@@ -103,7 +103,7 @@ jobs:
         with:
           name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
           path: ./framework/target/framework-1.0.0.jar
-        if-no-files-found: error
+          if-no-files-found: error
 #
 #      - name: Output artifact ID
 #        run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'

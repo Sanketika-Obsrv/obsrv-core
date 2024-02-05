@@ -59,7 +59,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build merged-pipeline image and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64
           target: merged-image
@@ -67,7 +67,7 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/merged-pipeline:${{ github.ref_name }}
 
       - name: Build merged-pipeline image and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64
           target: master-data-processor-image
@@ -75,7 +75,7 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/master-data-processor:${{ github.ref_name }}
 
       - name: Build ${{matrix.image}} image and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64
           target: ${{matrix.target}}
@@ -91,11 +91,11 @@ jobs:
         id: get-tag
         run: echo "Tag name is ${GITHUB_REF#refs/tags/}"
 
-#      - name: Upload Framework Artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: framework-${{ steps.get-tag.outputs.tag }}.jar
-#          path: ./framework/target/framework-1.0.0.jar
+      - name: Upload Framework Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: framework-${{ steps.get-tag.outputs.tag }}.jar
+          path: ./framework/target/framework-1.0.0.jar
 #
 #      - name: Upload Dataset Registry Artifact
 #        uses: actions/upload-artifact@v4

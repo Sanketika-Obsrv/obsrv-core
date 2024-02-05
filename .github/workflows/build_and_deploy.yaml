@@ -86,6 +86,9 @@ jobs:
     needs: [ check-tag ]
     runs-on: ubuntu-latest
     if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
+    outputs:
+      output1: ${{ steps.upload-framework-artifact.outputs.artifact }}
+      output2:  ${{ steps.upload-dataset-registry-artifact.outputs.artifact }
     steps:
       - name: Get Tag Name
         id: get-tag
@@ -94,7 +97,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Sertup JAVA
+      - name: Setup JAVA
         uses: actions/setup-java@v4
         with:
           java-version: '11'
@@ -107,6 +110,7 @@ jobs:
           mvn clean install -DskipTests
 
       - name: Upload Framework Artifacts
+        id: upload-framework-artifact
         uses: actions/upload-artifact@v4
         with:
           name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
@@ -119,6 +123,7 @@ jobs:
           mvn clean install -DskipTests
 
       - name: Upload Dataset Registry Artifacts
+        id: upload-dataset-registry-artifact
         uses: actions/upload-artifact@v4
         with:
           name: dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
@@ -128,7 +133,7 @@ jobs:
   artifacts-upload-pipeline:
     needs: [ check-tag, artifacts-upload-core ]
     runs-on: ubuntu-latest
-    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
+    if: needs.check-tag.outputs.ALLOWED_TAG == 'True' && needs.artifacts-upload-core.outputs.output1 && needs.artifacts-upload-core.outputs.output2
     strategy:
       matrix:
         include:
@@ -147,7 +152,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Sertup JAVA
+      - name: Setup JAVA
         uses: actions/setup-java@v4
         with:
           java-version: '11'

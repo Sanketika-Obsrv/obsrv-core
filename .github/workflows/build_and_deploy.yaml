@@ -23,64 +23,64 @@ jobs:
           (echo -n TRIGGER_ALLOWED= && echo 'print("${{ github.ref_name }}".split("_")[0]
           not in ${{ vars.CURRENT_RELEASE }})' | python3) >> "$GITHUB_OUTPUT"
 
-  build-image:
-    needs: check-tag
-    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - image: "extractor"
-            target: "extractor-image"
-          - image: "preprocessor"
-            target: "preprocessor-image"
-          - image: "denormalizer"
-            target: "denormalizer-image"
-          - image: "transformer"
-            target: "transformer-image"
-          - image: "druid-router"
-            target: "router-image"
-          - image: "merged-pipeline"
-            target: "merged-image"
-          - image: "master-data-processor"
-            target: "master-data-processor-image"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to docker hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build merged-pipeline image and push
-        uses: docker/build-push-action@v5
-        with:
-          platforms: linux/amd64
-          target: merged-image
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/merged-pipeline:${{ github.ref_name }}
-
-      - name: Build merged-pipeline image and push
-        uses: docker/build-push-action@v5
-        with:
-          platforms: linux/amd64
-          target: master-data-processor-image
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/master-data-processor:${{ github.ref_name }}
-
-      - name: Build ${{matrix.image}} image and push
-        uses: docker/build-push-action@v5
-        with:
-          platforms: linux/amd64
-          target: ${{matrix.target}}
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
+#  build-image:
+#    needs: check-tag
+#    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && github.event_name != 'pull_request'
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        include:
+#          - image: "extractor"
+#            target: "extractor-image"
+#          - image: "preprocessor"
+#            target: "preprocessor-image"
+#          - image: "denormalizer"
+#            target: "denormalizer-image"
+#          - image: "transformer"
+#            target: "transformer-image"
+#          - image: "druid-router"
+#            target: "router-image"
+#          - image: "merged-pipeline"
+#            target: "merged-image"
+#          - image: "master-data-processor"
+#            target: "master-data-processor-image"
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 0
+#
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@v3
+#
+#      - name: Login to docker hub
+#        uses: docker/login-action@v3
+#        with:
+#          username: ${{ secrets.DOCKERHUB_USERNAME }}
+#          password: ${{ secrets.DOCKERHUB_TOKEN }}
+#
+#      - name: Build merged-pipeline image and push
+#        uses: docker/build-push-action@v5
+#        with:
+#          platforms: linux/amd64
+#          target: merged-image
+#          push: true
+#          tags: ${{ secrets.DOCKERHUB_USERNAME }}/merged-pipeline:${{ github.ref_name }}
+#
+#      - name: Build merged-pipeline image and push
+#        uses: docker/build-push-action@v5
+#        with:
+#          platforms: linux/amd64
+#          target: master-data-processor-image
+#          push: true
+#          tags: ${{ secrets.DOCKERHUB_USERNAME }}/master-data-processor:${{ github.ref_name }}
+#
+#      - name: Build ${{matrix.image}} image and push
+#        uses: docker/build-push-action@v5
+#        with:
+#          platforms: linux/amd64
+#          target: ${{matrix.target}}
+#          push: true
+#          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
 
   artifacts-upload:
     needs: [ check-tag ]
@@ -95,7 +95,7 @@ jobs:
         id: upload-framework-artifact
         uses: actions/upload-artifact@v4
         with:
-          path: framework/target/framework-1.0.0.jar
+          path: framework-1.0.0.jar
 
       - name: Output artifact ID
         run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'

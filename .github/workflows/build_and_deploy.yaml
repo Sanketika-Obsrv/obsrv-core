@@ -83,9 +83,9 @@ jobs:
 #          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
 
   artifacts-upload:
-#    needs: [ check-tag ]
+    needs: [ check-tag ]
     runs-on: ubuntu-latest
-#    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
+    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
     steps:
       - name: Get Tag Name
         id: get-tag
@@ -99,13 +99,11 @@ jobs:
       - run: |
           cd ./framework
           mvn clean package -DskipTests
-#          cd ..
-#          mkdir staging && cp target/framework-1.0.0.jar staging
-#      - uses: actions/upload-artifact@v4
-#        with:
-#          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
-#          path: staging
-#        if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
+          path: ./framework/target/framework-1.0.0.jar
+        if-no-files-found: error
 #
 #      - name: Output artifact ID
 #        run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'

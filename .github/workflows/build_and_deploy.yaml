@@ -83,7 +83,7 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
 
   artifacts-upload:
-    needs: [ build-image ]
+    needs: [ check-tag ]
     runs-on: ubuntu-latest
     if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
     steps:
@@ -95,8 +95,8 @@ jobs:
         id: upload-framework-artifact
         uses: actions/upload-artifact@v4
         with:
-          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: /obsrv-core/framework/target/framework-1.0.0.jar
+          name: framework-1.0.0.jar
+          path: framework/target/
 
       - name: Output artifact ID
         run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'

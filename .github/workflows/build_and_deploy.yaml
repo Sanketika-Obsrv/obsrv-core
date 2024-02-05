@@ -95,8 +95,7 @@ jobs:
         id: upload-framework-artifact
         uses: actions/upload-artifact@v4
         with:
-          name: framework-1.0.0.jar
-          path: framework/target/
+          path: framework/target/framework-1.0.0.jar
 
       - name: Output artifact ID
         run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'

@@ -94,6 +94,9 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: PWD
+        run: pwd
+
       - name: Upload Framework Artifact
         id: upload-framework-artifact
         uses: actions/upload-artifact@v4

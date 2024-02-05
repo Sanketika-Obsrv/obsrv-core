@@ -89,12 +89,12 @@ jobs:
     steps:
       - name: Get Tag Name
         id: get-tag
-        run: echo "Tag name is ${GITHUB_REF#refs/tags/}"
+        run: echo ""::set-output name=tag_name::${GITHUB_REF#refs/tags/}"
 
       - name: Upload Framework Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: framework-${{ steps.get-tag.outputs.tag }}.jar
+          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
           path: ./framework/target/framework-1.0.0.jar
 #
 #      - name: Upload Dataset Registry Artifact

@@ -101,11 +101,13 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build and upload  framework artifact
+      - name: Build framework artifact
         id: upload-framework-artifact
         run: |
           cd ./framework
           mvn clean package -DskipTests
+
+      - name: Upload framework artifact
         uses: actions/upload-artifact@v4
         with:
           name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
@@ -113,11 +115,13 @@ jobs:
           if-no-files-found: error
       - run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'
 
-      - name: Build and upload  dataset-registry artifact
+      - name: Build dataset-registry artifact
         id: upload-dataset-registry-artifact
         run: |
           cd ./dataset-registry
           mvn clean package -DskipTests
+          
+      - name: Upload dataset-registry artifact
         uses: actions/upload-artifact@v4
         with:
           name: dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar

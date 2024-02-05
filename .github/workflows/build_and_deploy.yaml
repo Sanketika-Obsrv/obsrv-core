@@ -105,12 +105,12 @@ jobs:
         id: upload-framework-artifact
         run: |
           cd ./framework
-          mvn clean package -DskipTests
+          mvn clean install -DskipTests
 
       - name: Upload framework artifact
         uses: actions/upload-artifact@v4
         with:
-          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
+          name: framework-1.0.0.jar
           path: ./framework/target/framework-1.0.0.jar
           if-no-files-found: error
       - run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'
@@ -119,12 +119,12 @@ jobs:
         id: upload-dataset-registry-artifact
         run: |
           cd ./dataset-registry
-          mvn clean package -DskipTests
-          
+          mvn clean install -DskipTests
+
       - name: Upload dataset-registry artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
+          name: dataset-registry-1.0.0.jar
           path: ./dataset-registry/target/dataset-registry-1.0.0.jar
           if-no-files-found: error
       - run: echo 'Artifact ID is ${{ steps.upload-dataset-registry-artifact.outputs.artifact-id }}'

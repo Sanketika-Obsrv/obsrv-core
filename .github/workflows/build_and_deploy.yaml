@@ -133,7 +133,7 @@ jobs:
   artifacts-upload-pipeline:
     needs: [ check-tag, artifacts-upload-core ]
     runs-on: ubuntu-latest
-    if: needs.check-tag.outputs.ALLOWED_TAG == 'True' && needs.artifacts-upload-core.outputs.output1 && needs.artifacts-upload-core.outputs.output2
+    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
     strategy:
       matrix:
         include:

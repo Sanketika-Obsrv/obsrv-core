@@ -89,14 +89,14 @@ jobs:
     steps:
       - name: Get Tag Name
         id: get-tag
-        run: echo "::set-output name=tag_name::${GITHUB_REF#refs/tags/}"
+        run: echo "tag_name=${GITHUB_REF#refs/tags/}" >>$GITHUB_OUTPUT
 
       - name: Upload Framework Artifact
         id: upload-framework-artifact
         uses: actions/upload-artifact@v4
         with:
           name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: /obsrv-core/framework/framework/target/framework-1.0.0.jar
+          path: /obsrv-core/framework/target/framework-1.0.0.jar
 
       - name: Output artifact ID
         run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'

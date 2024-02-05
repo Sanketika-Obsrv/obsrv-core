@@ -95,7 +95,8 @@ jobs:
         id: upload-framework-artifact
         uses: actions/upload-artifact@v4
         with:
-          path: framework-1.0.0.jar
+          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
+          path: /home/sankethika/Documents/GitHub/sanketika-obsrv/obsrv-core/framework/target/framework-1.0.0.jar
 
       - name: Output artifact ID
         run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'

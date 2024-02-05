@@ -96,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: ../../framework/target/framework-1.0.0.jar
+          path: /obsrv-core/framework/framework/target/framework-1.0.0.jar
 
       - name: Output artifact ID
         run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'

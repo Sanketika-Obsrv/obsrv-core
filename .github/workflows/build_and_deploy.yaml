@@ -83,30 +83,33 @@ jobs:
 #          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
 
   artifacts-upload:
-    needs: [ check-tag ]
+#    needs: [ check-tag ]
     runs-on: ubuntu-latest
-    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
+#    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
     steps:
       - name: Get Tag Name
         id: get-tag
         run: echo "tag_name=${GITHUB_REF#refs/tags/}" >>$GITHUB_OUTPUT
-
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: PWD
-        run: pwd
-
-      - name: Upload Framework Artifact
-        id: upload-framework-artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v3
         with:
-          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: framework/target/framework-1.0.0.jar
-
-      - name: Output artifact ID
-        run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'
+          java-version: '11'
+          distribution: 'temurin'
+          cache: 'maven'
+      - run: |
+          cd ./framework
+          mvn clean package -DskipTests
+#          cd ..
+#          mkdir staging && cp target/framework-1.0.0.jar staging
+#      - uses: actions/upload-artifact@v4
+#        with:
+#          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
+#          path: staging
+#        if-no-files-found: error
 #
+#      - name: Output artifact ID
+#        run: echo 'Artifact ID is ${{ steps.upload-framework-artifact.outputs.artifact-id }}'
+##
 #      - name: Upload Dataset Registry Artifact
 #        uses: actions/upload-artifact@v4
 #        with:

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.module.scala.JsonScalaEnumeration
 import org.sunbird.obsrv.core.model.SystemConfig
 import org.sunbird.obsrv.model.DatasetStatus.DatasetStatus
+import org.sunbird.obsrv.model.KafkaConnectorEventType.KafkaConnectorEventType
 import org.sunbird.obsrv.model.TransformMode.TransformMode
 import org.sunbird.obsrv.model.ValidationMode.ValidationMode
 
@@ -53,8 +54,8 @@ object DatasetModels {
                                    @JsonProperty("field_key") fieldKey: String, @JsonProperty("transformation_function") transformationFunction: TransformationFunction,
                                    @JsonProperty("status") status: String, @JsonProperty("mode") @JsonScalaEnumeration(classOf[TransformModeType]) mode: Option[TransformMode] = Some(TransformMode.Strict))
 
-  case class ConnectorConfig(@JsonProperty("kafkaBrokers") kafkaBrokers: String, @JsonProperty("topic") topic: String, @JsonProperty("type") databaseType: String,
-                             @JsonProperty("connection") connection: Connection, @JsonProperty("tableName") tableName: String, @JsonProperty("databaseName") databaseName: String,
+  case class ConnectorConfig(@JsonProperty("kafkaBrokers") kafkaBrokers: String, @JsonProperty("topic") topic: String, @JsonProperty("kafka_event_type") @JsonScalaEnumeration(classOf[KafkaEventType]) kafkaEventType: Option[KafkaConnectorEventType] = None,
+                             @JsonProperty("type") databaseType: String, @JsonProperty("connection") connection: Connection, @JsonProperty("tableName") tableName: String, @JsonProperty("databaseName") databaseName: String,
                              @JsonProperty("pollingInterval") pollingInterval: PollingInterval, @JsonProperty("authenticationMechanism") authenticationMechanism: AuthenticationMechanism,
                              @JsonProperty("batchSize") batchSize: Int, @JsonProperty("timestampColumn") timestampColumn: String)
 
@@ -94,4 +95,11 @@ class DatasetStatusType extends TypeReference[DatasetStatus.type]
 object DatasetStatus extends Enumeration {
   type DatasetStatus = Value
   val Draft, Publish, Live, Retired, Purged = Value
+}
+
+class KafkaEventType extends TypeReference[KafkaConnectorEventType.type]
+
+object KafkaConnectorEventType extends Enumeration {
+  type KafkaConnectorEventType = Value
+  val DEBEZIUM = Value
 }

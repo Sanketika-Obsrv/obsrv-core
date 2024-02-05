@@ -107,6 +107,7 @@ jobs:
           mvn clean package -DskipTests
 
       - name: Upload artifact
+        id: upload-framework-artifact
         uses: actions/upload-artifact@v4
         with:
           name: framework-${{ steps.get-tag.outputs.tag_name }}.jar

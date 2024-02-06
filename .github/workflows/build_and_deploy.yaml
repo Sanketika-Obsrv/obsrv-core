@@ -23,111 +23,27 @@ jobs:
           (echo -n TRIGGER_ALLOWED= && echo 'print("${{ github.ref_name }}".split("_")[0]
           not in ${{ vars.CURRENT_RELEASE }})' | python3) >> "$GITHUB_OUTPUT"
 
-  artifacts-upload-core:
-    needs: [ check-tag ]
-    runs-on: ubuntu-latest
-    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
-    steps:
-      - name: Get Tag Name
-        id: get-tag
-        run: echo "tag_name=${GITHUB_REF#refs/tags/}" >>$GITHUB_OUTPUT
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup JAVA
-        uses: actions/setup-java@v4
-        with:
-          java-version: '11'
-          distribution: 'temurin'
-          cache: 'maven'
-
-      - name: Build Framework Artifacts
-        run: |
-          cd ./framework
-          mvn clean install -DskipTests
-
-      - name: Upload Framework Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: ./framework/target/framework-1.0.0.jar
-          if-no-files-found: error
-
-      - name: Build Dataset Registry Artifacts
-        run: |
-          cd ./dataset-registry
-          mvn clean install -DskipTests
-
-      - name: Upload Dataset Registry Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: ./dataset-registry/target/dataset-registry-1.0.0.jar
-          if-no-files-found: error
-
-  artifacts-upload-pipeline:
-    needs: [ check-tag, artifacts-upload-core ]
-    runs-on: ubuntu-latest
-    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
-    strategy:
-      matrix:
-        include:
-          - image: "extractor"
-#          - image: "preprocessor"
-#          - image: "denormalizer"
-#          - image: "transformer"
-#          - image: "druid-router"
-#          - image: "pipeline-merged"
-#          - image: "master-data-processor"
-    steps:
-      - name: Get Tag Name
-        id: get-tag
-        run: echo "tag_name=${GITHUB_REF#refs/tags/}" >>$GITHUB_OUTPUT
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup JAVA
-        uses: actions/setup-java@v4
-        with:
-          java-version: '11'
-          distribution: 'temurin'
-          cache: 'maven'
-
-      - name: Build Data Pipeline Artifacts
-        run: |
-          cd ./pipeline
-          mvn clean install -DskipTests
-
-      - name: Upload Data Pipeline Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{matrix.image}}-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: ./pipeline/${{matrix.image}}/target/${{matrix.image}}-1.0.0.jar
-          if-no-files-found: error
-
   build-image:
     needs: check-tag
-    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True' && github.event_name != 'pull_request'
+    if: needs.check-tag.outputs.ALLOWED_TAG ==  'True'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - image: "extractor"
             target: "extractor-image"
-#          - image: "preprocessor"
-#            target: "preprocessor-image"
-#          - image: "denormalizer"
-#            target: "denormalizer-image"
-#          - image: "transformer"
-#            target: "transformer-image"
-#          - image: "druid-router"
-#            target: "router-image"
-#          - image: "merged-pipeline"
-#            target: "merged-image"
-#          - image: "master-data-processor"
-#            target: "master-data-processor-image"
+          - image: "preprocessor"
+            target: "preprocessor-image"
+          - image: "denormalizer"
+            target: "denormalizer-image"
+          - image: "transformer"
+            target: "transformer-image"
+          - image: "druid-router"
+            target: "router-image"
+          - image: "merged-pipeline"
+            target: "merged-image"
+          - image: "master-data-processor"
+            target: "master-data-processor-image"
     steps:
       - uses: actions/checkout@v4
         with:

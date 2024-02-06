@@ -86,9 +86,6 @@ jobs:
     needs: [ check-tag ]
     runs-on: ubuntu-latest
     if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
-    outputs:
-      output1: ${{ steps.upload-framework-artifact.outputs.artifact_id }}
-      output2: ${{ steps.upload-dataset-registry-artifact.outputs.artifact_id }}
     steps:
       - name: Get Tag Name
         id: get-tag
@@ -110,7 +107,6 @@ jobs:
           mvn clean install -DskipTests
 
       - name: Upload Framework Artifacts
-        id: upload-framework-artifact
         uses: actions/upload-artifact@v4
         with:
           name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
@@ -123,7 +119,6 @@ jobs:
           mvn clean install -DskipTests
 
       - name: Upload Dataset Registry Artifacts
-        id: upload-dataset-registry-artifact
         uses: actions/upload-artifact@v4
         with:
           name: dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
@@ -133,7 +128,7 @@ jobs:
   artifacts-upload-pipeline:
     needs: [ check-tag, artifacts-upload-core ]
     runs-on: ubuntu-latest
-    if: needs.check-tag.outputs.ALLOWED_TAG == 'True' && needs.artifact-upload-core.outputs.output1 && needs.artifact-upload-core.outputs.output2
+    if: needs.check-tag.outputs.ALLOWED_TAG == 'True'
     strategy:
       matrix:
         include:

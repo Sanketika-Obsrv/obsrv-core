@@ -120,7 +120,7 @@ object DatasetRegistryService {
     val query = s"UPDATE dataset_source_config SET connector_stats = coalesce(connector_stats, '{}')::jsonb || " +
       s"jsonb_build_object('records', COALESCE(connector_stats->>'records', '0')::int + '$records'::int)  || " +
       s"jsonb_build_object('last_fetch_timestamp', '${lastFetchTimestamp}'::timestamp) || " +
-      s"jsonb_build_object('last_run_timestamp', '${new Timestamp(System.currentTimeMillis())}'::timestamp) WHERE id = '$id';"
+      s"jsonb_build_object('last_run_timestamp', '${new Timestamp(System.currentTimeMillis())}'::timestamp) WHERE id = '$id' AND connector_type = 'jdbc';"
     updateRegistry(query)
   }
 

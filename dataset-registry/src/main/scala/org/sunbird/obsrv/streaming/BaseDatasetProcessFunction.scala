@@ -43,9 +43,10 @@ trait SystemEventHandler {
     val obsrvMeta = event("obsrv_meta").asInstanceOf[Map[String, AnyRef]]
     val flags = obsrvMeta("flags").asInstanceOf[Map[String, AnyRef]]
     val timespans = obsrvMeta("timespans").asInstanceOf[Map[String, AnyRef]]
+    val sourceData = obsrvMeta("source").asInstanceOf[Map[String, AnyRef]]
 
     JSONUtil.serialize(SystemEvent(
-      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(producer)), dataset = dataset, dataset_type = dataset_type),
+      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(producer)), dataset = dataset, dataset_type = dataset_type, source = Some(sourceData)),
       data = EData(error = error, pipeline_stats = Some(PipelineStats(extractor_events = None,
         extractor_status = getStatus(flags, Producer.extractor), extractor_time = getTime(timespans, Producer.extractor),
         validator_status = getStatus(flags, Producer.validator), validator_time = getTime(timespans, Producer.validator),

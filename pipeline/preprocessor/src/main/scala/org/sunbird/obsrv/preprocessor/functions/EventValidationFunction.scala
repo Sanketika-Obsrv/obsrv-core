@@ -96,9 +96,12 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
     }
   }
 
-  private def getSystemEvent(dataset: Dataset, functionalError: FunctionalError, failedCount: Int): String = {
+  private def getSystemEvent(dataset: Dataset, event: mutable.Map[String, AnyRef], functionalError: FunctionalError, failedCount: Int): String = {
+    val obsrvMeta = event("obsrv_meta").asInstanceOf[Map[String, AnyRef]]
+    val sourceData = obsrvMeta("source").asInstanceOf[Map[String, AnyRef]]
+
     JSONUtil.serialize(SystemEvent(EventID.METRIC,
-      ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.validator)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
+      ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.validator)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType), source = Some(sourceData)),
       data = EData(
         error = Some(ErrorLog(pdata_id = Producer.validator, pdata_status = StatusCode.failed, error_type = functionalError, error_code = ErrorConstants.SCHEMA_VALIDATION_FAILED.errorCode, error_message = ErrorConstants.SCHEMA_VALIDATION_FAILED.errorMsg, error_level = ErrorLevel.warn, error_count = Some(failedCount))),
         pipeline_stats = None
@@ -106,23 +109,23 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
     ))
   }
 
-  private def generateSystemEvents(dataset: Dataset, validationFailureMsgs: List[ValidationMsg], context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
+  private def generateSystemEvents(dataset: Dataset, event: mutable.Map[String, AnyRef], validationFailureMsgs: List[ValidationMsg], context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
 
     val reqFailedCount = validationFailureMsgs.count(f => "required".equals(f.keyword))
     val typeFailedCount = validationFailureMsgs.count(f => "type".equals(f.keyword))
     val addTypeFailedCount = validationFailureMsgs.count(f => "additionalProperties".equals(f.keyword))
     val unknownFailureCount = validationFailureMsgs.count(f => !List("type","required","additionalProperties").contains(f.keyword))
     if (reqFailedCount > 0) {
-      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.RequiredFieldsMissing, reqFailedCount))
+      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, event, FunctionalError.RequiredFieldsMissing, reqFailedCount))
     }
     if (typeFailedCount > 0) {
-      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.DataTypeMismatch, typeFailedCount))
+      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, event, FunctionalError.DataTypeMismatch, typeFailedCount))
     }
     if (addTypeFailedCount > 0) {
-      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.AdditionalFieldsFound, typeFailedCount))
+      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, event, FunctionalError.AdditionalFieldsFound, typeFailedCount))
     }
     if (unknownFailureCount > 0) {
-      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.UnknownValidationError, unknownFailureCount))
+      context.output(config.systemEventsOutputTag, getSystemEvent(dataset, event, FunctionalError.UnknownValidationError, unknownFailureCount))
     }
 
     // Log the validation failure messages
@@ -151,7 +154,7 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
                                 validationFailureMsgs: List[ValidationMsg]): Unit = {
     metrics.incCounter(dataset.id, config.validationFailureMetricsCount)
     context.output(config.invalidEventsOutputTag, markFailed(event, ErrorConstants.SCHEMA_VALIDATION_FAILED, Producer.validator))
-    generateSystemEvents(dataset, validationFailureMsgs, context)
+    generateSystemEvents(dataset, event, validationFailureMsgs, context)
   }
 
 }

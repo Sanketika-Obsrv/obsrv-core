@@ -68,6 +68,9 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
 
   private def generateSystemEvent(dataset: Dataset, denormEvent: DenormEvent, context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
 
+    val obsrvMeta = denormEvent.msg("obsrv_meta").asInstanceOf[Map[String, AnyRef]]
+    val sourceData = obsrvMeta("source").asInstanceOf[Map[String, AnyRef]]
+
     denormEvent.fieldStatus.filter(f => !f._2.success).groupBy(f => f._2.error.get).map(f => (f._1, f._2.size))
       .foreach(f => {
         val functionalError = f._1 match {
@@ -77,7 +80,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
         }
         context.output(config.systemEventsOutputTag, JSONUtil.serialize(SystemEvent(
           EventID.METRIC,
-          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType), source = Some(sourceData)),
           data = EData(error = Some(ErrorLog(pdata_id = Producer.denorm, pdata_status = StatusCode.failed, error_type = functionalError, error_code = f._1.errorCode, error_message = f._1.errorMsg, error_level = ErrorLevel.critical, error_count = Some(f._2))))
         )))
       })

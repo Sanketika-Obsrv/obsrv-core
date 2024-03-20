@@ -24,6 +24,7 @@
 		<module>pipeline-merged</module>
 		<module>kafka-connector</module>
 		<module>master-data-processor</module>
+		<module>hudi-connector</module>
 	</modules>
 
 	<properties>

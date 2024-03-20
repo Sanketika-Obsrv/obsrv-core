@@ -1,4 +1,4 @@
-package org.sunbird.obsrv.writer
+package org.sunbird.obsrv.streaming
 
 import java.sql.Timestamp
 import java.time.{LocalDateTime, ZoneOffset}

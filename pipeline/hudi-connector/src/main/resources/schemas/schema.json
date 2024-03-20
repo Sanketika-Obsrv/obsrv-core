@@ -1,0 +1,108 @@
+{
+  "dataset": "financial_transactions",
+  "schema": {
+    "table": "financial_transactions",
+    "partitionColumn": "receiver_ifsc_code",
+    "timestampColumn": "txn_date",
+    "primaryKey": "txn_id",
+    "columnSpec": [
+      {
+        "column": "receiver_account_number",
+        "type": "string"
+      },
+      {
+        "column": "receiver_ifsc_code",
+        "type": "string"
+      },
+      {
+        "column": "sender_account_number",
+        "type": "string"
+      },
+      {
+        "column": "sender_contact_email",
+        "type": "string"
+      },
+      {
+        "column": "sender_ifsc_code",
+        "type": "string"
+      },
+      {
+        "column": "currency",
+        "type": "string"
+      },
+      {
+        "column": "txn_amount",
+        "type": "int"
+      },
+      {
+        "column": "txn_date",
+        "type": "string"
+      },
+      {
+        "column": "txn_id",
+        "type": "string"
+      },
+      {
+        "column": "txn_status",
+        "type": "string"
+      },
+      {
+        "column": "txn_type",
+        "type": "string"
+      }
+    ]
+  },
+  "inputFormat": {
+    "type": "json",
+    "flattenSpec": {
+      "fields": [
+        {
+          "type": "root",
+          "name": "receiver_account_number"
+        },
+        {
+          "type": "path",
+          "name": "sender_account_number",
+          "expr": "$.sender.account_number"
+        },
+        {
+          "type": "path",
+          "name": "sender_ifsc_code",
+          "expr": "$.sender.ifsc_code"
+        },
+        {
+          "type": "root",
+          "name": "receiver_ifsc_code"
+        },
+        {
+          "type": "root",
+          "name": "sender_contact_email"
+        },
+        {
+          "type": "root",
+          "name": "currency"
+        },
+        {
+          "type": "root",
+          "name": "txn_amount"
+        },
+        {
+          "type": "root",
+          "name": "txn_date"
+        },
+        {
+          "type": "root",
+          "name": "txn_id"
+        },
+        {
+          "type": "root",
+          "name": "txn_status"
+        },
+        {
+          "type": "root",
+          "name": "txn_type"
+        }
+      ]
+    }
+  }
+}

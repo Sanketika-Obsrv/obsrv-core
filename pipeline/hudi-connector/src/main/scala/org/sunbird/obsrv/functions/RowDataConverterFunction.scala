@@ -7,14 +7,13 @@ import org.apache.flink.formats.json.JsonToRowDataConverters
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper
 import org.sunbird.obsrv.util.HudiSchemaParser
 import org.apache.flink.table.data.RowData
-import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType}
+import org.apache.flink.table.types.logical.LogicalType
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.util.JSONUtil
 
 import scala.collection.mutable.{Map => MMap}
-import scala.collection.mutable
 
-case class RowDataType(fields: Array[String], fieldTypes: Array[LogicalType])
+// case class RowDataType(fields: Array[String], fieldTypes: Array[LogicalType])
 
 class RowDataConverterFunction() extends RichMapFunction[MMap[String, AnyRef], RowData] {
 
@@ -38,13 +37,13 @@ class RowDataConverterFunction() extends RichMapFunction[MMap[String, AnyRef], R
   def convertToRowData(event: Map[String, AnyRef]): RowData = {
     val eventJson = JSONUtil.serialize(event)
     val flattenedData = hudiSchemaParser.parseJson("financial_transactions", eventJson)
-    val rowDataType = retrieveEventFields(flattenedData)
-    val rowType: RowType = RowType.of(rowDataType.fieldTypes, rowDataType.fields)
+    val rowType = hudiSchemaParser.rowTypeMap("financial_transactions")
     val converter: JsonToRowDataConverters.JsonToRowDataConverter = jsonToRowDataConverters.createRowConverter(rowType)
     val rowData = converter.convert(objectMapper.readTree(JSONUtil.serialize(flattenedData))).asInstanceOf[RowData]
     rowData
   }
 
+  /*
   def retrieveEventFields(data: MMap[String, Any]): RowDataType = {
     val fields = mutable.SortedMap[String, LogicalType]()
     data.keySet.foreach {
@@ -62,4 +61,5 @@ class RowDataConverterFunction() extends RichMapFunction[MMap[String, AnyRef], R
     }
     RowDataType(fields.keySet.toArray, fields.values.toArray)
   }
+ */
 }

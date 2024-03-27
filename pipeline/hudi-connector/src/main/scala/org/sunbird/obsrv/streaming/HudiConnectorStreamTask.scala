@@ -7,22 +7,20 @@ import org.apache.flink.api.java.typeutils.TypeExtractor
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.streaming.api.datastream.DataStream
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
-// import org.apache.hudi.configuration.FlinkOptions
+import org.apache.hudi.configuration.FlinkOptions
 import org.apache.hudi.util.AvroSchemaConverter
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
 import org.sunbird.obsrv.functions.RowDataConverterFunction
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType}
 import org.apache.hudi.sink.utils.Pipelines
 import org.slf4j.LoggerFactory
-import org.sunbird.obsrv.util.{HudiSchemaParser, HudiSchemaSpec}
+import org.sunbird.obsrv.util.HudiSchemaParser
 
 import java.io.File
 import java.sql.Timestamp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import scala.collection.mutable
 import scala.collection.mutable.{Map => MMap}
 
 class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTask[String] {
@@ -44,21 +42,15 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     setHudiBaseConfigurations(conf)
     val schemaParser = new HudiSchemaParser()
     val financeSchema = schemaParser.hudiSchemaMap("financial_transactions")
-
-    val rowType = createRowType(financeSchema)
-    val avroSchema = AvroSchemaConverter.convertToSchema(rowType)
-    // conf.setString(FlinkOptions.PATH.key, s"${config.hudiBasePath}/${financeSchema.schema.table}")
-    conf.setString("path", s"${config.hudiBasePath}/${financeSchema.schema.table}")
-    // conf.setString(FlinkOptions.TABLE_NAME, financeSchema.schema.table)
-    conf.setString("hoodie.table.name", financeSchema.schema.table)
-    // conf.setString(FlinkOptions.RECORD_KEY_FIELD.key, financeSchema.schema.primaryKey)
-    conf.setString("hoodie.datasource.write.recordkey.field", financeSchema.schema.primaryKey)
-    // conf.setString(FlinkOptions.PRECOMBINE_FIELD.key, financeSchema.schema.timestampColumn)
-    conf.setString("hoodie.datasource.write.precombine.field", financeSchema.schema.timestampColumn)
-    // conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, financeSchema.schema.partitionColumn)
-    conf.setString("hoodie.datasource.write.partitionpath.field", financeSchema.schema.partitionColumn)
-    // conf.setString(FlinkOptions.SOURCE_AVRO_SCHEMA.key, avroSchema.toString)
-    conf.setString("source.avro-schema", avroSchema.toString)
+    // val rowType = createRowType(financeSchema)
+    val rowType = schemaParser.rowTypeMap("financial_transactions")
+    val avroSchema = AvroSchemaConverter.convertToSchema(rowType, "financial_transactions")
+    conf.setString(FlinkOptions.PATH.key, s"${config.hudiBasePath}/${financeSchema.schema.table}")
+    conf.setString(FlinkOptions.TABLE_NAME, financeSchema.schema.table)
+    conf.setString(FlinkOptions.RECORD_KEY_FIELD.key, financeSchema.schema.primaryKey)
+    conf.setString(FlinkOptions.PRECOMBINE_FIELD.key, financeSchema.schema.timestampColumn)
+    conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, financeSchema.schema.partitionColumn)
+    conf.setString(FlinkOptions.SOURCE_AVRO_SCHEMA.key, avroSchema.toString)
 
     if (config.hmsEnabled) {
       conf.setString("hive_sync.table", financeSchema.schema.table)
@@ -71,6 +63,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     env.execute("Flink-Hudi-Connector")
   }
 
+  /*
   private def createRowType(schema: HudiSchemaSpec): RowType = {
     val columnSpec = schema.schema.columnSpec
     val primaryKey = schema.schema.primaryKey
@@ -91,33 +84,27 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
         }
         rowTypeMap.put(spec.column, columnType)
     }
-    val rowType: RowType = RowType.of(rowTypeMap.values.toArray, rowTypeMap.keySet.toArray)
+    val rowType: RowType = RowType.of(false, rowTypeMap.values.toArray, rowTypeMap.keySet.toArray)
     rowType
   }
+  */
 
   private def setHudiBaseConfigurations(conf: Configuration): Unit = {
-    // conf.setString(FlinkOptions.PATH.key, config.hudiBasePath)
-    // conf.setString("path", config.hudiBasePath)
-    // conf.setString(FlinkOptions.TABLE_TYPE.key, config.hudiTableType)
-    conf.setString("table.type", config.hudiTableType)
-    // conf.setBoolean(FlinkOptions.METADATA_ENABLED.key, true)
-    conf.setBoolean("metadata.enabled", true)
-    // conf.setDouble(FlinkOptions.WRITE_BATCH_SIZE.key, 0.1)
-    conf.setDouble("write.batch.size", 0.1)
-    // conf.setBoolean(FlinkOptions.COMPACTION_SCHEDULE_ENABLED.key, config.hudiCompactionEnabled)
-    conf.setBoolean("compaction.schedule.enabled", config.hudiCompactionEnabled)
+    conf.setString(FlinkOptions.TABLE_TYPE.key, config.hudiTableType)
+    conf.setBoolean(FlinkOptions.METADATA_ENABLED.key, true)
+    conf.setDouble(FlinkOptions.WRITE_BATCH_SIZE.key, 0.1)
+    conf.setBoolean(FlinkOptions.COMPACTION_SCHEDULE_ENABLED.key, config.hudiCompactionEnabled)
     conf.setInteger("write.tasks", config.hudiWriteTasks)
+    conf.setString("hoodie.fs.atomic_creation.support", "s3a")
 
     if (config.hmsEnabled) {
       conf.setBoolean("hive_sync.enabled", config.hmsEnabled)
-      // conf.setString(FlinkOptions.HIVE_SYNC_DB.key(), config.hmsDatabaseName)
-      conf.setString("hive_sync.db", config.hmsDatabaseName)
+      conf.setString(FlinkOptions.HIVE_SYNC_DB.key(), config.hmsDatabaseName)
       conf.setString("hive_sync.username", config.hmsUsername)
       conf.setString("hive_sync.password", config.hmsPassword)
       conf.setString("hive_sync.mode", "hms")
       conf.setBoolean("hive_sync.use_jdbc", false)
-      // conf.setString(FlinkOptions.HIVE_SYNC_METASTORE_URIS.key(), config.hmsURI)
-      conf.setString("hive_sync.metastore.uris", config.hmsURI)
+      conf.setString(FlinkOptions.HIVE_SYNC_METASTORE_URIS.key(), config.hmsURI)
       conf.setString("hoodie.fs.atomic_creation.support", "s3a")
     }
 

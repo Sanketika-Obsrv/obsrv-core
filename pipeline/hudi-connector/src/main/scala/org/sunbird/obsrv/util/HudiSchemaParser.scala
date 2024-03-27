@@ -3,6 +3,7 @@ package org.sunbird.obsrv.util
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.github.classgraph.{ClassGraph, Resource}
+import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.util.JSONUtil
 
@@ -23,23 +24,48 @@ class HudiSchemaParser {
 
   val objectMapper = new ObjectMapper()
   objectMapper.registerModule(DefaultScalaModule)
-  val hudiSchemaMap: mutable.HashMap[String, HudiSchemaSpec] = {
-    readSchema("schemas")
-  }
+  val hudiSchemaMap = new mutable.HashMap[String, HudiSchemaSpec]()
+  val rowTypeMap = new mutable.HashMap[String, RowType]()
 
-  def readSchema(schemaUrl: String): mutable.HashMap[String, HudiSchemaSpec] = {
+  readSchema("schemas")
+
+  def readSchema(schemaUrl: String): Unit = {
     val classGraphResult = new ClassGraph().acceptPaths(schemaUrl).scan()
-    val schemaMap = new mutable.HashMap[String, HudiSchemaSpec]()
     try {
       val resources = classGraphResult.getResourcesWithExtension("json")
       resources.forEachByteArrayIgnoringIOException((res: Resource, content: Array[Byte]) => {
           val hudiSchemaSpec = JSONUtil.deserialize[HudiSchemaSpec](new String(content, StandardCharsets.UTF_8))
-          schemaMap.put(hudiSchemaSpec.dataset, hudiSchemaSpec)
+          val dataset = hudiSchemaSpec.dataset
+          hudiSchemaMap.put(dataset, hudiSchemaSpec)
+          rowTypeMap.put(dataset, createRowType(hudiSchemaSpec))
         })
     } finally {
       classGraphResult.close()
     }
-    schemaMap
+  }
+
+  private def createRowType(schema: HudiSchemaSpec): RowType = {
+    val columnSpec = schema.schema.columnSpec
+    val primaryKey = schema.schema.primaryKey
+    val partitionColumn = schema.schema.partitionColumn
+    val timeStampColumn = schema.schema.timestampColumn
+    val rowTypeMap = mutable.SortedMap[String, LogicalType]()
+    columnSpec.sortBy(_.column).map {
+      spec =>
+        val isNullable = if (spec.column.matches(s"$primaryKey|$partitionColumn|$timeStampColumn")) false else true
+        val columnType = spec.`type` match {
+          case "string" => new VarCharType(isNullable, 20)
+          case "double" => new DoubleType(isNullable)
+          case "long" => new BigIntType(isNullable)
+          case "int" => new IntType(isNullable)
+          case "boolean" => new BooleanType(true)
+          case "map[string, string]" => new MapType(new VarCharType(), new VarCharType())
+          case _ => new VarCharType(isNullable, 20)
+        }
+        rowTypeMap.put(spec.column, columnType)
+    }
+    val rowType: RowType = RowType.of(false, rowTypeMap.values.toArray, rowTypeMap.keySet.toArray)
+    rowType
   }
 
   def parseJson(dataset: String, event: String): mutable.Map[String, Any] = {
@@ -64,7 +90,7 @@ class HudiSchemaParser {
                     case _ => objectMapper.treeToValue(nodeValue, classOf[String])
                   }
                   flattenedEventData.put(field.name, fieldValue)
-              }
+              }.orElse(flattenedEventData.put(field.name, null))
           }
       }
     }

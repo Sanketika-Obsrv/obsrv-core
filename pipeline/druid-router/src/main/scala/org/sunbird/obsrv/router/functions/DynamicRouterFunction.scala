@@ -104,7 +104,7 @@ object TimestampKeyParser {
   }
 
   private def addTimeZone(datasetConfig: DatasetConfig, dateTime: DateTime): Long = {
-      val tz = DateTimeZone.forTimeZone(TimeZone.getTimeZone(datasetConfig.datasetTimezone.getOrElse("UTC"))) // TODO - Read from the system setting table for the default timezone
+      val tz = DateTimeZone.forTimeZone(TimeZone.getTimeZone(datasetConfig.datasetTimezone.getOrElse("+05:30"))) // TODO - Read from the system setting table for the default timezone
       println("timezone " + tz)
     val offsetInMilliseconds = tz.getOffset(dateTime)
     println("offsetInMilliseconds" + offsetInMilliseconds)

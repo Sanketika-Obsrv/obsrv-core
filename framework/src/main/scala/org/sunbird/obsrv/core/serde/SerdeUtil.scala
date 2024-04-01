@@ -57,8 +57,8 @@ class StringDeserializationSchema extends KafkaRecordDeserializationSchema[Strin
     try {
       out.collect(new String(record.value(), StandardCharsets.UTF_8))
     } catch {
-      case _: Exception =>
-        logger.error(s"Exception while parsing the message")
+      case ex: NullPointerException =>
+        logger.error(s"Exception while parsing the message: ${ex.getMessage}")
     }
   }
 }

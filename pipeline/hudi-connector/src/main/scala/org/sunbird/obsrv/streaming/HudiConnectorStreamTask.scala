@@ -5,16 +5,17 @@ import org.apache.commons.lang3.StringUtils
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 import org.apache.flink.api.java.utils.ParameterTool
+import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.datastream.DataStream
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.hudi.configuration.FlinkOptions
+import org.apache.hudi.sink.utils.Pipelines
 import org.apache.hudi.util.AvroSchemaConverter
+import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
 import org.sunbird.obsrv.functions.RowDataConverterFunction
-import org.apache.flink.configuration.Configuration
-import org.apache.hudi.sink.utils.Pipelines
-import org.slf4j.LoggerFactory
+import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.util.HudiSchemaParser
 
 import java.io.File
@@ -38,29 +39,35 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
   }
 
   def process(env: StreamExecutionEnvironment): Unit = {
-    val conf: Configuration = new Configuration()
-    setHudiBaseConfigurations(conf)
     val schemaParser = new HudiSchemaParser()
-    val financeSchema = schemaParser.hudiSchemaMap("financial_transactions")
-    // val rowType = createRowType(financeSchema)
-    val rowType = schemaParser.rowTypeMap("financial_transactions")
-    val avroSchema = AvroSchemaConverter.convertToSchema(rowType, "financial_transactions")
-    conf.setString(FlinkOptions.PATH.key, s"${config.hudiBasePath}/${financeSchema.schema.table}")
-    conf.setString(FlinkOptions.TABLE_NAME, financeSchema.schema.table)
-    conf.setString(FlinkOptions.RECORD_KEY_FIELD.key, financeSchema.schema.primaryKey)
-    conf.setString(FlinkOptions.PRECOMBINE_FIELD.key, financeSchema.schema.timestampColumn)
-    conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, financeSchema.schema.partitionColumn)
+    val dataSourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.datalakeIngestionSpec.nonEmpty)
+    dataSourceConfig.map{ dataSource =>
+      val dataStream = getMapDataStream(env, config, kafkaConnector)
+        .map(new RowDataConverterFunction())
+      val datasetId = dataSource.datasetId
+      val conf: Configuration = new Configuration()
+      setHudiBaseConfigurations(conf)
+      setDatasetConf(conf, datasetId, schemaParser)
+      val rowType = schemaParser.rowTypeMap(datasetId)
+      Pipelines.append(conf, rowType, dataStream)
+    }
+    env.execute("Flink-Hudi-Connector")
+  }
+
+  def setDatasetConf(conf: Configuration, dataset: String, schemaParser: HudiSchemaParser): Unit = {
+    val datasetSchema = schemaParser.hudiSchemaMap(dataset)
+    val rowType = schemaParser.rowTypeMap(dataset)
+    val avroSchema = AvroSchemaConverter.convertToSchema(rowType, dataset)
+    conf.setString(FlinkOptions.PATH.key, s"${config.hudiBasePath}/${datasetSchema.schema.table}")
+    conf.setString(FlinkOptions.TABLE_NAME, datasetSchema.schema.table)
+    conf.setString(FlinkOptions.RECORD_KEY_FIELD.key, datasetSchema.schema.primaryKey)
+    conf.setString(FlinkOptions.PRECOMBINE_FIELD.key, datasetSchema.schema.timestampColumn)
+    conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn)
     conf.setString(FlinkOptions.SOURCE_AVRO_SCHEMA.key, avroSchema.toString)
 
     if (config.hmsEnabled) {
-      conf.setString("hive_sync.table", financeSchema.schema.table)
+      conf.setString("hive_sync.table", datasetSchema.schema.table)
     }
-
-    val dataStream = getMapDataStream(env, config, kafkaConnector)
-      .map(new RowDataConverterFunction)
-    Pipelines.append(conf, rowType, dataStream)
-
-    env.execute("Flink-Hudi-Connector")
   }
 
   /*

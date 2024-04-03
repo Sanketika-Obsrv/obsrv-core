@@ -6,6 +6,7 @@ import io.github.classgraph.{ClassGraph, Resource}
 import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.util.JSONUtil
+import org.sunbird.obsrv.registry.DatasetRegistry
 
 import java.nio.charset.StandardCharsets
 import scala.collection.mutable
@@ -27,20 +28,30 @@ class HudiSchemaParser {
   val hudiSchemaMap = new mutable.HashMap[String, HudiSchemaSpec]()
   val rowTypeMap = new mutable.HashMap[String, RowType]()
 
-  readSchema("schemas")
+  readSchema()
 
-  def readSchema(schemaUrl: String): Unit = {
-    val classGraphResult = new ClassGraph().acceptPaths(schemaUrl).scan()
-    try {
-      val resources = classGraphResult.getResourcesWithExtension("json")
-      resources.forEachByteArrayIgnoringIOException((res: Resource, content: Array[Byte]) => {
-          val hudiSchemaSpec = JSONUtil.deserialize[HudiSchemaSpec](new String(content, StandardCharsets.UTF_8))
-          val dataset = hudiSchemaSpec.dataset
-          hudiSchemaMap.put(dataset, hudiSchemaSpec)
-          rowTypeMap.put(dataset, createRowType(hudiSchemaSpec))
-        })
-    } finally {
-      classGraphResult.close()
+//  def readSchema(schemaUrl: String): Unit = {
+//    val classGraphResult = new ClassGraph().acceptPaths(schemaUrl).scan()
+//    try {
+//      val resources = classGraphResult.getResourcesWithExtension("json")
+//      resources.forEachByteArrayIgnoringIOException((res: Resource, content: Array[Byte]) => {
+//          val hudiSchemaSpec = JSONUtil.deserialize[HudiSchemaSpec](new String(content, StandardCharsets.UTF_8))
+//          val dataset = hudiSchemaSpec.dataset
+//          hudiSchemaMap.put(dataset, hudiSchemaSpec)
+//          rowTypeMap.put(dataset, createRowType(hudiSchemaSpec))
+//        })
+//    } finally {
+//      classGraphResult.close()
+//    }
+//  }
+
+  def readSchema(): Unit = {
+    val datasourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.datalakeIngestionSpec.nonEmpty)
+    datasourceConfig.map{f =>
+      val hudiSchemaSpec = JSONUtil.deserialize[HudiSchemaSpec](f.datalakeIngestionSpec)
+      val dataset = hudiSchemaSpec.dataset
+      hudiSchemaMap.put(dataset, hudiSchemaSpec)
+      rowTypeMap.put(dataset, createRowType(hudiSchemaSpec))
     }
   }
 

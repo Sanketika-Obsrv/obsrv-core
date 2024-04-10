@@ -12,9 +12,10 @@ import org.apache.hudi.configuration.FlinkOptions
 import org.apache.hudi.sink.utils.Pipelines
 import org.apache.hudi.util.AvroSchemaConverter
 import org.slf4j.LoggerFactory
+import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
-import org.sunbird.obsrv.functions.RowDataConverterFunction
+import org.sunbird.obsrv.functions.{RowDataConverterFunction, ValidationFunction}
 import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.util.HudiSchemaParser
 
@@ -22,36 +23,43 @@ import java.io.File
 import java.sql.Timestamp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import scala.collection.mutable
 import scala.collection.mutable.{Map => MMap}
 
-class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTask[String] {
+class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTask[mutable.Map[String, AnyRef]] {
 
   implicit val mutableMapTypeInfo: TypeInformation[MMap[String, AnyRef]] = TypeExtractor.getForClass(classOf[MMap[String, AnyRef]])
   private val logger = LoggerFactory.getLogger(classOf[HudiConnectorStreamTask])
   def process(): Unit = {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
     process(env)
-    env.execute(config.jobName)
+//    env.execute(config.jobName)
   }
 
-  override def processStream(dataStream: DataStream[String]): DataStream[String] = {
+  override def processStream(dataStream: DataStream[mutable.Map[String, AnyRef]]): DataStream[mutable.Map[String, AnyRef]] = {
     null
   }
 
   def process(env: StreamExecutionEnvironment): Unit = {
     val schemaParser = new HudiSchemaParser()
-    val dataSourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.datalakeIngestionSpec.nonEmpty)
+    val dataSourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.`type`.nonEmpty && f.`type`.equalsIgnoreCase(Constants.DATALAKE_TYPE))
     dataSourceConfig.map{ dataSource =>
-      val dataStream = getMapDataStream(env, config, kafkaConnector)
-        .map(new RowDataConverterFunction())
       val datasetId = dataSource.datasetId
+      val dataStream = getMapDataStream(env, config, List(datasetId), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
+      val validStream = dataStream.process(new ValidationFunction(config)).setParallelism(config.downstreamOperatorsParallelism)
+
+      validStream.getSideOutput(config.invalidEventsOutputTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaInvalidTopic))
+        .name(config.invalidEventProducer).uid(config.invalidEventProducer).setParallelism(config.downstreamOperatorsParallelism)
+
+      val rowDataStream = validStream.getSideOutput(config.validEventsOutputTag).map(new RowDataConverterFunction(config))
       val conf: Configuration = new Configuration()
       setHudiBaseConfigurations(conf)
       setDatasetConf(conf, datasetId, schemaParser)
       val rowType = schemaParser.rowTypeMap(datasetId)
-      Pipelines.append(conf, rowType, dataStream)
+      Pipelines.append(conf, rowType, rowDataStream)
+      env.execute("Flink-Hudi-Connector")
     }
-    env.execute("Flink-Hudi-Connector")
+//    env.execute("Flink-Hudi-Connector")
   }
 
   def setDatasetConf(conf: Configuration, dataset: String, schemaParser: HudiSchemaParser): Unit = {
@@ -69,32 +77,6 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       conf.setString("hive_sync.table", datasetSchema.schema.table)
     }
   }
-
-  /*
-  private def createRowType(schema: HudiSchemaSpec): RowType = {
-    val columnSpec = schema.schema.columnSpec
-    val primaryKey = schema.schema.primaryKey
-    val partitionColumn = schema.schema.partitionColumn
-    val timeStampColumn = schema.schema.timestampColumn
-    val rowTypeMap = mutable.SortedMap[String, LogicalType]()
-    columnSpec.sortBy(_.column).map {
-      spec =>
-        val isNullable = if (spec.column.matches(s"$primaryKey|$partitionColumn|$timeStampColumn")) false else true
-        val columnType = spec.`type` match {
-          case "string" => new VarCharType(isNullable, 20)
-          case "double" => new DoubleType(isNullable)
-          case "long" => new BigIntType(isNullable)
-          case "int" => new IntType(isNullable)
-          case "boolean" => new BooleanType(true)
-          case "map[string, string]" => new MapType(new VarCharType(), new VarCharType())
-          case _ => new VarCharType(isNullable, 20)
-        }
-        rowTypeMap.put(spec.column, columnType)
-    }
-    val rowType: RowType = RowType.of(false, rowTypeMap.values.toArray, rowTypeMap.keySet.toArray)
-    rowType
-  }
-  */
 
   private def setHudiBaseConfigurations(conf: Configuration): Unit = {
     conf.setString(FlinkOptions.TABLE_TYPE.key, config.hudiTableType)

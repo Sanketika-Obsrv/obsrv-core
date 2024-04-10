@@ -14,5 +14,6 @@ object Constants {
   val LEVEL = "level"
   val TOPIC = "topic"
   val MESSAGE = "message"
+  val DATALAKE_TYPE = "datalake"
 
 }

@@ -10,7 +10,7 @@ import org.sunbird.obsrv.core.streaming.BaseJobConfig
 
 import scala.collection.mutable
 
-class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[String](config, "HudiSink") {
+class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mutable.Map[String, AnyRef]](config, "Flink-Hudi-Connector") {
 
   implicit val mapTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeExtractor.getForClass(classOf[mutable.Map[String, AnyRef]])
   implicit val stringTypeInfo: TypeInformation[String] = TypeExtractor.getForClass(classOf[String])
@@ -19,9 +19,17 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[Str
 
   override def inputConsumer(): String = config.getString("kafka.groupId")
 
-  override def successTag(): OutputTag[String] = OutputTag[String]("dummy-events")
+  override def successTag(): OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]]("dummy-events")
 
-  override def failedEventsOutputTag(): OutputTag[String] = OutputTag[String]("failed-events")
+  override def failedEventsOutputTag(): OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]]("failed-events")
+
+  val kafkaInvalidTopic: String = config.getString("kafka.output.invalid.topic")
+
+  val invalidEventsOutputTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]]("invalid-events")
+  val validEventsOutputTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]]("valid-events")
+
+  val invalidEventProducer = "invalid-events-sink"
+
 
   val hudiTableType: String =
     if (config.getString("hudi.table.type").equalsIgnoreCase("MERGE_ON_READ"))

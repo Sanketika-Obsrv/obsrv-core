@@ -1,10 +1,14 @@
 package org.sunbird.obsrv.util
 
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.fasterxml.jackson.annotation.JsonInclude.Include
+import com.fasterxml.jackson.core.JsonGenerator.Feature
+import com.fasterxml.jackson.databind.json.JsonMapper
+import com.fasterxml.jackson.databind.{DeserializationFeature, JsonNode, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.github.classgraph.{ClassGraph, Resource}
 import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType}
 import org.slf4j.LoggerFactory
+import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.registry.DatasetRegistry
 
@@ -23,8 +27,17 @@ class HudiSchemaParser {
 
   private val logger = LoggerFactory.getLogger(classOf[HudiSchemaParser])
 
-  val objectMapper = new ObjectMapper()
-  objectMapper.registerModule(DefaultScalaModule)
+//  val objectMapper = new ObjectMapper()
+//  objectMapper.registerModule(DefaultScalaModule)
+  @transient private val objectMapper = JsonMapper.builder()
+    .addModule(DefaultScalaModule)
+    .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+    .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+    .enable(Feature.WRITE_BIGDECIMAL_AS_PLAIN)
+    .build()
+
+  objectMapper.setSerializationInclusion(Include.NON_ABSENT)
+
   val hudiSchemaMap = new mutable.HashMap[String, HudiSchemaSpec]()
   val rowTypeMap = new mutable.HashMap[String, RowType]()
 
@@ -46,9 +59,9 @@ class HudiSchemaParser {
 //  }
 
   def readSchema(): Unit = {
-    val datasourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.datalakeIngestionSpec.nonEmpty)
+    val datasourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.`type`.nonEmpty && f.`type`.equalsIgnoreCase(Constants.DATALAKE_TYPE))
     datasourceConfig.map{f =>
-      val hudiSchemaSpec = JSONUtil.deserialize[HudiSchemaSpec](f.datalakeIngestionSpec)
+      val hudiSchemaSpec = JSONUtil.deserialize[HudiSchemaSpec](f.ingestionSpec)
       val dataset = hudiSchemaSpec.dataset
       hudiSchemaMap.put(dataset, hudiSchemaSpec)
       rowTypeMap.put(dataset, createRowType(hudiSchemaSpec))

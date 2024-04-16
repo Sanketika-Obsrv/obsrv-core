@@ -45,21 +45,21 @@ class TestTimestampKeyParser extends FlatSpec with Matchers {
       DatasetConfig(key = "id", tsKey = "date", entryTopic = "ingest", excludeFields = None, redisDBHost = None, redisDBPort = None, redisDB = None, indexData = None, tsFormat = None, datasetTimezone = None),
       JSONUtil.deserialize[mutable.Map[String, AnyRef]]("""{"id":1234, "date":1701373165123}"""))
     result5.isValid should be(true)
-    result5.value.asInstanceOf[Long] should be(1701373165123l)
+    result5.value.asInstanceOf[Long] should be(1701392965123l)
 
     // Validate number date field which is epoch in micro-seconds
     val result6 = TimestampKeyParser.parseTimestampKey(
       DatasetConfig(key = "id", tsKey = "date", entryTopic = "ingest", excludeFields = None, redisDBHost = None, redisDBPort = None, redisDB = None, indexData = None, tsFormat = None, datasetTimezone = None),
       JSONUtil.deserialize[mutable.Map[String, AnyRef]]("""{"id":1234, "date":1701373165123111}"""))
     result6.isValid should be(true)
-    result6.value.asInstanceOf[Long] should be(1701373165123l)
+    result6.value.asInstanceOf[Long] should be(1701392965123l)
 
     // Validate number date field which is epoch in nano-seconds
     val result7 = TimestampKeyParser.parseTimestampKey(
       DatasetConfig(key = "id", tsKey = "date", entryTopic = "ingest", excludeFields = None, redisDBHost = None, redisDBPort = None, redisDB = None, indexData = None, tsFormat = None, datasetTimezone = None),
       JSONUtil.deserialize[mutable.Map[String, AnyRef]]("""{"id":1234, "date":1701373165123111000}"""))
     result7.isValid should be(true)
-    result7.value.asInstanceOf[Long] should be(1701373165123l)
+    result7.value.asInstanceOf[Long] should be(1701392965123l)
 
     // Validate number date field which is not an epoch in milli, micro or nano seconds
     val result8 = TimestampKeyParser.parseTimestampKey(
@@ -97,7 +97,7 @@ class TestTimestampKeyParser extends FlatSpec with Matchers {
       DatasetConfig(key = "id", tsKey = "date", entryTopic = "ingest", excludeFields = None, redisDBHost = None, redisDBPort = None, redisDB = None, indexData = None, tsFormat = Some("yyyy-MM-dd"), datasetTimezone = None),
       JSONUtil.deserialize[mutable.Map[String, AnyRef]]("""{"id":1234, "date":"2023-03-01"}"""))
     result3.isValid should be(true)
-    result3.value.asInstanceOf[Long] should be(1677648600000l)
+    result3.value.asInstanceOf[Long] should be(1677628800000l)
 
     // Validate date parser with timezone
     val result4 = TimestampKeyParser.parseTimestampKey(

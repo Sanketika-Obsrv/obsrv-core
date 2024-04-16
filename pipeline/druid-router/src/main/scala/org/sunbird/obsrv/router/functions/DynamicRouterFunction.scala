@@ -109,7 +109,9 @@ object TimestampKeyParser {
         val offsetInMilliseconds = tz.getOffset(dateTime)
         dateTime.plusMillis(offsetInMilliseconds).getMillis
       } else {
-        dateTime.getMillis
+        val tz = DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+5:30"))
+        val offsetInMilliseconds = tz.getOffset(dateTime)
+        dateTime.plusMillis(offsetInMilliseconds).getMillis
       }
   }
 }

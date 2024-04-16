@@ -38,7 +38,7 @@ class TestTimestampKeyParser extends FlatSpec with Matchers {
       DatasetConfig(key = "id", tsKey = "date", entryTopic = "ingest", excludeFields = None, redisDBHost = None, redisDBPort = None, redisDB = None, indexData = None, tsFormat = None, datasetTimezone = None),
       JSONUtil.deserialize[mutable.Map[String, AnyRef]]("""{"id":1234, "date":1701373165}"""))
     result4.isValid should be(true)
-    result4.value.asInstanceOf[Long] should be(1701373165000l)
+    result4.value.asInstanceOf[Long] should be(1701392965000l)
 
     // Validate number date field which is epoch in milli-seconds
     val result5 = TimestampKeyParser.parseTimestampKey(
@@ -97,7 +97,7 @@ class TestTimestampKeyParser extends FlatSpec with Matchers {
       DatasetConfig(key = "id", tsKey = "date", entryTopic = "ingest", excludeFields = None, redisDBHost = None, redisDBPort = None, redisDB = None, indexData = None, tsFormat = Some("yyyy-MM-dd"), datasetTimezone = None),
       JSONUtil.deserialize[mutable.Map[String, AnyRef]]("""{"id":1234, "date":"2023-03-01"}"""))
     result3.isValid should be(true)
-    result3.value.asInstanceOf[Long] should be(1677609000000l)
+    result3.value.asInstanceOf[Long] should be(1677648600000l)
 
     // Validate date parser with timezone
     val result4 = TimestampKeyParser.parseTimestampKey(

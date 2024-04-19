@@ -5,14 +5,12 @@ import com.fasterxml.jackson.core.JsonGenerator.Feature
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.{DeserializationFeature, JsonNode, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import io.github.classgraph.{ClassGraph, Resource}
 import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.registry.DatasetRegistry
-
-import java.nio.charset.StandardCharsets
+import java.sql.Timestamp
 import scala.collection.mutable
 
 
@@ -43,21 +41,6 @@ class HudiSchemaParser {
 
   readSchema()
 
-//  def readSchema(schemaUrl: String): Unit = {
-//    val classGraphResult = new ClassGraph().acceptPaths(schemaUrl).scan()
-//    try {
-//      val resources = classGraphResult.getResourcesWithExtension("json")
-//      resources.forEachByteArrayIgnoringIOException((res: Resource, content: Array[Byte]) => {
-//          val hudiSchemaSpec = JSONUtil.deserialize[HudiSchemaSpec](new String(content, StandardCharsets.UTF_8))
-//          val dataset = hudiSchemaSpec.dataset
-//          hudiSchemaMap.put(dataset, hudiSchemaSpec)
-//          rowTypeMap.put(dataset, createRowType(hudiSchemaSpec))
-//        })
-//    } finally {
-//      classGraphResult.close()
-//    }
-//  }
-
   def readSchema(): Unit = {
     val datasourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.`type`.nonEmpty && f.`type`.equalsIgnoreCase(Constants.DATALAKE_TYPE))
     datasourceConfig.map{f =>
@@ -84,6 +67,7 @@ class HudiSchemaParser {
           case "int" => new IntType(isNullable)
           case "boolean" => new BooleanType(true)
           case "map[string, string]" => new MapType(new VarCharType(), new VarCharType())
+          case "timestamp" => new BigIntType(isNullable)
           case _ => new VarCharType(isNullable, 20)
         }
         rowTypeMap.put(spec.column, columnType)
@@ -111,6 +95,7 @@ class HudiSchemaParser {
                     case "int" => objectMapper.treeToValue(nodeValue, classOf[Int])
                     case "long" => objectMapper.treeToValue(nodeValue, classOf[Long])
                     case "double" => objectMapper.treeToValue(nodeValue, classOf[Double])
+                    case "timestamp" => objectMapper.treeToValue(nodeValue, classOf[Timestamp])
                     case _ => objectMapper.treeToValue(nodeValue, classOf[String])
                   }
                   flattenedEventData.put(field.name, fieldValue)

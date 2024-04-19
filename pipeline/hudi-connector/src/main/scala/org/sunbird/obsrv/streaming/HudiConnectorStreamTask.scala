@@ -49,7 +49,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       val validStream = dataStream.process(new ValidationFunction(config)).setParallelism(config.downstreamOperatorsParallelism)
 
       validStream.getSideOutput(config.invalidEventsOutputTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaInvalidTopic))
-        .name(config.invalidEventProducer).uid(config.invalidEventProducer).setParallelism(config.downstreamOperatorsParallelism)
+        .name(config.invalidEventProducer).uid(s"$datasetId-invalid-events-sink").setParallelism(config.downstreamOperatorsParallelism)
 
       val rowDataStream = validStream.getSideOutput(config.validEventsOutputTag).map(new RowDataConverterFunction(config))
       val conf: Configuration = new Configuration()
@@ -57,9 +57,8 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       setDatasetConf(conf, datasetId, schemaParser)
       val rowType = schemaParser.rowTypeMap(datasetId)
       Pipelines.append(conf, rowType, rowDataStream)
-      env.execute("Flink-Hudi-Connector")
     }
-//    env.execute("Flink-Hudi-Connector")
+    env.execute("Flink-Hudi-Connector")
   }
 
   def setDatasetConf(conf: Configuration, dataset: String, schemaParser: HudiSchemaParser): Unit = {
@@ -72,6 +71,10 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setString(FlinkOptions.PRECOMBINE_FIELD.key, datasetSchema.schema.timestampColumn)
     conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn)
     conf.setString(FlinkOptions.SOURCE_AVRO_SCHEMA.key, avroSchema.toString)
+
+    conf.setString(FlinkOptions.KEYGEN_CLASS_NAME.key(), "org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator")
+    conf.setString("hoodie.keygen.timebased.timestamp.type", "EPOCHMILLISECONDS")
+    conf.setString("hoodie.keygen.timebased.output.dateformat", "yyyy-MM-dd")
 
     if (config.hmsEnabled) {
       conf.setString("hive_sync.table", datasetSchema.schema.table)

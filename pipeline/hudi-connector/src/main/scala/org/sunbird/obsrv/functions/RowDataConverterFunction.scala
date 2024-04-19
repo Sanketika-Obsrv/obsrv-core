@@ -1,17 +1,14 @@
 package org.sunbird.obsrv.functions
 
-import com.fasterxml.jackson.databind.JsonNode
 import org.apache.flink.api.common.functions.RichMapFunction
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.formats.common.TimestampFormat
 import org.apache.flink.formats.json.JsonToRowDataConverters
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper
-//import com.fasterxml.jackson.databind.ObjectMapper
 import org.sunbird.obsrv.util.{HudiSchemaParser, HudiSchemaSpec}
 import org.apache.flink.table.data.RowData
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.util.{JSONUtil, Util}
-import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.streaming.HudiConnectorConfig
 import scala.collection.mutable.{Map => MMap}
 
@@ -35,7 +32,7 @@ class RowDataConverterFunction(config: HudiConnectorConfig) extends RichMapFunct
   }
 
   def convertToRowData(data: MMap[String, AnyRef]): RowData = {
-    val event = data("event")//.asInstanceOf[MMap[String, AnyRef]]
+    val event = data("event")
     val eventJson = JSONUtil.serialize(event)
     val datasetId = data.get("dataset").get.asInstanceOf[String]
     val flattenedData = hudiSchemaParser.parseJson(datasetId, eventJson)

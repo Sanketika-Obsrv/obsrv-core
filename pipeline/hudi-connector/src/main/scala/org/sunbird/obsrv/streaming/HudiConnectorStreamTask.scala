@@ -6,7 +6,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.streaming.api.datastream.DataStream
+import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSink}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.hudi.configuration.FlinkOptions
 import org.apache.hudi.sink.utils.Pipelines
@@ -57,8 +57,16 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       setDatasetConf(conf, datasetId, schemaParser)
       val rowType = schemaParser.rowTypeMap(datasetId)
       Pipelines.append(conf, rowType, rowDataStream)
-    }
+    }.orElse(List(addDefaultOperator(env, config, kafkaConnector)))
     env.execute("Flink-Hudi-Connector")
+  }
+
+  def addDefaultOperator(env: StreamExecutionEnvironment, config: HudiConnectorConfig, kafkaConnector: FlinkKafkaConnector): DataStreamSink[mutable.Map[String, AnyRef]] = {
+    val dataStreamSink: DataStreamSink[mutable.Map[String, AnyRef]] = getMapDataStream(env, config, kafkaConnector)
+      .sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaDefaultOutputTopic))
+      .name(s"kafka-connector-default-sink").uid(s"kafka-connector-default-sink")
+      .setParallelism(config.downstreamOperatorsParallelism)
+    dataStreamSink
   }
 
   def setDatasetConf(conf: Configuration, dataset: String, schemaParser: HudiSchemaParser): Unit = {

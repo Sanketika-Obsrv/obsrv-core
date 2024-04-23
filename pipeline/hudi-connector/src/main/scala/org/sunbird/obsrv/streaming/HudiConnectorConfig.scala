@@ -17,6 +17,8 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
 
   override def inputTopic(): String = config.getString("kafka.input.topic")
 
+  val kafkaDefaultOutputTopic: String = config.getString("kafka.output.topic")
+
   override def inputConsumer(): String = config.getString("kafka.groupId")
 
   override def successTag(): OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]]("dummy-events")

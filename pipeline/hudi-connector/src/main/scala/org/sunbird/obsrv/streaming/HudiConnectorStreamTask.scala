@@ -64,7 +64,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
   def addDefaultOperator(env: StreamExecutionEnvironment, config: HudiConnectorConfig, kafkaConnector: FlinkKafkaConnector): DataStreamSink[mutable.Map[String, AnyRef]] = {
     val dataStreamSink: DataStreamSink[mutable.Map[String, AnyRef]] = getMapDataStream(env, config, kafkaConnector)
       .sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaDefaultOutputTopic))
-      .name(s"kafka-connector-default-sink").uid(s"kafka-connector-default-sink")
+      .name(s"hudi-connector-default-sink").uid(s"hudi-connector-default-sink")
       .setParallelism(config.downstreamOperatorsParallelism)
     dataStreamSink
   }
@@ -80,9 +80,12 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn)
     conf.setString(FlinkOptions.SOURCE_AVRO_SCHEMA.key, avroSchema.toString)
 
-    conf.setString(FlinkOptions.KEYGEN_CLASS_NAME.key(), "org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator")
-    conf.setString("hoodie.keygen.timebased.timestamp.type", "EPOCHMILLISECONDS")
-    conf.setString("hoodie.keygen.timebased.output.dateformat", "yyyy-MM-dd")
+    val partitionField = datasetSchema.schema.columnSpec.filter(f => f.column.equalsIgnoreCase(datasetSchema.schema.partitionColumn)).head
+    if(partitionField.`type`.equalsIgnoreCase("timestamp")) {
+      conf.setString(FlinkOptions.KEYGEN_CLASS_NAME.key(), "org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator")
+      conf.setString("hoodie.keygen.timebased.timestamp.type", "EPOCHMILLISECONDS")
+      conf.setString("hoodie.keygen.timebased.output.dateformat", "yyyy-MM-dd")
+    }
 
     if (config.hmsEnabled) {
       conf.setString("hive_sync.table", datasetSchema.schema.table)

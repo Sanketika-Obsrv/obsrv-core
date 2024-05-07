@@ -8,17 +8,19 @@ import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSink}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
-import org.apache.hudi.configuration.FlinkOptions
+import org.apache.hudi.common.config.TimestampKeyGeneratorConfig
+import org.apache.hudi.configuration.{FlinkOptions, OptionsResolver}
 import org.apache.hudi.sink.utils.Pipelines
 import org.apache.hudi.util.AvroSchemaConverter
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
-import org.sunbird.obsrv.functions.{RowDataConverterFunction, ValidationFunction}
+import org.sunbird.obsrv.functions.RowDataConverterFunction
 import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.util.HudiSchemaParser
-
+import org.apache.hudi.config.HoodieWriteConfig.KEYGENERATOR_CLASS_NAME
+import org.apache.hudi.common.table.HoodieTableConfig.DROP_PARTITION_COLUMNS
 import java.io.File
 import java.sql.Timestamp
 import java.time.LocalDateTime
@@ -46,17 +48,22 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     dataSourceConfig.map{ dataSource =>
       val datasetId = dataSource.datasetId
       val dataStream = getMapDataStream(env, config, List(datasetId), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
-      val validStream = dataStream.process(new ValidationFunction(config)).setParallelism(config.downstreamOperatorsParallelism)
+        .map(new RowDataConverterFunction(config))
 
-      validStream.getSideOutput(config.invalidEventsOutputTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaInvalidTopic))
-        .name(config.invalidEventProducer).uid(s"$datasetId-invalid-events-sink").setParallelism(config.downstreamOperatorsParallelism)
-
-      val rowDataStream = validStream.getSideOutput(config.validEventsOutputTag).map(new RowDataConverterFunction(config))
       val conf: Configuration = new Configuration()
       setHudiBaseConfigurations(conf)
       setDatasetConf(conf, datasetId, schemaParser)
+      println("conf: " + conf.toMap.toString)
       val rowType = schemaParser.rowTypeMap(datasetId)
-      Pipelines.append(conf, rowType, rowDataStream)
+
+      val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)
+      val pipeline = Pipelines.hoodieStreamWrite(conf, hoodieRecordDataStream)
+      if (OptionsResolver.needsAsyncCompaction(conf)) {
+        Pipelines.compact(conf, pipeline)
+      } else {
+        Pipelines.clean(conf, pipeline)
+      }
+
     }.orElse(List(addDefaultOperator(env, config, kafkaConnector)))
     env.execute("Flink-Hudi-Connector")
   }
@@ -81,11 +88,22 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setString(FlinkOptions.SOURCE_AVRO_SCHEMA.key, avroSchema.toString)
 
     val partitionField = datasetSchema.schema.columnSpec.filter(f => f.column.equalsIgnoreCase(datasetSchema.schema.partitionColumn)).head
-    if(partitionField.`type`.equalsIgnoreCase("timestamp")) {
-      conf.setString(FlinkOptions.KEYGEN_CLASS_NAME.key(), "org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator")
-      conf.setString("hoodie.keygen.timebased.timestamp.type", "EPOCHMILLISECONDS")
-      conf.setString("hoodie.keygen.timebased.output.dateformat", "yyyy-MM-dd")
+    if(partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch")) {
+      conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")
     }
+//    if(partitionField.`type`.equalsIgnoreCase("timestamp")) {
+//      conf.setString(KEYGENERATOR_CLASS_NAME.key(), "org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator")
+//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_TYPE_FIELD.key(), "DATE_STRING")
+//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_INPUT_DATE_FORMAT.key(), "yyyy-MM-dd'T'HH:mm:ss.SSSZ,yyyy-MM-dd'T'HH:mm:ss.SSS,yyyy-MM-dd hh:mm:ss,yyyy-MM-dd,yyyyMMdd")
+//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_OUTPUT_DATE_FORMAT.key(), "yyyy-MM-dd")
+//      conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")
+//    }
+//    else if(partitionField.`type`.equalsIgnoreCase("epoch")){
+//      conf.setString(KEYGENERATOR_CLASS_NAME.key(), "org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator")
+//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_TYPE_FIELD.key(), "EPOCHMILLISECONDS")
+//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_OUTPUT_DATE_FORMAT.key(), "yyyy-MM-dd")
+//      conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")
+//    }
 
     if (config.hmsEnabled) {
       conf.setString("hive_sync.table", datasetSchema.schema.table)
@@ -98,7 +116,14 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setDouble(FlinkOptions.WRITE_BATCH_SIZE.key, 0.1)
     conf.setBoolean(FlinkOptions.COMPACTION_SCHEDULE_ENABLED.key, config.hudiCompactionEnabled)
     conf.setInteger("write.tasks", config.hudiWriteTasks)
+    conf.setInteger(FlinkOptions.COMPACTION_DELTA_COMMITS, 2)
+    conf.setString(FlinkOptions.COMPACTION_TRIGGER_STRATEGY, "num_or_time")
+    conf.setBoolean(FlinkOptions.COMPACTION_ASYNC_ENABLED, true)
+    conf.setInteger(FlinkOptions.BUCKET_ASSIGN_TASKS, 1)
+    conf.setInteger(FlinkOptions.COMPACTION_TASKS, 1)
     conf.setString("hoodie.fs.atomic_creation.support", "s3a")
+    conf.setString(FlinkOptions.HIVE_SYNC_TABLE_PROPERTIES, "hoodie.datasource.write.drop.partition.columns=true")
+    conf.setBoolean(DROP_PARTITION_COLUMNS.key, true)
 
     if (config.hmsEnabled) {
       conf.setBoolean("hive_sync.enabled", config.hmsEnabled)
@@ -109,6 +134,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       conf.setBoolean("hive_sync.use_jdbc", false)
       conf.setString(FlinkOptions.HIVE_SYNC_METASTORE_URIS.key(), config.hmsURI)
       conf.setString("hoodie.fs.atomic_creation.support", "s3a")
+      conf.setBoolean(FlinkOptions.HIVE_SYNC_SUPPORT_TIMESTAMP, true)
     }
 
   }

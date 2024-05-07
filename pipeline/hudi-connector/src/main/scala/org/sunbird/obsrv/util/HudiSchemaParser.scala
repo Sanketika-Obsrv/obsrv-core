@@ -5,12 +5,14 @@ import com.fasterxml.jackson.core.JsonGenerator.Feature
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.{DeserializationFeature, JsonNode, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType}
+import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType, TimestampType, DateType}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.registry.DatasetRegistry
 import java.sql.Timestamp
+import java.text.SimpleDateFormat
+import java.util.Date
 import scala.collection.mutable
 
 
@@ -34,6 +36,7 @@ class HudiSchemaParser {
     .enable(Feature.WRITE_BIGDECIMAL_AS_PLAIN)
     .build()
 
+  val df = new SimpleDateFormat("yyyy-MM-dd")
   objectMapper.setSerializationInclusion(Include.NON_ABSENT)
 
   val hudiSchemaMap = new mutable.HashMap[String, HudiSchemaSpec]()
@@ -56,6 +59,7 @@ class HudiSchemaParser {
     val primaryKey = schema.schema.primaryKey
     val partitionColumn = schema.schema.partitionColumn
     val timeStampColumn = schema.schema.timestampColumn
+    val partitionField = schema.schema.columnSpec.filter(f => f.column.equalsIgnoreCase(schema.schema.partitionColumn)).head
     val rowTypeMap = mutable.SortedMap[String, LogicalType]()
     columnSpec.sortBy(_.column).map {
       spec =>
@@ -67,12 +71,16 @@ class HudiSchemaParser {
           case "int" => new IntType(isNullable)
           case "boolean" => new BooleanType(true)
           case "map[string, string]" => new MapType(new VarCharType(), new VarCharType())
-          case "timestamp" => new BigIntType(isNullable)
+          case "epoch" => new BigIntType(isNullable)
           case _ => new VarCharType(isNullable, 20)
         }
         rowTypeMap.put(spec.column, columnType)
     }
+    if(partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch")) {
+      rowTypeMap.put(partitionField.column + "_partition", new VarCharType(false, 20))
+    }
     val rowType: RowType = RowType.of(false, rowTypeMap.values.toArray, rowTypeMap.keySet.toArray)
+    println("rowType: " + rowType)
     rowType
   }
 
@@ -82,6 +90,7 @@ class HudiSchemaParser {
     val flattenedEventData = mutable.Map[String, Any]()
     parserSpec.map { spec =>
       val columnSpec = spec.schema.columnSpec
+      val partitionField = spec.schema.columnSpec.filter(f => f.column.equalsIgnoreCase(spec.schema.partitionColumn)).head
       spec.inputFormat.flattenSpec.map {
         flattenSpec =>
           flattenSpec.fields.map {
@@ -89,20 +98,33 @@ class HudiSchemaParser {
               val node = retrieveFieldFromJson(jsonNode, field)
               node.map {
                 nodeValue =>
-                  val fieldDataType = columnSpec.filter(_.column.equalsIgnoreCase(field.name)).head.`type`
-                  val fieldValue = fieldDataType match {
-                    case "string" => objectMapper.treeToValue(nodeValue, classOf[String])
-                    case "int" => objectMapper.treeToValue(nodeValue, classOf[Int])
-                    case "long" => objectMapper.treeToValue(nodeValue, classOf[Long])
-                    case "double" => objectMapper.treeToValue(nodeValue, classOf[Double])
-                    case "timestamp" => objectMapper.treeToValue(nodeValue, classOf[Timestamp])
-                    case _ => objectMapper.treeToValue(nodeValue, classOf[String])
+                  try {
+                    val fieldDataType = columnSpec.filter(_.column.equalsIgnoreCase(field.name)).head.`type`
+                    val fieldValue = fieldDataType match {
+                      case "string" => objectMapper.treeToValue(nodeValue, classOf[String])
+                      case "int" => objectMapper.treeToValue(nodeValue, classOf[Int])
+                      case "long" => objectMapper.treeToValue(nodeValue, classOf[Long])
+                      case "double" => objectMapper.treeToValue(nodeValue, classOf[Double])
+                      case "epoch" => objectMapper.treeToValue(nodeValue, classOf[Long])
+                      case _ => objectMapper.treeToValue(nodeValue, classOf[String])
+                    }
+                    println("dataset: " + dataset + "fieldDataType: " + fieldDataType + " fieldValue: " + fieldValue)
+                    if(field.name.equalsIgnoreCase(partitionField.column)){
+                      if(fieldDataType.equalsIgnoreCase("timestamp")) {
+                        flattenedEventData.put(field.name + "_partition", df.format(objectMapper.treeToValue(nodeValue, classOf[Timestamp])))
+                      }
+                      else if(fieldDataType.equalsIgnoreCase("epoch")) {
+                        flattenedEventData.put(field.name + "_partition", df.format(objectMapper.treeToValue(nodeValue, classOf[Long])))
+                      }
+                    }
+                    flattenedEventData.put(field.name, fieldValue)
                   }
-                  flattenedEventData.put(field.name, fieldValue)
+
               }.orElse(flattenedEventData.put(field.name, null))
           }
       }
     }
+    println("flattenedEventData: " + flattenedEventData)
     flattenedEventData
   }
 

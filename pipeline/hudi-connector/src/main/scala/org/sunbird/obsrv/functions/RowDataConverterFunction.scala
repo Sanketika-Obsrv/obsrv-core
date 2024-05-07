@@ -22,7 +22,7 @@ class RowDataConverterFunction(config: HudiConnectorConfig) extends RichMapFunct
 
   override def open(parameters: Configuration): Unit = {
     super.open(parameters)
-    jsonToRowDataConverters = new JsonToRowDataConverters(false, true, TimestampFormat.ISO_8601)
+    jsonToRowDataConverters = new JsonToRowDataConverters(false, true, TimestampFormat.SQL)
     objectMapper = new ObjectMapper()
     hudiSchemaParser = new HudiSchemaParser()
   }

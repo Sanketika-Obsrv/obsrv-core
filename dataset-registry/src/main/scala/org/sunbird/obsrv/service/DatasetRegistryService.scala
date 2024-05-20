@@ -37,7 +37,7 @@ object DatasetRegistryService {
         val dataset = parseDataset(result)
         (dataset.id, dataset)
       }).toMap
-    }  finally {
+    } finally {
       postgresConnect.closeConnection()
     }
   }
@@ -120,8 +120,6 @@ object DatasetRegistryService {
       Option(Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {
         parseDatasource(result)
       }).toList)
-    } finally {
-      postgresConnect.closeConnection()
     }
   }
 
@@ -168,7 +166,7 @@ object DatasetRegistryService {
     val datasetConfig = rs.getString("dataset_config")
     val status = rs.getString("status")
     val tagArray = rs.getArray("tags")
-    val tags = if(tagArray != null) tagArray.getArray.asInstanceOf[Array[String]] else null
+    val tags = if (tagArray != null) tagArray.getArray.asInstanceOf[Array[String]] else null
     val dataVersion = rs.getInt("data_version")
 
     Dataset(datasetId, datasetType,

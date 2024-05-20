@@ -18,7 +18,7 @@ import scala.collection.mutable
 
 case class HudiSchemaSpec(dataset: String, schema: Schema, inputFormat: InputFormat)
 case class Schema(table: String, partitionColumn: String, timestampColumn: String, primaryKey: String, columnSpec: List[ColumnSpec])
-case class ColumnSpec(column: String, `type`: String)
+case class ColumnSpec(name: String, `type`: String)
 case class InputFormat(`type`: String, flattenSpec: Option[JsonFlattenSpec] = None, columns: Option[List[String]] = None)
 case class JsonFlattenSpec(fields: List[JsonFieldParserSpec])
 case class JsonFieldParserSpec(`type`: String, name: String, expr: Option[String] = None)
@@ -37,7 +37,9 @@ class HudiSchemaParser {
     .build()
 
   val df = new SimpleDateFormat("yyyy-MM-dd")
+//  val df1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
   objectMapper.setSerializationInclusion(Include.NON_ABSENT)
+//    .setDateFormat(df1)
 
   val hudiSchemaMap = new mutable.HashMap[String, HudiSchemaSpec]()
   val rowTypeMap = new mutable.HashMap[String, RowType]()
@@ -59,11 +61,11 @@ class HudiSchemaParser {
     val primaryKey = schema.schema.primaryKey
     val partitionColumn = schema.schema.partitionColumn
     val timeStampColumn = schema.schema.timestampColumn
-    val partitionField = schema.schema.columnSpec.filter(f => f.column.equalsIgnoreCase(schema.schema.partitionColumn)).head
+    val partitionField = schema.schema.columnSpec.filter(f => f.name.equalsIgnoreCase(schema.schema.partitionColumn)).head
     val rowTypeMap = mutable.SortedMap[String, LogicalType]()
-    columnSpec.sortBy(_.column).map {
+    columnSpec.sortBy(_.name).map {
       spec =>
-        val isNullable = if (spec.column.matches(s"$primaryKey|$partitionColumn|$timeStampColumn")) false else true
+        val isNullable = if (spec.name.matches(s"$primaryKey|$partitionColumn|$timeStampColumn")) false else true
         val columnType = spec.`type` match {
           case "string" => new VarCharType(isNullable, 20)
           case "double" => new DoubleType(isNullable)
@@ -74,10 +76,10 @@ class HudiSchemaParser {
           case "epoch" => new BigIntType(isNullable)
           case _ => new VarCharType(isNullable, 20)
         }
-        rowTypeMap.put(spec.column, columnType)
+        rowTypeMap.put(spec.name, columnType)
     }
     if(partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch")) {
-      rowTypeMap.put(partitionField.column + "_partition", new VarCharType(false, 20))
+      rowTypeMap.put(partitionField.name + "_partition", new VarCharType(false, 20))
     }
     val rowType: RowType = RowType.of(false, rowTypeMap.values.toArray, rowTypeMap.keySet.toArray)
     println("rowType: " + rowType)
@@ -90,7 +92,7 @@ class HudiSchemaParser {
     val flattenedEventData = mutable.Map[String, Any]()
     parserSpec.map { spec =>
       val columnSpec = spec.schema.columnSpec
-      val partitionField = spec.schema.columnSpec.filter(f => f.column.equalsIgnoreCase(spec.schema.partitionColumn)).head
+      val partitionField = spec.schema.columnSpec.filter(f => f.name.equalsIgnoreCase(spec.schema.partitionColumn)).head
       spec.inputFormat.flattenSpec.map {
         flattenSpec =>
           flattenSpec.fields.map {
@@ -99,7 +101,7 @@ class HudiSchemaParser {
               node.map {
                 nodeValue =>
                   try {
-                    val fieldDataType = columnSpec.filter(_.column.equalsIgnoreCase(field.name)).head.`type`
+                    val fieldDataType = columnSpec.filter(_.name.equalsIgnoreCase(field.name)).head.`type`
                     val fieldValue = fieldDataType match {
                       case "string" => objectMapper.treeToValue(nodeValue, classOf[String])
                       case "int" => objectMapper.treeToValue(nodeValue, classOf[Int])
@@ -109,7 +111,7 @@ class HudiSchemaParser {
                       case _ => objectMapper.treeToValue(nodeValue, classOf[String])
                     }
                     println("dataset: " + dataset + "fieldDataType: " + fieldDataType + " fieldValue: " + fieldValue)
-                    if(field.name.equalsIgnoreCase(partitionField.column)){
+                    if(field.name.equalsIgnoreCase(partitionField.name)){
                       if(fieldDataType.equalsIgnoreCase("timestamp")) {
                         flattenedEventData.put(field.name + "_partition", df.format(objectMapper.treeToValue(nodeValue, classOf[Timestamp])))
                       }

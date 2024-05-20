@@ -7,47 +7,47 @@
     "primaryKey": "txn_id",
     "columnSpec": [
       {
-        "column": "receiver_account_number",
+        "name": "receiver_account_number",
         "type": "string"
       },
       {
-        "column": "receiver_ifsc_code",
+        "name": "receiver_ifsc_code",
         "type": "string"
       },
       {
-        "column": "sender_account_number",
+        "name": "sender_account_number",
         "type": "string"
       },
       {
-        "column": "sender_contact_email",
+        "name": "sender_contact_email",
         "type": "string"
       },
       {
-        "column": "sender_ifsc_code",
+        "name": "sender_ifsc_code",
         "type": "string"
       },
       {
-        "column": "currency",
+        "name": "currency",
         "type": "string"
       },
       {
-        "column": "txn_amount",
+        "name": "txn_amount",
         "type": "int"
       },
       {
-        "column": "txn_date",
+        "name": "txn_date",
         "type": "string"
       },
       {
-        "column": "txn_id",
+        "name": "txn_id",
         "type": "string"
       },
       {
-        "column": "txn_status",
+        "name": "txn_status",
         "type": "string"
       },
       {
-        "column": "txn_type",
+        "name": "txn_type",
         "type": "string"
       }
     ]

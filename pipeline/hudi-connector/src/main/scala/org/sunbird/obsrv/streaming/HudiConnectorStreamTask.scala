@@ -19,7 +19,8 @@ import org.sunbird.obsrv.core.util.FlinkUtil
 import org.sunbird.obsrv.functions.RowDataConverterFunction
 import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.util.HudiSchemaParser
-import org.apache.hudi.config.HoodieWriteConfig.KEYGENERATOR_CLASS_NAME
+import org.apache.hudi.config.HoodieWriteConfig.SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP
+import org.apache.hudi.common.config.HoodieCommonConfig.SCHEMA_EVOLUTION_ENABLE
 import org.apache.hudi.common.table.HoodieTableConfig.DROP_PARTITION_COLUMNS
 import java.io.File
 import java.sql.Timestamp
@@ -56,6 +57,8 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       println("conf: " + conf.toMap.toString)
       val rowType = schemaParser.rowTypeMap(datasetId)
 
+//      Pipelines.append(conf, rowType, dataStream)
+
       val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)
       val pipeline = Pipelines.hoodieStreamWrite(conf, hoodieRecordDataStream)
       if (OptionsResolver.needsAsyncCompaction(conf)) {
@@ -79,7 +82,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
   def setDatasetConf(conf: Configuration, dataset: String, schemaParser: HudiSchemaParser): Unit = {
     val datasetSchema = schemaParser.hudiSchemaMap(dataset)
     val rowType = schemaParser.rowTypeMap(dataset)
-    val avroSchema = AvroSchemaConverter.convertToSchema(rowType, dataset)
+    val avroSchema = AvroSchemaConverter.convertToSchema(rowType, dataset.replace("-", "_"))
     conf.setString(FlinkOptions.PATH.key, s"${config.hudiBasePath}/${datasetSchema.schema.table}")
     conf.setString(FlinkOptions.TABLE_NAME, datasetSchema.schema.table)
     conf.setString(FlinkOptions.RECORD_KEY_FIELD.key, datasetSchema.schema.primaryKey)
@@ -87,7 +90,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn)
     conf.setString(FlinkOptions.SOURCE_AVRO_SCHEMA.key, avroSchema.toString)
 
-    val partitionField = datasetSchema.schema.columnSpec.filter(f => f.column.equalsIgnoreCase(datasetSchema.schema.partitionColumn)).head
+    val partitionField = datasetSchema.schema.columnSpec.filter(f => f.name.equalsIgnoreCase(datasetSchema.schema.partitionColumn)).head
     if(partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch")) {
       conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")
     }
@@ -124,6 +127,8 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setString("hoodie.fs.atomic_creation.support", "s3a")
     conf.setString(FlinkOptions.HIVE_SYNC_TABLE_PROPERTIES, "hoodie.datasource.write.drop.partition.columns=true")
     conf.setBoolean(DROP_PARTITION_COLUMNS.key, true)
+    conf.setBoolean(SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP.key(), true); // Enable dropping columns
+    conf.setBoolean(SCHEMA_EVOLUTION_ENABLE.key(), true); // Enable schema evolution
 
     if (config.hmsEnabled) {
       conf.setBoolean("hive_sync.enabled", config.hmsEnabled)

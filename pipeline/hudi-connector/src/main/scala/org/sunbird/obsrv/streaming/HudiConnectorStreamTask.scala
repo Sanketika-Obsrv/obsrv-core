@@ -129,6 +129,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setBoolean(DROP_PARTITION_COLUMNS.key, true)
     conf.setBoolean(SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP.key(), true); // Enable dropping columns
     conf.setBoolean(SCHEMA_EVOLUTION_ENABLE.key(), true); // Enable schema evolution
+    conf.setString(FlinkOptions.PAYLOAD_CLASS_NAME, "org.apache.hudi.common.model.PartialUpdateAvroPayload")
 
     if (config.hmsEnabled) {
       conf.setBoolean("hive_sync.enabled", config.hmsEnabled)

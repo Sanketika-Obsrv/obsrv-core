@@ -42,6 +42,11 @@ object DatasetRegistry {
     DatasetRegistryService.readDatasources(datasetId)
   }
 
+  def getAllDatasources(): List[DataSource] = {
+    val datasourceList = DatasetRegistryService.readAllDatasources()
+    datasourceList.getOrElse(List())
+  }
+
   def getDataSetIds(datasetType: String): List[String] = {
     datasets.filter(f => f._2.datasetType.equals(datasetType)).keySet.toList
   }

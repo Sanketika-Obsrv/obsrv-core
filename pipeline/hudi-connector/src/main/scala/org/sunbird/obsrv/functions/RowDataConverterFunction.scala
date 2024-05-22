@@ -32,9 +32,7 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
   }
 
   def convertToRowData(data: MMap[String, AnyRef]): RowData = {
-//    val event = data("event")
     val eventJson = JSONUtil.serialize(data)
-//    val datasetId = data.get("dataset").get.asInstanceOf[String]
     val flattenedData = hudiSchemaParser.parseJson(datasetId, eventJson)
     val rowType = hudiSchemaParser.rowTypeMap(datasetId)
     val converter: JsonToRowDataConverters.JsonToRowDataConverter = jsonToRowDataConverters.createRowConverter(rowType)

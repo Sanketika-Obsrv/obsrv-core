@@ -27,8 +27,6 @@ class HudiSchemaParser {
 
   private val logger = LoggerFactory.getLogger(classOf[HudiSchemaParser])
 
-//  val objectMapper = new ObjectMapper()
-//  objectMapper.registerModule(DefaultScalaModule)
   @transient private val objectMapper = JsonMapper.builder()
     .addModule(DefaultScalaModule)
     .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
@@ -37,9 +35,7 @@ class HudiSchemaParser {
     .build()
 
   val df = new SimpleDateFormat("yyyy-MM-dd")
-//  val df1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
   objectMapper.setSerializationInclusion(Include.NON_ABSENT)
-//    .setDateFormat(df1)
 
   val hudiSchemaMap = new mutable.HashMap[String, HudiSchemaSpec]()
   val rowTypeMap = new mutable.HashMap[String, RowType]()

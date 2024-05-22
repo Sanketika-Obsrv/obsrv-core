@@ -36,7 +36,6 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
   def process(): Unit = {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
     process(env)
-//    env.execute(config.jobName)
   }
 
   override def processStream(dataStream: DataStream[mutable.Map[String, AnyRef]]): DataStream[mutable.Map[String, AnyRef]] = {
@@ -56,8 +55,6 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       setDatasetConf(conf, datasetId, schemaParser)
       logger.info("conf: " + conf.toMap.toString)
       val rowType = schemaParser.rowTypeMap(datasetId)
-
-//      Pipelines.append(conf, rowType, dataStream)
 
       val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)
       val pipeline = Pipelines.hoodieStreamWrite(conf, hoodieRecordDataStream)
@@ -94,19 +91,6 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     if(partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch")) {
       conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")
     }
-//    if(partitionField.`type`.equalsIgnoreCase("timestamp")) {
-//      conf.setString(KEYGENERATOR_CLASS_NAME.key(), "org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator")
-//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_TYPE_FIELD.key(), "DATE_STRING")
-//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_INPUT_DATE_FORMAT.key(), "yyyy-MM-dd'T'HH:mm:ss.SSSZ,yyyy-MM-dd'T'HH:mm:ss.SSS,yyyy-MM-dd hh:mm:ss,yyyy-MM-dd,yyyyMMdd")
-//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_OUTPUT_DATE_FORMAT.key(), "yyyy-MM-dd")
-//      conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")
-//    }
-//    else if(partitionField.`type`.equalsIgnoreCase("epoch")){
-//      conf.setString(KEYGENERATOR_CLASS_NAME.key(), "org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator")
-//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_TYPE_FIELD.key(), "EPOCHMILLISECONDS")
-//      conf.setString(TimestampKeyGeneratorConfig.TIMESTAMP_OUTPUT_DATE_FORMAT.key(), "yyyy-MM-dd")
-//      conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")
-//    }
 
     if (config.hmsEnabled) {
       conf.setString("hive_sync.table", datasetSchema.schema.table)

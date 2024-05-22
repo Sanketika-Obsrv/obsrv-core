@@ -82,7 +82,7 @@ class HudiSchemaParser {
       rowTypeMap.put(partitionField.name + "_partition", new VarCharType(false, 20))
     }
     val rowType: RowType = RowType.of(false, rowTypeMap.values.toArray, rowTypeMap.keySet.toArray)
-    println("rowType: " + rowType)
+    logger.info("rowType: " + rowType)
     rowType
   }
 
@@ -110,7 +110,6 @@ class HudiSchemaParser {
                       case "epoch" => objectMapper.treeToValue(nodeValue, classOf[Long])
                       case _ => objectMapper.treeToValue(nodeValue, classOf[String])
                     }
-                    println("dataset: " + dataset + "fieldDataType: " + fieldDataType + " fieldValue: " + fieldValue)
                     if(field.name.equalsIgnoreCase(partitionField.name)){
                       if(fieldDataType.equalsIgnoreCase("timestamp")) {
                         flattenedEventData.put(field.name + "_partition", df.format(objectMapper.treeToValue(nodeValue, classOf[Timestamp])))
@@ -121,12 +120,17 @@ class HudiSchemaParser {
                     }
                     flattenedEventData.put(field.name, fieldValue)
                   }
+                  catch {
+                    case ex: Exception =>
+                      logger.info("Hudi Schema Parser - Exception: ", ex.getMessage)
+                      flattenedEventData.put(field.name, null)
+                  }
 
               }.orElse(flattenedEventData.put(field.name, null))
           }
       }
     }
-    println("flattenedEventData: " + flattenedEventData)
+    logger.info("flattenedEventData: " + flattenedEventData)
     flattenedEventData
   }
 

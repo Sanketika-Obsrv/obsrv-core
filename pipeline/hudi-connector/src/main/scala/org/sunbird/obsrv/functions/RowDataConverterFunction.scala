@@ -12,7 +12,7 @@ import org.sunbird.obsrv.core.util.{JSONUtil, Util}
 import org.sunbird.obsrv.streaming.HudiConnectorConfig
 import scala.collection.mutable.{Map => MMap}
 
-class RowDataConverterFunction(config: HudiConnectorConfig) extends RichMapFunction[MMap[String, AnyRef], RowData] {
+class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) extends RichMapFunction[MMap[String, AnyRef], RowData] {
 
   var jsonToRowDataConverters: JsonToRowDataConverters = _
   var objectMapper: ObjectMapper = _
@@ -32,9 +32,9 @@ class RowDataConverterFunction(config: HudiConnectorConfig) extends RichMapFunct
   }
 
   def convertToRowData(data: MMap[String, AnyRef]): RowData = {
-    val event = data("event")
-    val eventJson = JSONUtil.serialize(event)
-    val datasetId = data.get("dataset").get.asInstanceOf[String]
+//    val event = data("event")
+    val eventJson = JSONUtil.serialize(data)
+//    val datasetId = data.get("dataset").get.asInstanceOf[String]
     val flattenedData = hudiSchemaParser.parseJson(datasetId, eventJson)
     val rowType = hudiSchemaParser.rowTypeMap(datasetId)
     val converter: JsonToRowDataConverters.JsonToRowDataConverter = jsonToRowDataConverters.createRowConverter(rowType)

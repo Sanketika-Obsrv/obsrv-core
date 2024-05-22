@@ -49,12 +49,12 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     dataSourceConfig.map{ dataSource =>
       val datasetId = dataSource.datasetId
       val dataStream = getMapDataStream(env, config, List(datasetId), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
-        .map(new RowDataConverterFunction(config))
+        .map(new RowDataConverterFunction(config, datasetId))
 
       val conf: Configuration = new Configuration()
       setHudiBaseConfigurations(conf)
       setDatasetConf(conf, datasetId, schemaParser)
-      println("conf: " + conf.toMap.toString)
+      logger.info("conf: " + conf.toMap.toString)
       val rowType = schemaParser.rowTypeMap(datasetId)
 
 //      Pipelines.append(conf, rowType, dataStream)

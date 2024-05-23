@@ -9,7 +9,6 @@ import java.io.File
 import java.sql.{ResultSet, Timestamp}
 
 object DatasetRegistryService {
-
   private val configFile = new File("/data/flink/conf/baseconfig.conf")
   // $COVERAGE-OFF$ This code only executes within a flink cluster
   val config: Config = if (configFile.exists()) {
@@ -47,7 +46,7 @@ object DatasetRegistryService {
     val postgresConnect = new PostgresConnect(postgresConfig)
     try {
       val rs = postgresConnect.executeQuery(s"SELECT * FROM datasets where id='$id'")
-      if(rs.next()) {
+      if (rs.next()) {
         Some(parseDataset(rs))
       } else {
         None
@@ -129,9 +128,10 @@ object DatasetRegistryService {
   }
 
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
-    val query = s"UPDATE dataset_source_config SET connector_stats = jsonb_set(jsonb_set(coalesce(connector_stats, '{}')::jsonb, '{records}'," +
-      s" ((COALESCE(connector_stats->>'records', '0')::int + $records)::text)::jsonb, true), '{last_fetch_timestamp}', " +
-      s"to_jsonb('$lastFetchTimestamp'::timestamp), true) WHERE id = '$id'"
+    val query = s"UPDATE dataset_source_config SET connector_stats = coalesce(connector_stats, '{}')::jsonb || " +
+      s"jsonb_build_object('records', COALESCE(connector_stats->>'records', '0')::int + '$records'::int)  || " +
+      s"jsonb_build_object('last_fetch_timestamp', '${lastFetchTimestamp}'::timestamp) || " +
+      s"jsonb_build_object('last_run_timestamp', '${new Timestamp(System.currentTimeMillis())}'::timestamp) WHERE id = '$id';"
     updateRegistry(query)
   }
 
@@ -193,7 +193,7 @@ object DatasetRegistryService {
 
     DatasetSourceConfig(id = id, datasetId = datasetId, connectorType = connectorType,
       JSONUtil.deserialize[ConnectorConfig](connectorConfig), status,
-      if(connectorStats != null) Some(JSONUtil.deserialize[ConnectorStats](connectorStats)) else None
+      if (connectorStats != null) Some(JSONUtil.deserialize[ConnectorStats](connectorStats)) else None
     )
   }
 
@@ -216,7 +216,7 @@ object DatasetRegistryService {
     val status = rs.getString("status")
     val mode = rs.getString("mode")
 
-    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status, Some(if(mode != null) TransformMode.withName(mode) else TransformMode.Strict))
+    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status, Some(if (mode != null) TransformMode.withName(mode) else TransformMode.Strict))
   }
 
 }

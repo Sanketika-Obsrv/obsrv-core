@@ -18,11 +18,11 @@
     <description>
         Extract batch events into individual events
     </description>
-
+    
     <properties>
-        <encoding>UTF-8</encoding>
-        <scoverage.plugin.version>1.4.0</scoverage.plugin.version>
-    </properties>
+		<encoding>UTF-8</encoding>
+		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
+	</properties>
 
     <dependencies>
         <dependency>
@@ -132,8 +132,8 @@
     </dependencies>
 
     <build>
-        <sourceDirectory>src/main/scala</sourceDirectory>
-        <testSourceDirectory>src/test/scala</testSourceDirectory>
+    		<sourceDirectory>src/main/scala</sourceDirectory>
+		    <testSourceDirectory>src/test/scala</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -243,16 +243,16 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.scoverage</groupId>
-                <artifactId>scoverage-maven-plugin</artifactId>
-                <version>${scoverage.plugin.version}</version>
-                <configuration>
-                    <scalaVersion>${scala.version}</scalaVersion>
-                    <aggregate>true</aggregate>
-                    <highlighting>true</highlighting>
-                </configuration>
-            </plugin>
+			<plugin>
+				<groupId>org.scoverage</groupId>
+				<artifactId>scoverage-maven-plugin</artifactId>
+				<version>${scoverage.plugin.version}</version>
+				<configuration>
+					<scalaVersion>${scala.version}</scalaVersion>
+					<aggregate>true</aggregate>
+					<highlighting>true</highlighting>
+				</configuration>
+			</plugin>
         </plugins>
     </build>
 

@@ -111,6 +111,17 @@ object DatasetRegistryService {
     }
   }
 
+  def readAllDatasources(): Option[List[DataSource]] = {
+
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    try {
+      val rs = postgresConnect.executeQuery(s"SELECT * FROM datasources")
+      Option(Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {
+        parseDatasource(result)
+      }).toList)
+    }
+  }
+
   def updateDatasourceRef(datasource: DataSource, datasourceRef: String): Int = {
     val query = s"UPDATE datasources set datasource_ref = '$datasourceRef' where datasource='${datasource.datasource}' and dataset_id='${datasource.datasetId}'"
     updateRegistry(query)
@@ -190,10 +201,11 @@ object DatasetRegistryService {
     val id = rs.getString("id")
     val datasource = rs.getString("datasource")
     val datasetId = rs.getString("dataset_id")
+    val datasourceType = rs.getString("type")
     val ingestionSpec = rs.getString("ingestion_spec")
     val datasourceRef = rs.getString("datasource_ref")
 
-    DataSource(id, datasource, datasetId, ingestionSpec, datasourceRef)
+    DataSource(id, datasource, datasetId, datasourceType, ingestionSpec, datasourceRef)
   }
 
   private def parseDatasetTransformation(rs: ResultSet): DatasetTransformation = {

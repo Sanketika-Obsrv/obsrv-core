@@ -12,7 +12,7 @@ import org.sunbird.obsrv.core.util.{JSONUtil, Util}
 import org.sunbird.obsrv.streaming.HudiConnectorConfig
 import scala.collection.mutable.{Map => MMap}
 
-class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) extends RichMapFunction[MMap[String, AnyRef], RowData] {
+class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String, datasetType: String) extends RichMapFunction[MMap[String, AnyRef], RowData] {
 
   var jsonToRowDataConverters: JsonToRowDataConverters = _
   var objectMapper: ObjectMapper = _
@@ -32,12 +32,27 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
   }
 
   def convertToRowData(data: MMap[String, AnyRef]): RowData = {
-    val eventJson = JSONUtil.serialize(data)
+    val eventJson = if(datasetType.equals("dataset")) JSONUtil.serialize(data) else JSONUtil.serialize(data("event"))
+//    val eventJson = JSONUtil.serialize(data)
     val flattenedData = hudiSchemaParser.parseJson(datasetId, eventJson)
     val rowType = hudiSchemaParser.rowTypeMap(datasetId)
     val converter: JsonToRowDataConverters.JsonToRowDataConverter = jsonToRowDataConverters.createRowConverter(rowType)
     val rowData = converter.convert(objectMapper.readTree(JSONUtil.serialize(flattenedData))).asInstanceOf[RowData]
     rowData
+  }
+
+}
+
+import org.apache.flink.api.common.functions.FilterFunction
+
+class DatasetFilter(datasetId: String, datasetType: String) extends FilterFunction[MMap[String, AnyRef]] {
+  override def filter(data: MMap[String, AnyRef]): Boolean = {
+    if(datasetType.equals("dataset")) {
+      true
+    }
+    else {
+      data("dataset").toString.equals(datasetId)
+    }
   }
 
 }

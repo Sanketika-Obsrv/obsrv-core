@@ -16,12 +16,13 @@ import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
-import org.sunbird.obsrv.functions.RowDataConverterFunction
+import org.sunbird.obsrv.functions.{DatasetFilter, RowDataConverterFunction}
 import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.util.HudiSchemaParser
 import org.apache.hudi.config.HoodieWriteConfig.SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP
 import org.apache.hudi.common.config.HoodieCommonConfig.SCHEMA_EVOLUTION_ENABLE
 import org.apache.hudi.common.table.HoodieTableConfig.DROP_PARTITION_COLUMNS
+
 import java.io.File
 import java.sql.Timestamp
 import java.time.LocalDateTime
@@ -47,8 +48,11 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     val dataSourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.`type`.nonEmpty && f.`type`.equalsIgnoreCase(Constants.DATALAKE_TYPE))
     dataSourceConfig.map{ dataSource =>
       val datasetId = dataSource.datasetId
-      val dataStream = getMapDataStream(env, config, List(datasetId), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
-        .map(new RowDataConverterFunction(config, datasetId))
+      val datasetType = DatasetRegistry.getDataset(datasetId).get.datasetType
+      val inputStream = if(datasetType.equals("dataset")) getMapDataStream(env, config, List(datasetId), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
+      else getMapDataStream(env, config, List(config.kafkaTopicEnv + ".masterdata.transform"), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
+
+      val dataStream = inputStream.filter(new DatasetFilter(datasetId,datasetType)).map(new RowDataConverterFunction(config, datasetId, datasetType))
 
       val conf: Configuration = new Configuration()
       setHudiBaseConfigurations(conf)

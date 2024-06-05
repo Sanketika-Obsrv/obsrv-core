@@ -27,6 +27,8 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
 
   val kafkaInvalidTopic: String = config.getString("kafka.output.invalid.topic")
 
+  val kafkaTopicEnv: String = config.getString("job.env")
+
   val invalidEventsOutputTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]]("invalid-events")
   val validEventsOutputTag: OutputTag[mutable.Map[String, AnyRef]] = OutputTag[mutable.Map[String, AnyRef]]("valid-events")
 

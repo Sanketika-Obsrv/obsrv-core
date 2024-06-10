@@ -45,7 +45,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
 
   def process(env: StreamExecutionEnvironment): Unit = {
     val schemaParser = new HudiSchemaParser()
-    val dataSourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.`type`.nonEmpty && f.`type`.equalsIgnoreCase(Constants.DATALAKE_TYPE))
+    val dataSourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.`type`.nonEmpty && f.`type`.equalsIgnoreCase(Constants.DATALAKE_TYPE) && f.status.equalsIgnoreCase("Live"))
     dataSourceConfig.map{ dataSource =>
       val datasetId = dataSource.datasetId
       val datasetType = DatasetRegistry.getDataset(datasetId).get.datasetType

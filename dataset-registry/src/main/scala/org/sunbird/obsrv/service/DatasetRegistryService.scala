@@ -202,10 +202,11 @@ object DatasetRegistryService {
     val datasource = rs.getString("datasource")
     val datasetId = rs.getString("dataset_id")
     val datasourceType = rs.getString("type")
+    val datasourceStatus = rs.getString("status")
     val ingestionSpec = rs.getString("ingestion_spec")
     val datasourceRef = rs.getString("datasource_ref")
 
-    DataSource(id, datasource, datasetId, datasourceType, ingestionSpec, datasourceRef)
+    DataSource(id, datasource, datasetId, datasourceType, datasourceStatus, ingestionSpec, datasourceRef)
   }
 
   private def parseDatasetTransformation(rs: ResultSet): DatasetTransformation = {

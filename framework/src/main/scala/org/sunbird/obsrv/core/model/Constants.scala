@@ -15,5 +15,6 @@ object Constants {
   val TOPIC = "topic"
   val MESSAGE = "message"
   val DATALAKE_TYPE = "datalake"
+  val MASTER_DATASET_TYPE = "master-dataset"
 
 }

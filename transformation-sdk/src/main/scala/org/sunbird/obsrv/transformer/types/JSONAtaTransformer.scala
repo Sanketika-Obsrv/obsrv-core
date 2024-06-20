@@ -40,13 +40,13 @@ class JSONAtaTransformer extends ITransformer {
       expr.evaluate(jsonNode)
     } catch {
       case ex1: ParseException =>
-        logger.error(s"Transformer(JSONATA) | Exception parsing transformation expression | Data=${JSONUtil.serialize(dt)} | error=${ex1.getMessage}", ex1)
+        logger.error(s"Transformer(JSONATA) | Exception parsing transformation expression | Data=${JSONUtil.serialize(tf)} | error=${ex1.getMessage}", ex1)
         MissingNode.getInstance()
       case ex2: EvaluateException =>
-        logger.error(s"Transformer(JSONATA) | Exception evaluating transformation expression | Data=${JSONUtil.serialize(dt)} | error=${ex2.getMessage}", ex2)
+        logger.error(s"Transformer(JSONATA) | Exception evaluating transformation expression | Data=${JSONUtil.serialize(tf)} | error=${ex2.getMessage}", ex2)
         MissingNode.getInstance()
       case ex3: Exception =>
-        logger.error(s"Transformer(JSONATA) | Unknown error | Data=${JSONUtil.serialize(dt)} | error=${ex3.getMessage}", ex3)
+        logger.error(s"Transformer(JSONATA) | Unknown error | Data=${JSONUtil.serialize(tf)} | error=${ex3.getMessage}", ex3)
         MissingNode.getInstance()
     }
   }

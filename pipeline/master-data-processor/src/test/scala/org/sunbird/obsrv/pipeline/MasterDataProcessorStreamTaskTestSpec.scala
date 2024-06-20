@@ -96,6 +96,7 @@ class MasterDataProcessorStreamTaskTestSpec extends BaseSpecWithDatasetRegistry 
     task.process(env)
     Future {
       env.execute(masterDataConfig.jobName)
+      Thread.sleep(5000)
     }
 
     val input = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.system.event.topic"), 7, timeout = 30.seconds)
@@ -120,7 +121,7 @@ class MasterDataProcessorStreamTaskTestSpec extends BaseSpecWithDatasetRegistry 
 
     val mutableMetricsMap = mutable.Map[String, Long]();
     BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### MasterDataProcessorStreamTaskTestSpec:metrics ###", getPrintableMetrics(mutableMetricsMap))
+    Console.println("### MasterDataProcessorStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
 
     masterDataConfig.successTag().getId should be ("processing_stats")
 

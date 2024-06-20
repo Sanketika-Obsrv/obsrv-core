@@ -6,7 +6,6 @@ import org.apache.flink.streaming.api.datastream.DataStream
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
-import org.sunbird.obsrv.model.TransformType
 import org.sunbird.obsrv.transformer.functions.TransformerFunction
 
 import java.io.File

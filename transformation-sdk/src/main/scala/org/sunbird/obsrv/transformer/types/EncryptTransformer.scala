@@ -2,17 +2,23 @@ package org.sunbird.obsrv.transformer.types
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.MissingNode
-import org.sunbird.obsrv.transformer.functions.TransformerFunctionHelper.JsonHelper
-import org.sunbird.obsrv.transformer.util.CipherUtil
-import org.json4s.{JValue, MappingException}
+import org.json4s.{DefaultFormats, Formats, JValue, MappingException}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.DatasetTransformation
+import org.sunbird.obsrv.transformer.util.CipherUtil
 
 class EncryptTransformer extends ITransformer {
 
+  implicit val jsonFormats: Formats = DefaultFormats.withLong
   private val logger = LoggerFactory.getLogger(classOf[EncryptTransformer])
+
+  implicit class JsonHelper(json: JValue) {
+    def customExtract[T](path: String)(implicit mf: Manifest[T]): T = {
+      path.split('.').foldLeft(json)({ case (acc: JValue, node: String) => acc \ node }).extract[T]
+    }
+  }
 
   override def transformField(json: JValue, jsonNode: JsonNode, dt: DatasetTransformation): (JValue, TransformFieldStatus) = {
     val emptyNode = getJSON(dt.fieldKey, MissingNode.getInstance())

@@ -3,7 +3,7 @@ package org.sunbird.obsrv.transformer.types
 import co.com.bancolombia.datamask.{MaskUtils => CustomMaskUtils}
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.MissingNode
-import org.json4s._
+import org.json4s.{DefaultFormats, Formats, JValue, MappingException}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.util.JSONUtil

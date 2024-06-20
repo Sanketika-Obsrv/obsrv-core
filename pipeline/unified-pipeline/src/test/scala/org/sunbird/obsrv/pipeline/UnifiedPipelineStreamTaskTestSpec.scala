@@ -106,7 +106,7 @@ class UnifiedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
     val mutableMetricsMap = mutable.Map[String, Long]();
     BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### MergedPipelineStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
+    Console.println("### UnifiedPipelineStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
 
     mutableMetricsMap("ExtractorJob.d1.extractor-total-count") should be(4)
     mutableMetricsMap("ExtractorJob.d1.extractor-duplicate-count") should be(1)

@@ -2,13 +2,14 @@ package org.sunbird.obsrv.transformer.util
 
 import com.api.jsonata4java.expressions.{EvaluateException, Expressions, ParseException}
 import com.fasterxml.jackson.databind.JsonNode
-import org.sunbird.obsrv.transformer.types.ConditionStatus
 import org.slf4j.LoggerFactory
+import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Condition
 import org.sunbird.obsrv.model.TransformMode.TransformMode
 
+case class ConditionStatus(expr: String, success: Boolean, mode: Option[TransformMode] = None, error: Option[Error] = None)
 object ConditionEvaluator {
 
   private val logger = LoggerFactory.getLogger(ConditionEvaluator.getClass)

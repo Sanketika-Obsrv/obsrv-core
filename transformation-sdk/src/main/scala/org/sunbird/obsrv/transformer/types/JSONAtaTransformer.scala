@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels
+import org.sunbird.obsrv.model.DatasetModels.TransformationFunction
 
 class JSONAtaTransformer extends ITransformer {
 
@@ -31,6 +32,24 @@ class JSONAtaTransformer extends ITransformer {
         (emptyNode, TransformFieldStatus(dt.fieldKey, dt.transformationFunction.expr, success = false, dt.mode.get, Some(ErrorConstants.ERR_UNKNOWN_TRANSFORM_EXCEPTION)))
     }
   }
+
+  def evaluate(jsonNode: JsonNode, tf: TransformationFunction): JsonNode = {
+
+    try {
+      val expr = Expressions.parse(tf.expr)
+      expr.evaluate(jsonNode)
+    } catch {
+      case ex1: ParseException =>
+        logger.error(s"Transformer(JSONATA) | Exception parsing transformation expression | Data=${JSONUtil.serialize(dt)} | error=${ex1.getMessage}", ex1)
+        MissingNode.getInstance()
+      case ex2: EvaluateException =>
+        logger.error(s"Transformer(JSONATA) | Exception evaluating transformation expression | Data=${JSONUtil.serialize(dt)} | error=${ex2.getMessage}", ex2)
+        MissingNode.getInstance()
+      case ex3: Exception =>
+        logger.error(s"Transformer(JSONATA) | Unknown error | Data=${JSONUtil.serialize(dt)} | error=${ex3.getMessage}", ex3)
+        MissingNode.getInstance()
+    }
+  }
 }
 
 object JSONAtaTransformer {
@@ -39,6 +58,10 @@ object JSONAtaTransformer {
 
   def transform(json: JValue, jsonNode: JsonNode, dtList: List[DatasetModels.DatasetTransformation]): TransformationResult = {
     jsonAtaTransformer.transform(json, jsonNode, dtList)
+  }
+
+  def evaluate(jsonNode: JsonNode, transformation: TransformationFunction): JsonNode = {
+    jsonAtaTransformer.evaluate(jsonNode, transformation)
   }
 
 }

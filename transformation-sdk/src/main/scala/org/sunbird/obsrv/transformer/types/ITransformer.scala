@@ -2,17 +2,16 @@ package org.sunbird.obsrv.transformer.types
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.JsonNodeType
-import org.sunbird.obsrv.transformer.util.ConditionEvaluator
-import org.json4s.{JNothing, JObject, JValue}
 import org.json4s.native.JsonMethods.parse
+import org.json4s.{JNothing, JObject, JValue}
 import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.model.DatasetModels.DatasetTransformation
 import org.sunbird.obsrv.model.TransformMode.TransformMode
+import org.sunbird.obsrv.transformer.util.ConditionEvaluator
 
 import scala.collection.mutable.ListBuffer
 
 case class TransformFieldStatus(fieldKey: String, expr: String, success: Boolean, mode: TransformMode, error: Option[Error] = None)
-case class ConditionStatus(expr: String, success: Boolean, mode: Option[TransformMode] = None, error: Option[Error] = None)
 case class TransformationResult(json: JValue, fieldStatus: List[TransformFieldStatus])
 abstract class ITransformer[T] {
 

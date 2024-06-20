@@ -25,8 +25,8 @@ object DatasetModels {
   case class ValidationConfig(@JsonProperty("validate") validate: Option[Boolean] = Some(true),
                               @JsonProperty("mode") @JsonScalaEnumeration(classOf[ValidationModeType]) mode: Option[ValidationMode])
 
-  case class DenormFieldConfig(@JsonProperty("denorm_key") denormKey: String, @JsonProperty("redis_db") redisDB: Int,
-                               @JsonProperty("denorm_out_field") denormOutField: String)
+  case class DenormFieldConfig(@JsonProperty("denorm_key") denormKey: Option[String], @JsonProperty("redis_db") redisDB: Int,
+                               @JsonProperty("denorm_out_field") denormOutField: String, @JsonProperty("jsonata_expr") jsonAtaExpr: Option[String])
 
   case class DenormConfig(@JsonProperty("redis_db_host") redisDBHost: String, @JsonProperty("redis_db_port") redisDBPort: Int,
                           @JsonProperty("denorm_fields") denormFields: List[DenormFieldConfig])

@@ -36,10 +36,7 @@ FROM --platform=linux/x86_64 sanketikahub/flink:1.15.2-scala_2.12-jdk-11 as mast
 USER flink
 COPY --from=build-pipeline /app/pipeline/master-data-processor/target/master-data-processor-1.0.0.jar $FLINK_HOME/lib
 
-FROM --platform=linux/x86_64 flink:1.15.0-scala_2.12-java11 as hudi-connector-image
+FROM --platform=linux/x86_64 sanketikahub/flink:1.15.0-scala_2.12-lakehouse as lakehouse-connector-image
 USER flink
-COPY ./pipeline/hudi-connector/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar $FLINK_HOME/lib
-COPY ./pipeline/hudi-connector/flink-s3-fs-hadoop-1.15.2.jar $FLINK_HOME/lib
-COPY ./pipeline/hudi-connector/hbase-server-2.4.13.jar $FLINK_HOME/lib
 RUN mkdir $FLINK_HOME/custom-lib
 COPY ./pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/custom-lib

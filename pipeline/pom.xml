@@ -21,7 +21,7 @@
 		<module>denormalizer</module>
 		<module>transformer</module>
 		<module>druid-router</module>
-		<module>pipeline-merged</module>
+		<module>unified-pipeline</module>
 		<module>master-data-processor</module>
 		<module>hudi-connector</module>
 	</modules>

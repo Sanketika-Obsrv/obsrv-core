@@ -19,26 +19,21 @@ import scala.collection.mutable
  * Druid Router stream task routes every event into its respective topic configured at dataset level
  */
 
-class MergedPipelineStreamTask(config: Config, mergedPipelineConfig: MergedPipelineConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTask[mutable.Map[String, AnyRef]] {
+class UnifiedPipelineStreamTask(config: Config, pipelineConfig: UnifiedPipelineConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTask[mutable.Map[String, AnyRef]] {
 
   private val serialVersionUID = 146697324640926024L
 
   // $COVERAGE-OFF$ Disabling scoverage as the below code can only be invoked within flink cluster
   def process(): Unit = {
 
-    implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(mergedPipelineConfig)
+    implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(pipelineConfig)
     process(env)
-    env.execute(mergedPipelineConfig.jobName)
+    env.execute(pipelineConfig.jobName)
   }
   // $COVERAGE-ON$
 
-  /**
-   * Created an overloaded process function to enable unit testing
-   * @param env StreamExecutionEnvironment
-   */
   def process(env: StreamExecutionEnvironment): Unit = {
-
-    val dataStream = getMapDataStream(env, mergedPipelineConfig, kafkaConnector)
+    val dataStream = getMapDataStream(env, pipelineConfig, kafkaConnector)
     processStream(dataStream)
   }
 
@@ -63,18 +58,17 @@ class MergedPipelineStreamTask(config: Config, mergedPipelineConfig: MergedPipel
 }
 
 // $COVERAGE-OFF$ Disabling scoverage as the below code can only be invoked within flink cluster
-object MergedPipelineStreamTask {
+object UnifiedPipelineStreamTask {
 
   def main(args: Array[String]): Unit = {
     val configFilePath = Option(ParameterTool.fromArgs(args).get("config.file.path"))
     val config = configFilePath.map {
       path => ConfigFactory.parseFile(new File(path)).resolve()
-    }.getOrElse(ConfigFactory.load("merged-pipeline.conf").withFallback(ConfigFactory.systemEnvironment()))
-    val mergedPipelineConfig = new MergedPipelineConfig(config)
-    val kafkaUtil = new FlinkKafkaConnector(mergedPipelineConfig)
-    val task = new MergedPipelineStreamTask(config, mergedPipelineConfig, kafkaUtil)
+    }.getOrElse(ConfigFactory.load("unified-pipeline.conf").withFallback(ConfigFactory.systemEnvironment()))
+    val pipelineConfig = new UnifiedPipelineConfig(config)
+    val kafkaUtil = new FlinkKafkaConnector(pipelineConfig)
+    val task = new UnifiedPipelineStreamTask(config, pipelineConfig, kafkaUtil)
     task.process()
   }
 }
-
 // $COVERAGE-ON$

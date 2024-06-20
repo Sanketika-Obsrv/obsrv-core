@@ -1,4 +1,4 @@
-package org.sunbird.obsrv.fixture
+package org.sunbird.obsrv.pipeline
 
 object EventFixture {
 
@@ -11,6 +11,4 @@ object EventFixture {
 
   val VALID_BATCH_EVENT_D2 = """{"dataset":"d2","id":"event4","event":{"id":"4567","vehicleCode":"HYUN-CRE-D6","date":"2023-03-01","dealer":{"dealerCode":"KUNUnited","locationId":"KUN1","email":"dealer1@gmail.com","phone":"9849012345"},"metrics":{"bookingsTaken":50,"deliveriesPromised":20,"deliveriesDone":19}}}"""
   val INVALID_BATCH_EVENT_D2 = """{"dataset":"d2","id":"event5","event1":{"id":"1234","vehicleCode":"HYUN-CRE-D6","date":"2023-03-01","dealer":{"dealerCode":"KUNUnited","locationId":"KUN1","email":"dealer1@gmail.com","phone":"9849012345"},"metrics":{"bookingsTaken":50,"deliveriesPromised":20,"deliveriesDone":19}}}"""
-
-
 }

@@ -49,5 +49,8 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
   val hmsPassword: String = config.getString("hudi.hms.database.password")
   val hmsDatabaseName: String = config.getString("hudi.hms.database.name")
   val hmsURI: String = config.getString("hudi.hms.uri")
-
+  val hudiWriteBatchSize: Int = config.getInt("hudi.write.batch.size")
+  val hudiCompactionTasks: Int = config.getInt("hudi.compaction.tasks")
+  val hudiIndexType: String = config.getString("hudi.index.type")
+  val deltaCommits: Int = config.getInt("hudi.delta.commits")
 }

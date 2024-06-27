@@ -41,3 +41,7 @@ FROM --platform=linux/x86_64 sanketikahub/flink:1.15.0-scala_2.12-lakehouse as l
 USER flink
 RUN mkdir $FLINK_HOME/custom-lib
 COPY ./pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/custom-lib
+
+FROM --platform=linux/x86_64 sanketikahub/flink:1.15.2-scala_2.12-jdk-11 as cache-indexer-image
+USER flink
+COPY --from=build-pipeline /app/pipeline/cache-indexer/target/cache-indexer-1.0.0.jar $FLINK_HOME/lib

@@ -31,14 +31,14 @@ class TestTransformerFunctionHelper extends BaseSpecWithDatasetRegistry with Mat
 
     val json = parse(jsonStr)
     val dtList = Option(List(
-      DatasetTransformation("tf1", "obs2.0", "spatialExtent", TransformationFunction("mask", None, "spatialExtent"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "assetRef", TransformationFunction("mask", None, "assetRef"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "accountEmail", TransformationFunction("mask", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE' and accountEmail='firstname.lastname@gmail.com' and $number(value)>=100")), "accountEmail"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "accountPhone2", TransformationFunction("mask", None, "accountPhone"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "codeComponentsList", TransformationFunction("jsonata", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE' and accountEmail='firstname.lastname@gmail.com' and $number(value)>=100")), "$keys(codeComponents)"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "valueAsInt", TransformationFunction("jsonata", None, "$number(value)"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "firmwareComponent", TransformationFunction("jsonata", None, "codeComponents[0]"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "optionalValue", TransformationFunction("jsonata", None, "$number(optionValue)"), "active")
+      DatasetTransformation("tf1", "obs2.0", "spatialExtent", TransformationFunction("mask", None, "spatialExtent")),
+      DatasetTransformation("tf1", "obs2.0", "assetRef", TransformationFunction("mask", None, "assetRef")),
+      DatasetTransformation("tf1", "obs2.0", "accountEmail", TransformationFunction("mask", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE' and accountEmail='firstname.lastname@gmail.com' and $number(value)>=100")), "accountEmail")),
+      DatasetTransformation("tf1", "obs2.0", "accountPhone2", TransformationFunction("mask", None, "accountPhone")),
+      DatasetTransformation("tf1", "obs2.0", "codeComponentsList", TransformationFunction("jsonata", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE' and accountEmail='firstname.lastname@gmail.com' and $number(value)>=100")), "$keys(codeComponents)")),
+      DatasetTransformation("tf1", "obs2.0", "valueAsInt", TransformationFunction("jsonata", None, "$number(value)")),
+      DatasetTransformation("tf1", "obs2.0", "firmwareComponent", TransformationFunction("jsonata", None, "codeComponents[0]")),
+      DatasetTransformation("tf1", "obs2.0", "optionalValue", TransformationFunction("jsonata", None, "$number(optionValue)"))
     ))
 
     val result = TransformerFunctionHelper.processTransformations(json, dtList)
@@ -51,11 +51,11 @@ class TestTransformerFunctionHelper extends BaseSpecWithDatasetRegistry with Mat
     assert(JSONUtil.getKey("optionalValue", JSONUtil.serialize(result.resultJson)).isMissingNode.equals(true))
 
     val dtList2 = Option(List(
-      DatasetTransformation("tf1", "obs2.0", "accountPhone", TransformationFunction("mask", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE1'")), "accountPhone"), "active", Some(TransformMode.Lenient)),
-      DatasetTransformation("tf4", "obs2.0", "asset.assetRef2", TransformationFunction("mask", None, "assetRef2"), "Live", Some(TransformMode.Lenient)),
-      DatasetTransformation("tf5", "obs2.0", "asset.assetRef3", TransformationFunction("mask", None, "assetRef3"), "Live", Some(TransformMode.Lenient)),
-      DatasetTransformation("tf6", "obs2.0", "asset.assetRef4", TransformationFunction("mask", None, "assetRef4"), "Live", Some(TransformMode.Lenient)),
-      DatasetTransformation("tf7", "obs2.0", "asset.assetRef5", TransformationFunction("custom", None, "join(d2.assetRef4)"), "Live", Some(TransformMode.Lenient))
+      DatasetTransformation("tf1", "obs2.0", "accountPhone", TransformationFunction("mask", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE1'")), "accountPhone"), Some(TransformMode.Lenient)),
+      DatasetTransformation("tf4", "obs2.0", "asset.assetRef2", TransformationFunction("mask", None, "assetRef2"), Some(TransformMode.Lenient)),
+      DatasetTransformation("tf5", "obs2.0", "asset.assetRef3", TransformationFunction("mask", None, "assetRef3"), Some(TransformMode.Lenient)),
+      DatasetTransformation("tf6", "obs2.0", "asset.assetRef4", TransformationFunction("mask", None, "assetRef4"), Some(TransformMode.Lenient)),
+      DatasetTransformation("tf7", "obs2.0", "asset.assetRef5", TransformationFunction("custom", None, "join(d2.assetRef4)"), Some(TransformMode.Lenient))
     ))
     val result2 = TransformerFunctionHelper.processTransformations(json, dtList2)
     result2.status should be(StatusCode.partial)
@@ -74,9 +74,9 @@ class TestTransformerFunctionHelper extends BaseSpecWithDatasetRegistry with Mat
 
     val json = parse(jsonStr)
     val dtList = Option(List(
-      DatasetTransformation("tf1", "obs2.0", "codeComponentsList", TransformationFunction("jsonata", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE' and accountEmail='firstname.lastname@gmail.com' and $number(value)>=100")), "$keys(codeComponents).length"), "active", Some(TransformMode.Lenient)),
-      DatasetTransformation("tf1", "obs2.0", "valueAsInt", TransformationFunction("jsonata", None, "$number(value)"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "firmwareComponent", TransformationFunction("jsonata", None, "codeComponents[0]"), "active")
+      DatasetTransformation("tf1", "obs2.0", "codeComponentsList", TransformationFunction("jsonata", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE' and accountEmail='firstname.lastname@gmail.com' and $number(value)>=100")), "$keys(codeComponents).length"), Some(TransformMode.Lenient)),
+      DatasetTransformation("tf1", "obs2.0", "valueAsInt", TransformationFunction("jsonata", None, "$number(value)")),
+      DatasetTransformation("tf1", "obs2.0", "firmwareComponent", TransformationFunction("jsonata", None, "codeComponents[0]"))
     ))
     val result = TransformerFunctionHelper.processTransformations(json, dtList)
     result.status should be(StatusCode.partial)
@@ -89,10 +89,10 @@ class TestTransformerFunctionHelper extends BaseSpecWithDatasetRegistry with Mat
 
     val json = parse(jsonStr)
     val dtList = Option(List(
-      DatasetTransformation("tf1", "obs2.0", "codeComponentsList", TransformationFunction("jsonata", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE' and accountEmail='firstname.lastname@gmail.com' and $number(value)>=100")), "$keys(codeComponent).length"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "valueAsInt", TransformationFunction("jsonata", None, "number(value)"), "active"),
-      DatasetTransformation("tf1", "obs2.0", "valueAsInt2", TransformationFunction("jsonata", None, null), "Live", Some(TransformMode.Lenient)),
-      DatasetTransformation("tf1", "obs2.0", "firmwareComponent", TransformationFunction("jsonata", None, "codeComponents[0]"), "active")
+      DatasetTransformation("tf1", "obs2.0", "codeComponentsList", TransformationFunction("jsonata", Some(Condition("jsonata", "obsCode='M_BATTERY_CHARGE' and accountEmail='firstname.lastname@gmail.com' and $number(value)>=100")), "$keys(codeComponent).length")),
+      DatasetTransformation("tf1", "obs2.0", "valueAsInt", TransformationFunction("jsonata", None, "number(value)")),
+      DatasetTransformation("tf1", "obs2.0", "valueAsInt2", TransformationFunction("jsonata", None, null), Some(TransformMode.Lenient)),
+      DatasetTransformation("tf1", "obs2.0", "firmwareComponent", TransformationFunction("jsonata", None, "codeComponents[0]"))
     ))
     val result = TransformerFunctionHelper.processTransformations(json, dtList)
     result.status should be(StatusCode.failed)
@@ -130,12 +130,12 @@ class TestTransformerFunctionHelper extends BaseSpecWithDatasetRegistry with Mat
   it should "encrypt the fields in the event" in {
     val json = parse(jsonStr)
     val dtList = Option(List(
-      DatasetTransformation("tf1", "obs2.0", "accountEmail", TransformationFunction("encrypt", None, "accountEmail"), "Live"),
-      DatasetTransformation("tf2", "obs2.0", "accountPhone", TransformationFunction("encrypt", None, "accountPhone"), "Live"),
-      DatasetTransformation("tf3", "obs2.0", "assetRef", TransformationFunction("encrypt", None, "assetRef"), "Live"),
-      DatasetTransformation("tf4", "obs2.0", "asset.assetRef2", TransformationFunction("encrypt", None, "assetRef2"), "Live"),
-      DatasetTransformation("tf5", "obs2.0", "asset.assetRef3", TransformationFunction("encrypt", None, "assetRef3"), "Live"),
-      DatasetTransformation("tf6", "obs2.0", "asset.assetRef4", TransformationFunction("encrypt", None, "assetRef4"), "Live")
+      DatasetTransformation("tf1", "obs2.0", "accountEmail", TransformationFunction("encrypt", None, "accountEmail")),
+      DatasetTransformation("tf2", "obs2.0", "accountPhone", TransformationFunction("encrypt", None, "accountPhone")),
+      DatasetTransformation("tf3", "obs2.0", "assetRef", TransformationFunction("encrypt", None, "assetRef")),
+      DatasetTransformation("tf4", "obs2.0", "asset.assetRef2", TransformationFunction("encrypt", None, "assetRef2")),
+      DatasetTransformation("tf5", "obs2.0", "asset.assetRef3", TransformationFunction("encrypt", None, "assetRef3")),
+      DatasetTransformation("tf6", "obs2.0", "asset.assetRef4", TransformationFunction("encrypt", None, "assetRef4"))
     ))
     val result = TransformerFunctionHelper.processTransformations(json, dtList)
     val jsonData = compact(render(result.resultJson))

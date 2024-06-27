@@ -119,7 +119,7 @@ class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     noException should be thrownBy {
       denormCache.open(Dataset(id = "d123", datasetType = "dataset", extractionConfig = None, dedupConfig = None, validationConfig = None, jsonSchema = None,
         denormConfig = Some(DenormConfig(redisDBHost = "localhost", redisDBPort = redisPort, denormFields = List(DenormFieldConfig(denormKey = Some("vehicleCode"), redisDB = 3, denormOutField = "vehicle_data", jsonAtaExpr = None)))), routerConfig = RouterConfig(""),
-        datasetConfig = DatasetConfig(key = "id", tsKey = "date", entryTopic = "ingest"), status = DatasetStatus.Live))
+        datasetConfig = DatasetConfig(IndexingConfig(olapStoreEnabled = false, lakehouseEnabled = false, cacheEnabled = false), KeysConfig(Some("id"), None, Some("date"), None)), status = DatasetStatus.Live, "ingest"))
     }
   }
 

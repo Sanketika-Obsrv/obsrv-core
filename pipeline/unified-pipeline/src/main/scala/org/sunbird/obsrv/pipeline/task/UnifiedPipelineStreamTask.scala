@@ -9,7 +9,7 @@ import org.sunbird.obsrv.core.util.FlinkUtil
 import org.sunbird.obsrv.denormalizer.task.{DenormalizerConfig, DenormalizerStreamTask}
 import org.sunbird.obsrv.extractor.task.{ExtractorConfig, ExtractorStreamTask}
 import org.sunbird.obsrv.preprocessor.task.{PipelinePreprocessorConfig, PipelinePreprocessorStreamTask}
-import org.sunbird.obsrv.router.task.{DruidRouterConfig, DynamicRouterStreamTask}
+import org.sunbird.obsrv.router.task.{DynamicRouterConfig, DynamicRouterStreamTask}
 import org.sunbird.obsrv.transformer.task.{TransformerConfig, TransformerStreamTask}
 
 import java.io.File
@@ -43,7 +43,7 @@ class UnifiedPipelineStreamTask(config: Config, pipelineConfig: UnifiedPipelineC
     val preprocessorTask = new PipelinePreprocessorStreamTask(new PipelinePreprocessorConfig(config), kafkaConnector)
     val denormalizerTask = new DenormalizerStreamTask(new DenormalizerConfig(config), kafkaConnector)
     val transformerTask = new TransformerStreamTask(new TransformerConfig(config), kafkaConnector)
-    val routerTask = new DynamicRouterStreamTask(new DruidRouterConfig(config), kafkaConnector)
+    val routerTask = new DynamicRouterStreamTask(new DynamicRouterConfig(config), kafkaConnector)
 
     routerTask.processStream(
       transformerTask.processStream(

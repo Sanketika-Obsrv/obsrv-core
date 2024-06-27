@@ -74,7 +74,7 @@ abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[Stri
 
   override def getMetricsList(): MetricsList = {
     val metrics = getMetrics() ++ List(config.eventFailedMetricsCount)
-    MetricsList(DatasetRegistry.getDataSetIds(config.datasetType()), metrics)
+    MetricsList(DatasetRegistry.getDataSetIds(), metrics)
   }
 
   private def initMetrics(datasetId: String): Unit = {
@@ -138,7 +138,7 @@ abstract class BaseDatasetWindowProcessFunction(config: BaseJobConfig[mutable.Ma
 
   override def getMetricsList(): MetricsList = {
     val metrics = getMetrics() ++ List(config.eventFailedMetricsCount)
-    MetricsList(DatasetRegistry.getDataSetIds(config.datasetType()), metrics)
+    MetricsList(DatasetRegistry.getDataSetIds(), metrics)
   }
 
   private def initMetrics(datasetId: String): Unit = {

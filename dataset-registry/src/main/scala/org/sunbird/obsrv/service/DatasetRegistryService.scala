@@ -119,6 +119,8 @@ object DatasetRegistryService {
       Option(Iterator.continually((rs, rs.next)).takeWhile(f => f._2).map(f => f._1).map(result => {
         parseDatasource(result)
       }).toList)
+    } finally {
+      postgresConnect.closeConnection()
     }
   }
 
@@ -130,7 +132,7 @@ object DatasetRegistryService {
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
     val query = s"UPDATE dataset_source_config SET connector_stats = coalesce(connector_stats, '{}')::jsonb || " +
       s"jsonb_build_object('records', COALESCE(connector_stats->>'records', '0')::int + '$records'::int)  || " +
-      s"jsonb_build_object('last_fetch_timestamp', '${lastFetchTimestamp}'::timestamp) || " +
+      s"jsonb_build_object('last_fetch_timestamp', '$lastFetchTimestamp'::timestamp) || " +
       s"jsonb_build_object('last_run_timestamp', '${new Timestamp(System.currentTimeMillis())}'::timestamp) WHERE id = '$id';"
     updateRegistry(query)
   }
@@ -163,11 +165,25 @@ object DatasetRegistryService {
     val jsonSchema = rs.getString("data_schema")
     val denormConfig = rs.getString("denorm_config")
     val routerConfig = rs.getString("router_config")
-    val datasetConfig = rs.getString("dataset_config")
+    val datasetConfigStr = rs.getString("dataset_config")
     val status = rs.getString("status")
     val tagArray = rs.getArray("tags")
     val tags = if (tagArray != null) tagArray.getArray.asInstanceOf[Array[String]] else null
     val dataVersion = rs.getInt("data_version")
+    val apiVersion = rs.getString("api_version")
+    val entryTopic = rs.getString("entry_topic")
+
+    val datasetConfig: DatasetConfig = if ("v2".equalsIgnoreCase(apiVersion)) {
+      JSONUtil.deserialize[DatasetConfig](datasetConfigStr)
+    } else {
+      val v1Config = JSONUtil.deserialize[DatasetConfigV1](datasetConfigStr)
+      DatasetConfig(
+        indexingConfig = IndexingConfig(olapStoreEnabled = true, lakehouseEnabled = false, cacheEnabled = if ("master".equalsIgnoreCase(datasetType)) true else false),
+        keysConfig = KeysConfig(dataKey = Some(v1Config.key), None, tsKey = Some(v1Config.tsKey), None),
+        excludeFields = v1Config.excludeFields, datasetTimezone = v1Config.datasetTimezone,
+        cacheConfig = Some(CacheConfig(redisDBHost = v1Config.redisDBHost, redisDBPort = v1Config.redisDBPort, redisDB = v1Config.redisDB))
+      )
+    }
 
     Dataset(datasetId, datasetType,
       if (extractionConfig == null) None else Some(JSONUtil.deserialize[ExtractionConfig](extractionConfig)),
@@ -176,10 +192,12 @@ object DatasetRegistryService {
       Option(jsonSchema),
       if (denormConfig == null) None else Some(JSONUtil.deserialize[DenormConfig](denormConfig)),
       JSONUtil.deserialize[RouterConfig](routerConfig),
-      JSONUtil.deserialize[DatasetConfig](datasetConfig),
+      datasetConfig,
       DatasetStatus.withName(status),
+      entryTopic,
       Option(tags),
-      Option(dataVersion)
+      Option(dataVersion),
+      Option(apiVersion)
     )
   }
 
@@ -214,10 +232,9 @@ object DatasetRegistryService {
     val datasetId = rs.getString("dataset_id")
     val fieldKey = rs.getString("field_key")
     val transformationFunction = rs.getString("transformation_function")
-    val status = rs.getString("status")
     val mode = rs.getString("mode")
 
-    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), status, Some(if (mode != null) TransformMode.withName(mode) else TransformMode.Strict))
+    DatasetTransformation(id, datasetId, fieldKey, JSONUtil.deserialize[TransformationFunction](transformationFunction), Some(if (mode != null) TransformMode.withName(mode) else TransformMode.Strict))
   }
 
 }

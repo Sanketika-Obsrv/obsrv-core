@@ -45,8 +45,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hudi</groupId>
-      <artifactId>hudi-flink1.15-bundle</artifactId>
-      <version>0.14.1</version>
+      <artifactId>hudi-flink1.17-bundle</artifactId>
+      <version>0.15.0</version>
       <exclusions>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
@@ -123,6 +123,12 @@
           <artifactId>log4j-slf4j-impl</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-statebackend-rocksdb</artifactId>
+      <version>1.17.2</version>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
 

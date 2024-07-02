@@ -41,16 +41,24 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
     else HoodieTableType.MERGE_ON_READ.name()
 
   val hudiBasePath: String = config.getString("hudi.table.base.path")
-  val hudiCompactionEnabled: Boolean = config.getBoolean("hudi.compaction.enabled")
-  val hudiWriteTasks: Int = config.getInt("hudi.write.tasks")
 
   val hmsEnabled: Boolean = if (config.hasPath("hudi.hms.enabled")) config.getBoolean("hudi.hms.enabled") else false
   val hmsUsername: String = config.getString("hudi.hms.database.username")
   val hmsPassword: String = config.getString("hudi.hms.database.password")
   val hmsDatabaseName: String = config.getString("hudi.hms.database.name")
   val hmsURI: String = config.getString("hudi.hms.uri")
-  val hudiWriteBatchSize: Int = config.getInt("hudi.write.batch.size")
+
+  val hudiWriteTasks: Int = config.getInt("hudi.write.tasks")
   val hudiCompactionTasks: Int = config.getInt("hudi.compaction.tasks")
-  val hudiIndexType: String = config.getString("hudi.index.type")
+  val hudiWriteBatchSize: Int = config.getInt("hudi.write.batch.size")
   val deltaCommits: Int = config.getInt("hudi.delta.commits")
+  val compressionCodec: String = config.getString("hudi.compression.codec")
+  val hudiCompactionEnabled: Boolean = config.getBoolean("hudi.compaction.enabled")
+  val hudiMetadataEnabled: Boolean = config.getBoolean("hudi.metadata.enabled")
+  val hudiIndexType: String = config.getString("hudi.index.type")
+
+  // Memory
+  val hudiWriteTaskMemory: Int = config.getInt("hudi.write.task.max.memory")
+  val hudiCompactionTaskMemory: Int = config.getInt("hudi.write.compaction.max.memory")
+
 }

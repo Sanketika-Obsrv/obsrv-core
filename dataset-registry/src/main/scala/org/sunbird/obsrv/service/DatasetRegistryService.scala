@@ -156,23 +156,14 @@ object DatasetRegistryService {
       postgresConnect.closeConnection()
     }
   }
-
+  
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     var preparedStatement: PreparedStatement = null
-    val query =
-      """
-  UPDATE dataset_source_config
-  SET connector_stats = COALESCE(connector_stats, '{}'::jsonb) ||
-    jsonb_build_object('records', COALESCE(connector_stats->>'records', '0')::int + ?) ||
-    jsonb_build_object('last_fetch_timestamp', ?) ||
-    jsonb_build_object('last_run_timestamp', ?)
-  WHERE id = ?;
-"""
-
+    val query = "UPDATE dataset_source_config SET connector_stats = COALESCE(connector_stats, '{}')::jsonb || jsonb_build_object('records', COALESCE(connector_stats->>'records', '0')::int + ? ::int) || jsonb_build_object('last_fetch_timestamp', ? ::timestamp) || jsonb_build_object('last_run_timestamp', ? ::timestamp) WHERE id = ?;"
     try {
       preparedStatement = postgresConnect.prepareStatement(query)
-      preparedStatement.setLong(1, records)
+      preparedStatement.setString(1, records.toString)
       preparedStatement.setTimestamp(2, lastFetchTimestamp)
       preparedStatement.setTimestamp(3, new Timestamp(System.currentTimeMillis()))
       preparedStatement.setString(4, id)
@@ -187,7 +178,7 @@ object DatasetRegistryService {
   def updateConnectorDisconnections(id: String, disconnections: Int): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     var preparedStatement: PreparedStatement = null
-    val query = "UPDATE dataset_source_config SET connector_stats = jsonb_set(coalesce(connector_stats, '{}'::jsonb), '{disconnections}', to_jsonb(?)) WHERE id = ?"
+    val query = "UPDATE dataset_source_config SET connector_stats = jsonb_set(coalesce(connector_stats, '{}')::jsonb, '{disconnections}', to_jsonb(?)) WHERE id = ?"
     try {
       preparedStatement = postgresConnect.prepareStatement(query)
       preparedStatement.setInt(1, disconnections)
@@ -202,11 +193,11 @@ object DatasetRegistryService {
   def updateConnectorAvgBatchReadTime(id: String, avgReadTime: Long): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     var preparedStatement: PreparedStatement = null
-    val query = "UPDATE dataset_source_config SET connector_stats = jsonb_set(coalesce(connector_stats, '{}'::jsonb), '{avg_batch_read_time}', to_jsonb(?)) WHERE id = ?"
+    val query = "UPDATE dataset_source_config SET connector_stats = jsonb_set(coalesce(connector_stats, '{}')::jsonb, '{avg_batch_read_time}', to_jsonb(?)) WHERE id = ?"
     try {
       preparedStatement = postgresConnect.prepareStatement(query)
-      preparedStatement.setLong(1, avgReadTime) // Set the avgReadTime parameter
-      preparedStatement.setString(2, id) // Set the id parameter
+      preparedStatement.setLong(1, avgReadTime)
+      preparedStatement.setString(2, id)
       postgresConnect.executeUpdate(preparedStatement)
     } finally {
       if (preparedStatement != null) preparedStatement.close()

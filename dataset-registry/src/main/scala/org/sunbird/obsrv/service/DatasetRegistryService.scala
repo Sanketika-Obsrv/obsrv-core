@@ -6,7 +6,7 @@ import org.sunbird.obsrv.model.DatasetModels._
 import org.sunbird.obsrv.model.{DatasetStatus, TransformMode}
 
 import java.io.File
-import java.sql.{PreparedStatement, ResultSet, SQLException, Timestamp}
+import java.sql.{PreparedStatement, ResultSet, Timestamp}
 
 object DatasetRegistryService {
   private val configFile = new File("/data/flink/conf/baseconfig.conf")

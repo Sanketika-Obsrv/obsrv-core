@@ -92,5 +92,7 @@ class SchemaValidator() extends java.io.Serializable {
   private def convertToJsonNode(data: Map[String, AnyRef]): JsonNode = {
     JSONUtil.convertValue(data)
   }
+
+
 }
 // $COVERAGE-ON$

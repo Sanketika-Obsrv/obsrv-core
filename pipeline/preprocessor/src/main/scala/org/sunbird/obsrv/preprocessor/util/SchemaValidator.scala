@@ -31,6 +31,7 @@ class SchemaValidator() extends java.io.Serializable {
   private val serialVersionUID = 8780940932759659175L
   private[this] val logger = LoggerFactory.getLogger(classOf[SchemaValidator])
   private[this] val schemaMap = mutable.Map[String, (JsonSchema, Boolean)]()
+
   // This creates a schema factory that will use Draft 2020-12 as the default if $schema is not specified
   // in the schema data. If $schema is specified in the schema data then that schema dialect will be used
   // instead and this version is ignored.
@@ -72,30 +73,14 @@ class SchemaValidator() extends java.io.Serializable {
   }
 
   def schemaFileExists(dataset: Dataset): Boolean = {
-    //println("schemaMap " + schemaMap)
     schemaMap.get(dataset.id).map(f => f._2).orElse(Some(false)).get
   }
 
   @throws[IOException]
   def validate(datasetId: String, event: Map[String, AnyRef]): Set[ValidationMessage] = {
-
     import scala.collection.JavaConverters._
     val schema = schemaMap.getOrElse(datasetId, throw new ObsrvException(ErrorConstants.JSON_SCHEMA_NOT_FOUND))._1
-    val messages = schema.validate(convertToJsonNode(event)).asScala.toSet
-    messages.foreach { message =>
-      println(s"Type: ${message.getType}")
-      println(s"Code: ${message.getCode}")
-      println(s"Message: ${message.getMessage}")
-      println(s"Instance Location: ${message.getInstanceLocation}")
-      println(s"Property: ${message.getProperty}")
-      println(s"Evaluation Path: ${message.getEvaluationPath}")
-      println(s"Schema Location: ${message.getSchemaLocation}")
-      println(s"Message Key: ${message.getMessageKey}")
-      println(s"Arguments: ${JSONUtil.serialize(message.getArguments)}")
-      println(s"Details: ${JSONUtil.serialize(message.getDetails)}")
-      println("-" * 40) // Separator for readability
-    }
-    messages
+    schema.validate(convertToJsonNode(event)).asScala.toSet
   }
 
   def getValidationMessages(validationMessages: Set[ValidationMessage]): List[ValidationMsg] = {
@@ -107,6 +92,5 @@ class SchemaValidator() extends java.io.Serializable {
   private def convertToJsonNode(data: Map[String, AnyRef]): JsonNode = {
     JSONUtil.convertValue(data)
   }
-
 }
 // $COVERAGE-ON$

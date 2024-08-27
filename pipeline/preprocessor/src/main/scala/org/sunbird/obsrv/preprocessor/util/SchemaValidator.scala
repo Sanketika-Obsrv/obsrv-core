@@ -63,11 +63,11 @@ class SchemaValidator() extends java.io.Serializable {
     try {
       val schemaValidatorsConfig = SchemaValidatorsConfig.builder().build()
       val jsonSchema = schemaFactory.getSchema(jsonSchemaStr, schemaValidatorsConfig)
-      jsonSchema.validate(convertToJsonNode(Map())) // Test validate to check if Schema is valid
+      jsonSchema.validate(convertToJsonNode(Map("pqr" -> "value"))) // Test validate to check if Schema is valid
       schemaMap.put(datasetId, (jsonSchema, true))
     } catch {
       case ex: Exception =>
-        println(s"SchemaValidator:loadJsonSchema() - Unable to parse the schema json for dataset: $datasetId", ex)
+        logger.error(s"SchemaValidator:loadJsonSchema() - Unable to parse the schema json for dataset: $datasetId", ex)
         throw new ObsrvException(ErrorConstants.INVALID_JSON_SCHEMA)
     }
   }

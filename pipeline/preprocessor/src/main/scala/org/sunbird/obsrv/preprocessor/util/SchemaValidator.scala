@@ -67,12 +67,12 @@ class SchemaValidator() extends java.io.Serializable {
         val jsonSchema = schemaFactory.getSchema(jsonSchemaStr, schemaValidatorsConfig)
         schemaMap.put(datasetId, (jsonSchema, true))
       } else {
-        println(s"SchemaValidator:loadJsonSchema() - Invalid Schema found for dataset : $datasetId, schema errors: $validationMessage")
+        logger.error(s"SchemaValidator:loadJsonSchema() - Invalid Schema found for dataset : $datasetId, schema errors: ${JSONUtil.serialize(validationMessage)}")
         throw new ObsrvException(ErrorConstants.INVALID_JSON_SCHEMA)
       }
     } catch {
       case ex: Exception =>
-        println(s"SchemaValidator:loadJsonSchema() - Unable to parse the schema json for dataset: $datasetId", ex)
+        logger.error(s"SchemaValidator:loadJsonSchema() - Unable to parse the schema json for dataset: $datasetId", ex)
         throw new ObsrvException(ErrorConstants.INVALID_JSON_SCHEMA)
     }
   }

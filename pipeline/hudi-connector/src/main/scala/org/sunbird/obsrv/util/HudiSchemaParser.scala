@@ -126,7 +126,7 @@ class HudiSchemaParser {
           }
       }
     }
-    logger.info("flattenedEventData: " + flattenedEventData)
+    // logger.debug("flattenedEventData: " + flattenedEventData)
     flattenedEventData
   }
 

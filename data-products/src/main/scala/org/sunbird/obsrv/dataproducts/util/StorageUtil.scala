@@ -48,4 +48,14 @@ object StorageUtil {
     config.getString("source.spec").replace("FILE_PATH", filePath)
   }
 
+  def getDate(retensionPeriod: Int): String  = {
+    val dt = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().minusDays(retensionPeriod)
+    val timestamp = dt.getMillis
+    dayPeriodFormat.print(dt)
+  }
+
+  def getDataSourceRefFormat(datasource: DataSource, date: String): String = {
+    datasource.datasource + '-' + date
+  }
+
 }

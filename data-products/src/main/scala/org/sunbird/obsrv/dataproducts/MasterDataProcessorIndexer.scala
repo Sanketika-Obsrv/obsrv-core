@@ -17,6 +17,7 @@ import org.sunbird.obsrv.registry.DatasetRegistry
 
 object MasterDataProcessorIndexer {
   private final val logger: Logger = LogManager.getLogger(MasterDataProcessorIndexer.getClass)
+  private final val defaultRetentionPeriodInDays:Int = 2
 
   @throws[ObsrvException]
   def processDataset(config: Config, dataset: Dataset, spark: SparkSession): Map[String, Long] = {
@@ -29,8 +30,10 @@ object MasterDataProcessorIndexer {
         submitIngestionTask(dataset.id, ingestionSpec, config)
         DatasetRegistry.updateDatasourceRef(datasource, paths.datasourceRef)
       }
-      if (!datasource.datasourceRef.equals(paths.datasourceRef)) {
-        deleteDataSource(dataset.id, datasource.datasourceRef, config)
+      val retentionPeriodInDays: Int = if (config.getInt("datasource.retention.period.days").isWhole()) defaultRetentionPeriodInDays else config.getInt("datasource.retention.period.days")
+      val unusedDataSource: String = StorageUtil.getDataSourceRefFormat(datasource, StorageUtil.getDate(retentionPeriodInDays))
+      if (!unusedDataSource.equals(paths.datasourceRef)) {
+        deleteDataSource(dataset.id, unusedDataSource, config)
       }
       Map("success_dataset_count" -> 1, "total_dataset_count" -> 1, "total_events_processed" -> eventsCount)
     }

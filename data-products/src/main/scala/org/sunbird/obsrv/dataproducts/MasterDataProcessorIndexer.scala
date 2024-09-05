@@ -30,7 +30,12 @@ object MasterDataProcessorIndexer {
         submitIngestionTask(dataset.id, ingestionSpec, config)
         DatasetRegistry.updateDatasourceRef(datasource, paths.datasourceRef)
       }
-      val retentionPeriodInDays: Int = if (config.getInt("datasource.retention.period.days").isWhole()) defaultRetentionPeriodInDays else config.getInt("datasource.retention.period.days")
+      val retentionPeriodInDays: Int =
+        if (config.hasPath("datasource.retention.period.days") && config.getInt("datasource.retention.period.days") != 0)
+          config.getInt("datasource.retention.period.days")
+        else
+          defaultRetentionPeriodInDays
+
       val unusedDataSource: String = StorageUtil.getDataSourceRefFormat(datasource, StorageUtil.getDate(retentionPeriodInDays))
       if (!unusedDataSource.equals(paths.datasourceRef)) {
         deleteDataSource(dataset.id, unusedDataSource, config)

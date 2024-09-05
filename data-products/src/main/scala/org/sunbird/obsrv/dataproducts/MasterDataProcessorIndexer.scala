@@ -91,7 +91,7 @@ object MasterDataProcessorIndexer {
   }
 
   def fetchDatasource(dataset: Dataset): DataSource = {
-    val datasources: List[DataSource] = DatasetRegistry.getDatasources(dataset.id).get.filter(ds => ds.`type`.toLowerCase() == "druid")
+    val datasources: List[DataSource] = DatasetRegistry.getDatasources(dataset.id)
     if (datasources.isEmpty) {
       throw new ObsrvException(ErrorConstants.ERR_DATASOURCE_NOT_FOUND)
     }

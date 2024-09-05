@@ -118,7 +118,7 @@ class HudiSchemaParser {
                   }
                   catch {
                     case ex: Exception =>
-                      logger.info("Hudi Schema Parser - Exception: ", ex.getMessage)
+                      // logger.debug("Hudi Schema Parser - Exception: ", ex.getMessage)
                       flattenedEventData.put(field.name, null)
                   }
 
@@ -126,7 +126,7 @@ class HudiSchemaParser {
           }
       }
     }
-    logger.info("flattenedEventData: " + flattenedEventData)
+    // logger.debug("flattenedEventData: " + flattenedEventData)
     flattenedEventData
   }
 

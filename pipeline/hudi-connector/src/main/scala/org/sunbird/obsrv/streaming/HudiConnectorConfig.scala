@@ -5,7 +5,6 @@ import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 import org.apache.flink.streaming.api.scala.OutputTag
 import org.apache.hudi.common.model.HoodieTableType
-import org.apache.hudi.configuration.FlinkOptions
 import org.sunbird.obsrv.core.streaming.BaseJobConfig
 
 import scala.collection.mutable
@@ -13,7 +12,6 @@ import scala.collection.mutable
 class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mutable.Map[String, AnyRef]](config, "Flink-Hudi-Connector") {
 
   implicit val mapTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeExtractor.getForClass(classOf[mutable.Map[String, AnyRef]])
-  implicit val stringTypeInfo: TypeInformation[String] = TypeExtractor.getForClass(classOf[String])
 
   override def inputTopic(): String = config.getString("kafka.input.topic")
 
@@ -41,13 +39,25 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
     else HoodieTableType.MERGE_ON_READ.name()
 
   val hudiBasePath: String = config.getString("hudi.table.base.path")
-  val hudiCompactionEnabled: Boolean = config.getBoolean("hudi.compaction.enabled")
-  val hudiWriteTasks: Int = config.getInt("hudi.write.tasks")
 
   val hmsEnabled: Boolean = if (config.hasPath("hudi.hms.enabled")) config.getBoolean("hudi.hms.enabled") else false
   val hmsUsername: String = config.getString("hudi.hms.database.username")
   val hmsPassword: String = config.getString("hudi.hms.database.password")
   val hmsDatabaseName: String = config.getString("hudi.hms.database.name")
   val hmsURI: String = config.getString("hudi.hms.uri")
+
+  val hudiWriteTasks: Int = config.getInt("hudi.write.tasks")
+  val hudiCompactionTasks: Int = config.getInt("hudi.compaction.tasks")
+  val hudiWriteBatchSize: Int = config.getInt("hudi.write.batch.size")
+  val deltaCommits: Int = config.getInt("hudi.delta.commits")
+  val compactionDeltaSeconds: Int = config.getInt("hudi.delta.seconds")
+  val compressionCodec: String = config.getString("hudi.compression.codec")
+  val hudiCompactionEnabled: Boolean = config.getBoolean("hudi.compaction.enabled")
+  val hudiMetadataEnabled: Boolean = config.getBoolean("hudi.metadata.enabled")
+  val hudiIndexType: String = config.getString("hudi.index.type")
+
+  // Memory
+  val hudiWriteTaskMemory: Int = config.getInt("hudi.write.task.max.memory")
+  val hudiCompactionTaskMemory: Int = config.getInt("hudi.write.compaction.max.memory")
 
 }

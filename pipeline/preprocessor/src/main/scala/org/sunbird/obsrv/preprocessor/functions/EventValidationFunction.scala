@@ -1,6 +1,6 @@
 package org.sunbird.obsrv.preprocessor.functions
 
-import com.github.fge.jsonschema.core.report.ProcessingReport
+import com.networknt.schema.ValidationMessage
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
@@ -63,7 +63,7 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
                             metrics: Metrics): Unit = {
     val event = msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]]
     if (schemaValidator.schemaFileExists(dataset)) {
-      val validationReport = schemaValidator.validate(dataset.id, event)
+      val validationReport: Set[ValidationMessage] = schemaValidator.validate(dataset.id, event)
       onValidationResult(dataset, msg, metrics, ctx, validationReport)
     } else {
       metrics.incCounter(dataset.id, config.validationSkipMetricsCount)
@@ -73,13 +73,13 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
 
   private def onValidationResult(dataset: Dataset, event: mutable.Map[String, AnyRef], metrics: Metrics,
                                  ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
-                                 validationReport: ProcessingReport): Unit = {
-    if (validationReport.isSuccess) {
+                                 validationReport: Set[ValidationMessage]): Unit = {
+    if (validationReport.isEmpty) {
       validationSuccess(dataset, event, metrics, ctx)
     } else {
-      val validationFailureMsgs = schemaValidator.getValidationMessages(report = validationReport)
+      val validationFailureMsgs = schemaValidator.getValidationMessages(validationReport)
       val validationFailureCount = validationFailureMsgs.size
-      val additionalFieldsCount = validationFailureMsgs.count(f => "additionalProperties".equals(f.keyword))
+      val additionalFieldsCount = validationFailureMsgs.count(f => "additionalProperties".equals(f.messageKey.getOrElse("")))
       if (validationFailureCount == additionalFieldsCount) {
         dataset.validationConfig.get.mode.get match {
           case ValidationMode.Strict =>
@@ -108,10 +108,10 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
 
   private def generateSystemEvents(dataset: Dataset, validationFailureMsgs: List[ValidationMsg], context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
 
-    val reqFailedCount = validationFailureMsgs.count(f => "required".equals(f.keyword))
-    val typeFailedCount = validationFailureMsgs.count(f => "type".equals(f.keyword))
-    val addTypeFailedCount = validationFailureMsgs.count(f => "additionalProperties".equals(f.keyword))
-    val unknownFailureCount = validationFailureMsgs.count(f => !List("type","required","additionalProperties").contains(f.keyword))
+    val reqFailedCount = validationFailureMsgs.count(f => "required".equals(f.messageKey.getOrElse("")))
+    val typeFailedCount = validationFailureMsgs.count(f => "type".equals(f.messageKey.getOrElse("")))
+    val addTypeFailedCount = validationFailureMsgs.count(f => "additionalProperties".equals(f.messageKey.getOrElse("")))
+    val unknownFailureCount = validationFailureMsgs.count(f => !List("type","required","additionalProperties").contains(f.messageKey.getOrElse("")))
     if (reqFailedCount > 0) {
       context.output(config.systemEventsOutputTag, getSystemEvent(dataset, FunctionalError.RequiredFieldsMissing, reqFailedCount))
     }
@@ -127,7 +127,7 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
 
     // Log the validation failure messages
     validationFailureMsgs.foreach(f => {
-      f.keyword match {
+      f.messageKey.getOrElse("") match {
         case "additionalProperties" =>
           logger.warn(s"SchemaValidator | Additional properties found | dataset=${dataset.id} | ValidationMessage=${JSONUtil.serialize(f)}")
         case "required" =>

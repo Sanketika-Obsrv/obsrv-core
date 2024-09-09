@@ -105,12 +105,12 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setBoolean(FlinkOptions.METADATA_ENABLED.key, config.hudiMetadataEnabled)
 
     conf.setDouble(FlinkOptions.WRITE_BATCH_SIZE.key, config.hudiWriteBatchSize)
-    conf.setInteger(FlinkOptions.COMPACTION_TASKS, config.downstreamOperatorsParallelism)
+    conf.setInteger(FlinkOptions.COMPACTION_TASKS, config.hudiCompactionTasks)
     conf.setBoolean(FlinkOptions.COMPACTION_SCHEDULE_ENABLED.key, config.hudiCompactionEnabled)
     conf.setInteger(FlinkOptions.WRITE_TASKS, config.downstreamOperatorsParallelism)
     conf.setInteger(FlinkOptions.COMPACTION_DELTA_COMMITS, config.deltaCommits)
     conf.setString(FlinkOptions.COMPACTION_TRIGGER_STRATEGY, FlinkOptions.NUM_OR_TIME)
-    conf.setInteger(FlinkOptions.COMPACTION_DELTA_SECONDS, config.compactionDeltaSeconds)
+    // conf.setInteger(FlinkOptions.COMPACTION_DELTA_SECONDS, config.compactionDeltaSeconds)
     conf.setBoolean(FlinkOptions.COMPACTION_ASYNC_ENABLED, true)
 
     conf.setString("hoodie.fs.atomic_creation.support", "s3a")

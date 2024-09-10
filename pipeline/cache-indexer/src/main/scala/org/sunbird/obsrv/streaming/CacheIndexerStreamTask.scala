@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
 import org.sunbird.obsrv.function.MasterDataProcessorFunction
-import org.sunbird.obsrv.model.DatasetType
+import org.sunbird.obsrv.model.{DatasetStatus, DatasetType}
 import org.sunbird.obsrv.pipeline.task.CacheIndexerConfig
 import org.sunbird.obsrv.registry.DatasetRegistry
 
@@ -31,6 +31,7 @@ class CacheIndexerStreamTask(config: CacheIndexerConfig, kafkaConnector: FlinkKa
   def process(env: StreamExecutionEnvironment): Unit = {
 
     val datasets = DatasetRegistry.getAllDatasets(Some(DatasetType.master.toString))
+      .filter(ds => ds.status.toString.equalsIgnoreCase(DatasetStatus.Live.toString))
     val datasetIds = datasets.map(f => f.id)
     val dataStream = getTopicMapDataStream(env, config, datasetIds, consumerSourceName = s"cache-indexer-consumer", kafkaConnector)
     processStream(dataStream)

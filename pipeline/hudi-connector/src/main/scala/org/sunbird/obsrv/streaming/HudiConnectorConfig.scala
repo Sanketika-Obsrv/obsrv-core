@@ -59,5 +59,6 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
   // Memory
   val hudiWriteTaskMemory: Int = config.getInt("hudi.write.task.max.memory")
   val hudiCompactionTaskMemory: Int = config.getInt("hudi.write.compaction.max.memory")
+  val hudiFsAtomicCreationSupport: String = config.getString("hudi.fs.atomic_creation.support")
 
 }

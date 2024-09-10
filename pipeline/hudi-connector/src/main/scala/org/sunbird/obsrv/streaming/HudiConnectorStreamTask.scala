@@ -113,7 +113,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setInteger(FlinkOptions.COMPACTION_DELTA_SECONDS, config.compactionDeltaSeconds)
     conf.setBoolean(FlinkOptions.COMPACTION_ASYNC_ENABLED, true)
 
-    conf.setString("hoodie.fs.atomic_creation.support", "s3a")
+    conf.setString("hoodie.fs.atomic_creation.support", config.hudiFsAtomicCreationSupport)
     conf.setString(FlinkOptions.HIVE_SYNC_TABLE_PROPERTIES, "hoodie.datasource.write.drop.partition.columns=true")
     conf.setBoolean(DROP_PARTITION_COLUMNS.key, true)
     conf.setBoolean(SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP.key(), true); // Enable dropping columns
@@ -135,7 +135,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       conf.setString("hive_sync.mode", "hms")
       conf.setBoolean("hive_sync.use_jdbc", false)
       conf.setString(FlinkOptions.HIVE_SYNC_METASTORE_URIS.key(), config.hmsURI)
-      conf.setString("hoodie.fs.atomic_creation.support", "s3a")
+      conf.setString("hoodie.fs.atomic_creation.support", config.hudiFsAtomicCreationSupport)
       conf.setBoolean(FlinkOptions.HIVE_SYNC_SUPPORT_TIMESTAMP, true)
     }
 

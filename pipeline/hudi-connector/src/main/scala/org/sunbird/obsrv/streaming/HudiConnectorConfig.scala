@@ -50,11 +50,13 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
   val hudiCompactionTasks: Int = config.getInt("hudi.compaction.tasks")
   val hudiWriteBatchSize: Int = config.getInt("hudi.write.batch.size")
   val deltaCommits: Int = config.getInt("hudi.delta.commits")
-  val compactionDeltaSeconds: Int = config.getInt("hudi.delta.seconds")
+  val metadataDeltaCommits: Int = config.getInt("hudi.metadata.delta.commits")
   val compressionCodec: String = config.getString("hudi.compression.codec")
   val hudiCompactionEnabled: Boolean = config.getBoolean("hudi.compaction.enabled")
   val hudiMetadataEnabled: Boolean = config.getBoolean("hudi.metadata.enabled")
-  val hudiIndexType: String = config.getString("hudi.index.type")
+  val writeLockProvider: String = config.getString("hudi.write.lock.provider")
+  val writeConcurrencyMode: String = config.getString("hudi.write.concurrency.mode")
+  val metadataColumnStatsEnabled: Boolean = config.getBoolean("hudi.metadata.index.column.stats.enabled")
 
   // Memory
   val hudiWriteTaskMemory: Int = config.getInt("hudi.write.task.max.memory")

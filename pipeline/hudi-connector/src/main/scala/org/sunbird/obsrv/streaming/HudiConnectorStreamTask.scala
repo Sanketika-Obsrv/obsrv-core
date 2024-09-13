@@ -68,7 +68,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
         Pipelines.clean(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
       }
     }.orElse(List(addDefaultOperator(env, config, kafkaConnector)))
-    env.execute("Flink-Hudi-Connector")
+    env.execute("Hudi-Connector")
   }
 
   def addDefaultOperator(env: StreamExecutionEnvironment, config: HudiConnectorConfig, kafkaConnector: FlinkKafkaConnector): DataStreamSink[mutable.Map[String, AnyRef]] = {
@@ -103,6 +103,11 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
   private def setHudiBaseConfigurations(conf: Configuration): Unit = {
     conf.setString(FlinkOptions.TABLE_TYPE.key, config.hudiTableType)
     conf.setBoolean(FlinkOptions.METADATA_ENABLED.key, config.hudiMetadataEnabled)
+    conf.setBoolean("hoodie.metadata.index.column.stats.enable", config.metadataColumnStatsEnabled)
+    conf.setString("hoodie.write.concurrency.mode", config.writeConcurrencyMode)
+    conf.setString("hoodie.write.lock.provider", config.writeLockProvider)
+    conf.setInteger(FlinkOptions.METADATA_COMPACTION_DELTA_COMMITS, config.metadataDeltaCommits)
+    conf.setBoolean(FlinkOptions.CLEAN_ASYNC_ENABLED, false)
 
     conf.setDouble(FlinkOptions.WRITE_BATCH_SIZE.key, config.hudiWriteBatchSize)
     conf.setInteger(FlinkOptions.COMPACTION_TASKS, config.hudiCompactionTasks)
@@ -110,7 +115,6 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setInteger(FlinkOptions.WRITE_TASKS, config.downstreamOperatorsParallelism)
     conf.setInteger(FlinkOptions.COMPACTION_DELTA_COMMITS, config.deltaCommits)
     conf.setString(FlinkOptions.COMPACTION_TRIGGER_STRATEGY, FlinkOptions.NUM_OR_TIME)
-    // conf.setInteger(FlinkOptions.COMPACTION_DELTA_SECONDS, config.compactionDeltaSeconds)
     conf.setBoolean(FlinkOptions.COMPACTION_ASYNC_ENABLED, true)
 
     conf.setString("hoodie.fs.atomic_creation.support", "s3a")
@@ -122,7 +126,6 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     conf.setString("hoodie.parquet.compression.codec", config.compressionCodec)
 
     // Index Type Configurations
-    conf.setString(FlinkOptions.INDEX_TYPE, config.hudiIndexType)
     conf.setInteger(FlinkOptions.BUCKET_ASSIGN_TASKS, config.downstreamOperatorsParallelism)
     conf.setDouble(FlinkOptions.WRITE_TASK_MAX_SIZE, config.hudiWriteTaskMemory)
     conf.setInteger(FlinkOptions.COMPACTION_MAX_MEMORY, config.hudiCompactionTaskMemory)

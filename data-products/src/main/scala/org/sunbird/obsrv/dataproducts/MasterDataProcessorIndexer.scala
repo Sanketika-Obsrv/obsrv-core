@@ -17,7 +17,7 @@ import org.sunbird.obsrv.registry.DatasetRegistry
 
 object MasterDataProcessorIndexer {
   private final val logger: Logger = LogManager.getLogger(MasterDataProcessorIndexer.getClass)
-  private final val defaultRetentionPeriodInDays:Int = 2
+  private final val defaultRetentionPeriodInDays: Int = 2
 
   @throws[ObsrvException]
   def processDataset(config: Config, dataset: Dataset, spark: SparkSession): Map[String, Long] = {

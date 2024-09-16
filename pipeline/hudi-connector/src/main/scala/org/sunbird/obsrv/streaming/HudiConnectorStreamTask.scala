@@ -6,6 +6,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.configuration.Configuration
+import org.apache.flink.contrib.streaming.state.EmbeddedRocksDBStateBackend
 import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSink}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.hudi.common.config.TimestampKeyGeneratorConfig
@@ -16,12 +17,13 @@ import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
-import org.sunbird.obsrv.functions.RowDataConverterFunction
+import org.sunbird.obsrv.function.RowDataConverterFunction
 import org.sunbird.obsrv.registry.DatasetRegistry
 import org.sunbird.obsrv.util.HudiSchemaParser
 import org.apache.hudi.config.HoodieWriteConfig.SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP
 import org.apache.hudi.common.config.HoodieCommonConfig.SCHEMA_EVOLUTION_ENABLE
 import org.apache.hudi.common.table.HoodieTableConfig.DROP_PARTITION_COLUMNS
+
 import java.io.File
 import java.sql.Timestamp
 import java.time.LocalDateTime
@@ -35,6 +37,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
   private val logger = LoggerFactory.getLogger(classOf[HudiConnectorStreamTask])
   def process(): Unit = {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
+    env.setStateBackend(new EmbeddedRocksDBStateBackend)
     process(env)
   }
 
@@ -49,6 +52,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       val datasetId = dataSource.datasetId
       val dataStream = getMapDataStream(env, config, List(datasetId), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
         .map(new RowDataConverterFunction(config, datasetId))
+        .setParallelism(config.downstreamOperatorsParallelism)
 
       val conf: Configuration = new Configuration()
       setHudiBaseConfigurations(conf)
@@ -59,11 +63,10 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)
       val pipeline = Pipelines.hoodieStreamWrite(conf, hoodieRecordDataStream)
       if (OptionsResolver.needsAsyncCompaction(conf)) {
-        Pipelines.compact(conf, pipeline)
+        Pipelines.compact(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
       } else {
-        Pipelines.clean(conf, pipeline)
+        Pipelines.clean(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
       }
-
     }.orElse(List(addDefaultOperator(env, config, kafkaConnector)))
     env.execute("Flink-Hudi-Connector")
   }
@@ -99,21 +102,30 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
 
   private def setHudiBaseConfigurations(conf: Configuration): Unit = {
     conf.setString(FlinkOptions.TABLE_TYPE.key, config.hudiTableType)
-    conf.setBoolean(FlinkOptions.METADATA_ENABLED.key, true)
-    conf.setDouble(FlinkOptions.WRITE_BATCH_SIZE.key, 0.1)
+    conf.setBoolean(FlinkOptions.METADATA_ENABLED.key, config.hudiMetadataEnabled)
+
+    conf.setDouble(FlinkOptions.WRITE_BATCH_SIZE.key, config.hudiWriteBatchSize)
+    conf.setInteger(FlinkOptions.COMPACTION_TASKS, config.downstreamOperatorsParallelism)
     conf.setBoolean(FlinkOptions.COMPACTION_SCHEDULE_ENABLED.key, config.hudiCompactionEnabled)
-    conf.setInteger("write.tasks", config.hudiWriteTasks)
-    conf.setInteger(FlinkOptions.COMPACTION_DELTA_COMMITS, 2)
-    conf.setString(FlinkOptions.COMPACTION_TRIGGER_STRATEGY, "num_or_time")
+    conf.setInteger(FlinkOptions.WRITE_TASKS, config.downstreamOperatorsParallelism)
+    conf.setInteger(FlinkOptions.COMPACTION_DELTA_COMMITS, config.deltaCommits)
+    conf.setString(FlinkOptions.COMPACTION_TRIGGER_STRATEGY, FlinkOptions.NUM_OR_TIME)
+    conf.setInteger(FlinkOptions.COMPACTION_DELTA_SECONDS, config.compactionDeltaSeconds)
     conf.setBoolean(FlinkOptions.COMPACTION_ASYNC_ENABLED, true)
-    conf.setInteger(FlinkOptions.BUCKET_ASSIGN_TASKS, 1)
-    conf.setInteger(FlinkOptions.COMPACTION_TASKS, 1)
-    conf.setString("hoodie.fs.atomic_creation.support", "s3a")
+
+    conf.setString("hoodie.fs.atomic_creation.support", config.hudiFsAtomicCreationSupport)
     conf.setString(FlinkOptions.HIVE_SYNC_TABLE_PROPERTIES, "hoodie.datasource.write.drop.partition.columns=true")
     conf.setBoolean(DROP_PARTITION_COLUMNS.key, true)
     conf.setBoolean(SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP.key(), true); // Enable dropping columns
     conf.setBoolean(SCHEMA_EVOLUTION_ENABLE.key(), true); // Enable schema evolution
     conf.setString(FlinkOptions.PAYLOAD_CLASS_NAME, "org.apache.hudi.common.model.PartialUpdateAvroPayload")
+    conf.setString("hoodie.parquet.compression.codec", config.compressionCodec)
+
+    // Index Type Configurations
+    conf.setString(FlinkOptions.INDEX_TYPE, config.hudiIndexType)
+    conf.setInteger(FlinkOptions.BUCKET_ASSIGN_TASKS, config.downstreamOperatorsParallelism)
+    conf.setDouble(FlinkOptions.WRITE_TASK_MAX_SIZE, config.hudiWriteTaskMemory)
+    conf.setInteger(FlinkOptions.COMPACTION_MAX_MEMORY, config.hudiCompactionTaskMemory)
 
     if (config.hmsEnabled) {
       conf.setBoolean("hive_sync.enabled", config.hmsEnabled)
@@ -123,7 +135,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       conf.setString("hive_sync.mode", "hms")
       conf.setBoolean("hive_sync.use_jdbc", false)
       conf.setString(FlinkOptions.HIVE_SYNC_METASTORE_URIS.key(), config.hmsURI)
-      conf.setString("hoodie.fs.atomic_creation.support", "s3a")
+      conf.setString("hoodie.fs.atomic_creation.support", config.hudiFsAtomicCreationSupport)
       conf.setBoolean(FlinkOptions.HIVE_SYNC_SUPPORT_TIMESTAMP, true)
     }
 

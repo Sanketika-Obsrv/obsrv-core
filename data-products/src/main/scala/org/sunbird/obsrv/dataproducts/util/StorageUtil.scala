@@ -38,7 +38,7 @@ object StorageUtil {
     val cloudPrefix = provider.sparkURIFormat + config.getString("cloud.storage.container")
     val pathSuffix = s"""masterdata-indexer/${datasource.datasetId}/$date/"""
     val ingestionPath = cloudPrefix.replace(provider.sparkURIFormat, provider.druidURIFormat) + pathSuffix
-    val datasourceRef = datasource.datasource + '-' + date
+    val datasourceRef =  this.getDataSourceRefFormat(datasource, date)
     val outputFilePath = cloudPrefix + pathSuffix
     Paths(datasourceRef, ingestionPath, outputFilePath, timestamp)
   }
@@ -46,6 +46,15 @@ object StorageUtil {
   // This method provides appropriate input source spec depending on the cloud storage provider
   def getInputSourceSpec(filePath: String, config: Config): String = {
     config.getString("source.spec").replace("FILE_PATH", filePath)
+  }
+
+  def getDate(retensionPeriod: Int): String  = {
+    val dt = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().minusDays(retensionPeriod)
+    dayPeriodFormat.print(dt)
+  }
+
+  def getDataSourceRefFormat(datasource: DataSource, date: String): String = {
+    datasource.datasource + '-' + date
   }
 
 }

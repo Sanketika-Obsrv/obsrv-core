@@ -192,7 +192,7 @@
                             </filters>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>in.sanketika.obsrv.pipeline.task.UnifiedPipelineStreamTask</mainClass>
+                                    <mainClass>org.sunbird.obsrv.pipeline.task.UnifiedPipelineStreamTask</mainClass>
                                 </transformer>
                                 <!-- append default configs -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">

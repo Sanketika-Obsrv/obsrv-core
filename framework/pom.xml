@@ -20,7 +20,7 @@
 		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
 		<release-version>release-4.6.0</release-version>
         <!-- <jackson-bom.version>2.13.4.20221013</jackson-bom.version> -->
-        <jackson-bom.version>2.15.2</jackson-bom.version>
+        <jackson-bom.version>2.17.2</jackson-bom.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -43,6 +43,12 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-kafka</artifactId>
             <version>${flink.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.kafka</groupId>
+                    <artifactId>kafka-clients</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
@@ -77,6 +83,14 @@
                 <exclusion>
                     <groupId>com.fasterxml.jackson.core</groupId>
                     <artifactId>jackson-databind</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-annotations</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

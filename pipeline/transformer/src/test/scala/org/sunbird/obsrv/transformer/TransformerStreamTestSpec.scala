@@ -2,12 +2,11 @@ package org.sunbird.obsrv.transformer
 
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+import org.apache.flink.runtime.testutils.{InMemoryReporter, MiniClusterResourceConfiguration}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model._
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
@@ -15,15 +14,13 @@ import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, PostgresConnect}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 import org.sunbird.obsrv.transformer.task.{TransformerConfig, TransformerStreamTask}
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
+  private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
-    .setConfiguration(testConfiguration())
+    .setConfiguration(metricsReporter.addToConfiguration(new Configuration()))
     .setNumberSlotsPerTaskManager(1)
     .setNumberTaskManagers(1)
     .build)
@@ -40,16 +37,8 @@ class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
     )
   implicit val deserializer: StringDeserializer = new StringDeserializer()
 
-  def testConfiguration(): Configuration = {
-    val config = new Configuration()
-    config.setString("metrics.reporter", "job_metrics_reporter")
-    config.setString("metrics.reporter.job_metrics_reporter.class", classOf[BaseMetricsReporter].getName)
-    config
-  }
-
   override def beforeAll(): Unit = {
     super.beforeAll()
-    BaseMetricsReporter.gaugeMetrics.clear()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     insertTestData()
     createTestTopics()
@@ -94,9 +83,7 @@ class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(transformerConfig)
     val task = new TransformerStreamTask(transformerConfig, kafkaConnector)
     task.process(env)
-    Future {
-      env.execute(transformerConfig.jobName)
-    }
+    env.executeAsync(transformerConfig.jobName)
 
     val outputs = EmbeddedKafka.consumeNumberMessagesFrom[String](transformerConfig.kafkaTransformTopic, 3, timeout = 30.seconds)
     validateOutputs(outputs)
@@ -107,10 +94,7 @@ class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](transformerConfig.kafkaSystemTopic, 5, timeout = 30.seconds)
     validateSystemEvents(systemEvents)
 
-    val mutableMetricsMap = mutable.Map[String, Long]()
-    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### DenormalizerStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
-    validateMetrics(mutableMetricsMap)
+    validateMetrics(metricsReporter)
 
     transformerConfig.successTag().getId should be("transformed-events")
   }
@@ -150,9 +134,9 @@ class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
         val event = msg(Constants.EVENT).asInstanceOf[String]
         val obsrvMeta = msg(Constants.OBSRV_META).asInstanceOf[Map[String, AnyRef]]
         obsrvMeta("timespans").asInstanceOf[Map[String, AnyRef]]("transformer").asInstanceOf[Int] should be > 0
-        obsrvMeta("flags").asInstanceOf[Map[String, AnyRef]]("transformer").asInstanceOf[String] should be (StatusCode.failed.toString)
-        obsrvMeta("error").asInstanceOf[Map[String, AnyRef]]("src").asInstanceOf[String] should be (Producer.transformer.toString)
-        obsrvMeta("error").asInstanceOf[Map[String, AnyRef]]("error_code").asInstanceOf[String] should be (ErrorConstants.ERR_TRANSFORMATION_FAILED.errorCode)
+        obsrvMeta("flags").asInstanceOf[Map[String, AnyRef]]("transformer").asInstanceOf[String] should be(StatusCode.failed.toString)
+        obsrvMeta("error").asInstanceOf[Map[String, AnyRef]]("src").asInstanceOf[String] should be(Producer.transformer.toString)
+        obsrvMeta("error").asInstanceOf[Map[String, AnyRef]]("error_code").asInstanceOf[String] should be(ErrorConstants.ERR_TRANSFORMATION_FAILED.errorCode)
         idx match {
           case 0 =>
             event should be("{\"event\":{\"dealer\":{\"maskedPhone\":\"98******45\",\"locationId\":\"KUN1\",\"dealerCode\":\"D123\",\"phone\":\"9849012345\"},\"vehicleCode\":\"HYUN-CRE-D6\",\"id\":\"1235\",\"date\":\"2023-03-01\",\"metrics\":{\"bookingsTaken\":50,\"deliveriesPromised\":20,\"deliveriesDone\":19}},\"dataset\":\"d1\"}")
@@ -211,19 +195,24 @@ class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
      */
   }
 
-  private def validateMetrics(mutableMetricsMap: mutable.Map[String, Long]): Unit = {
-    mutableMetricsMap(s"${transformerConfig.jobName}.d1.${transformerConfig.totalEventCount}") should be(2)
-    mutableMetricsMap(s"${transformerConfig.jobName}.d1.${transformerConfig.transformSuccessCount}") should be(1)
-    mutableMetricsMap(s"${transformerConfig.jobName}.d1.${transformerConfig.transformFailedCount}") should be(1)
+  private def validateMetrics(metricsReporter: InMemoryReporter): Unit = {
 
-    mutableMetricsMap(s"${transformerConfig.jobName}.d2.${transformerConfig.totalEventCount}") should be(1)
-    mutableMetricsMap(s"${transformerConfig.jobName}.d2.${transformerConfig.transformPartialCount}") should be(1)
+    val d1Metrics = getMetrics(metricsReporter, "d1")
+    d1Metrics(transformerConfig.totalEventCount) should be(2)
+    d1Metrics(transformerConfig.transformSuccessCount) should be(1)
+    d1Metrics(transformerConfig.transformFailedCount) should be(1)
 
-    mutableMetricsMap(s"${transformerConfig.jobName}.d3.${transformerConfig.totalEventCount}") should be(1)
-    mutableMetricsMap(s"${transformerConfig.jobName}.d3.${transformerConfig.transformSkippedCount}") should be(1)
+    val d2Metrics = getMetrics(metricsReporter, "d2")
+    d2Metrics(transformerConfig.totalEventCount) should be(1)
+    d2Metrics(transformerConfig.transformPartialCount) should be(1)
 
-    mutableMetricsMap(s"${transformerConfig.jobName}.d4.${transformerConfig.totalEventCount}") should be(1)
-    mutableMetricsMap(s"${transformerConfig.jobName}.d4.${transformerConfig.transformFailedCount}") should be(1)
+    val d3Metrics = getMetrics(metricsReporter, "d3")
+    d3Metrics(transformerConfig.totalEventCount) should be(1)
+    d3Metrics(transformerConfig.transformSkippedCount) should be(1)
+
+    val d4Metrics = getMetrics(metricsReporter, "d4")
+    d4Metrics(transformerConfig.totalEventCount) should be(1)
+    d4Metrics(transformerConfig.transformFailedCount) should be(1)
   }
 
 }

@@ -2,12 +2,11 @@ package org.sunbird.obsrv.router
 
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+import org.apache.flink.runtime.testutils.{InMemoryReporter, MiniClusterResourceConfiguration}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model._
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
@@ -15,15 +14,13 @@ import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, PostgresConnect}
 import org.sunbird.obsrv.router.task.{DynamicRouterConfig, DynamicRouterStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
+  private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
-    .setConfiguration(testConfiguration())
+    .setConfiguration(metricsReporter.addToConfiguration(new Configuration()))
     .setNumberSlotsPerTaskManager(1)
     .setNumberTaskManagers(1)
     .build)
@@ -39,16 +36,8 @@ class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     )
   implicit val deserializer: StringDeserializer = new StringDeserializer()
 
-  def testConfiguration(): Configuration = {
-    val config = new Configuration()
-    config.setString("metrics.reporter", "job_metrics_reporter")
-    config.setString("metrics.reporter.job_metrics_reporter.class", classOf[BaseMetricsReporter].getName)
-    config
-  }
-
   override def beforeAll(): Unit = {
     super.beforeAll()
-    BaseMetricsReporter.gaugeMetrics.clear()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     val postgresConnect = new PostgresConnect(postgresConfig)
     insertTestData(postgresConnect)
@@ -86,9 +75,7 @@ class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(routerConfig)
     val task = new DynamicRouterStreamTask(routerConfig, kafkaConnector)
     task.process(env)
-    Future {
-      env.execute(routerConfig.jobName)
-    }
+    env.executeAsync(routerConfig.jobName)
 
     val outputs = EmbeddedKafka.consumeNumberMessagesFrom[String]("d1-events", 1, timeout = 30.seconds)
     validateOutputs(outputs)
@@ -99,10 +86,7 @@ class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](routerConfig.kafkaSystemTopic, 2, timeout = 30.seconds)
     validateSystemEvents(systemEvents)
 
-    val mutableMetricsMap = mutable.Map[String, Long]()
-    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### DynamicRouterStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
-    validateMetrics(mutableMetricsMap)
+    validateMetrics(metricsReporter)
   }
 
   private def validateOutputs(outputs: List[String]): Unit = {
@@ -142,7 +126,7 @@ class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
       event.ctx.pdata.id should be(routerConfig.jobName)
       event.ctx.pdata.`type` should be(PDataType.flink)
       event.ctx.pdata.pid.get should be(Producer.router)
-      if(event.data.error.isDefined) {
+      if (event.data.error.isDefined) {
         val errorLog = event.data.error.get
         errorLog.error_level should be(ErrorLevel.critical)
         errorLog.pdata_id should be(Producer.router)
@@ -152,20 +136,25 @@ class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
         errorLog.error_message should be(ErrorConstants.INDEX_KEY_MISSING_OR_BLANK.errorMsg)
         errorLog.error_type should be(FunctionalError.MissingTimestampKey)
       } else {
-        event.data.pipeline_stats.isDefined should be (true)
-        event.data.pipeline_stats.get.latency_time.isDefined should be (true)
-        event.data.pipeline_stats.get.processing_time.isDefined should be (true)
-        event.data.pipeline_stats.get.total_processing_time.isDefined should be (true)
+        event.data.pipeline_stats.isDefined should be(true)
+        event.data.pipeline_stats.get.latency_time.isDefined should be(true)
+        event.data.pipeline_stats.get.processing_time.isDefined should be(true)
+        event.data.pipeline_stats.get.total_processing_time.isDefined should be(true)
       }
 
     })
   }
 
-  private def validateMetrics(mutableMetricsMap: mutable.Map[String, Long]): Unit = {
-    mutableMetricsMap(s"${routerConfig.jobName}.d1.${routerConfig.routerTotalCount}") should be(1)
-    mutableMetricsMap(s"${routerConfig.jobName}.d1.${routerConfig.routerSuccessCount}") should be(1)
-    mutableMetricsMap(s"${routerConfig.jobName}.d2.${routerConfig.routerTotalCount}") should be(1)
-    mutableMetricsMap(s"${routerConfig.jobName}.d2.${routerConfig.eventFailedMetricsCount}") should be(1)
+  private def validateMetrics(metricsReporter: InMemoryReporter): Unit = {
+
+    val d1Metrics = getMetrics(metricsReporter, "d1")
+    d1Metrics(routerConfig.routerTotalCount) should be(1)
+    d1Metrics(routerConfig.routerSuccessCount) should be(1)
+
+    val d2Metrics = getMetrics(metricsReporter, "d2")
+    d2Metrics(routerConfig.routerTotalCount) should be(1)
+    d2Metrics(routerConfig.eventFailedMetricsCount) should be(1)
+
   }
 
 }

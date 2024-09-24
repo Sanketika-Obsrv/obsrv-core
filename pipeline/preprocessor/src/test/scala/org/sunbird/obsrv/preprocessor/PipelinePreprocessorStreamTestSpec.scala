@@ -2,12 +2,11 @@ package org.sunbird.obsrv.preprocessor
 
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+import org.apache.flink.runtime.testutils.{InMemoryReporter, MiniClusterResourceConfiguration}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.model.Models.SystemEvent
@@ -17,15 +16,13 @@ import org.sunbird.obsrv.preprocessor.fixture.EventFixtures
 import org.sunbird.obsrv.preprocessor.task.{PipelinePreprocessorConfig, PipelinePreprocessorStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
+  private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
-    .setConfiguration(testConfiguration())
+    .setConfiguration(metricsReporter.addToConfiguration(new Configuration()))
     .setNumberSlotsPerTaskManager(1)
     .setNumberTaskManagers(1)
     .build)
@@ -41,16 +38,8 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     )
   implicit val deserializer: StringDeserializer = new StringDeserializer()
 
-  def testConfiguration(): Configuration = {
-    val config = new Configuration()
-    config.setString("metrics.reporter", "job_metrics_reporter")
-    config.setString("metrics.reporter.job_metrics_reporter.class", classOf[BaseMetricsReporter].getName)
-    config
-  }
-
   override def beforeAll(): Unit = {
     super.beforeAll()
-    BaseMetricsReporter.gaugeMetrics.clear()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     prepareTestData()
     createTestTopics()
@@ -79,8 +68,8 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, router_config, dataset_config, status, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d4', 'dataset', '" + """{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string"},"vehicleCode":{"type":"string"},"date":{"type":"string"},"dealer":{"type":"object","properties":{"dealerCode":{"type":"string"},"locationId":{"type":"string"},"email":{"type":"string"},"phone":{"type":"string"}},"additionalProperties":false,"required":["dealerCode","locationId"]},"metrics":{"type":"object","properties":{"bookingsTaken":{"type":"integer"},"deliveriesPromised":{"type":"integer"},"deliveriesDone":{"type":"integer"}},"additionalProperties":false}},"additionalProperties":false,"required":["id","vehicleCode","date"]}""" + "', '{\"validate\": true, \"mode\": \"Strict\"}', '{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'v1', 'ingest', 'System', 'System', now(), now());")
     postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, router_config, dataset_config, status, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d5', 'dataset', '" + """{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string"},"vehicleCode":{"type":"string"},"date":{"type":"string"},"dealer":{"type":"object","properties":{"dealerCode":{"type":"string"},"locationId":{"type":"string"},"email":{"type":"string"},"phone":{"type":"string"}},"additionalProperties":false,"required":["dealerCode","locationId"]},"metrics":{"type":"object","properties":{"bookingsTaken":{"type":"integer"},"deliveriesPromised":{"type":"integer"},"deliveriesDone":{"type":"integer"}},"additionalProperties":false}},"additionalProperties":false,"required":["id","vehicleCode","date"]}""" + "', '{\"validate\": true, \"mode\": \"IgnoreNewFields\"}', '{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'v1', 'ingest', 'System', 'System', now(), now());")
     postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, router_config, dataset_config, status, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d6', 'dataset', '" + """{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","maxLength":5},"vehicleCode":{"type":"string"},"date":{"type":"string"},"dealer":{"type":"object","properties":{"dealerCode":{"type":"string"},"locationId":{"type":"string"},"email":{"type":"string"},"phone":{"type":"string"}},"additionalProperties":false,"required":["dealerCode","locationId"]},"metrics":{"type":"object","properties":{"bookingsTaken":{"type":"integer"},"deliveriesPromised":{"type":"integer"},"deliveriesDone":{"type":"integer"}},"additionalProperties":false}},"additionalProperties":false,"required":["id","vehicleCode","date"]}""" + "', '{\"validate\": true, \"mode\": \"DiscardNewFields\"}', '{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'v1', 'ingest', 'System', 'System', now(), now());")
-    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, router_config, dataset_config, status, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d7', 'dataset', '"+EventFixtures.INVALID_SCHEMA+"', '{\"validate\": true, \"mode\": \"Strict\"}','{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'v1', 'ingest', 'System', 'System', now(), now());")
-    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, extraction_config, dedup_config, router_config, dataset_config, status, data_version, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d8', 'dataset', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"validate\": false, \"mode\": \"Strict\"}', '{\"is_batch_event\": true, \"extraction_key\": \"events\", \"dedup_config\": {\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}}', '{\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}', '{\"topic\":\"d1-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":"+config.getInt("redis.port")+",\"redis_db\":2}', 'Live', 2, 'v1', 'ingest', 'System', 'System', now(), now());")
+    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, router_config, dataset_config, status, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d7', 'dataset', '" + EventFixtures.INVALID_SCHEMA + "', '{\"validate\": true, \"mode\": \"Strict\"}','{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'v1', 'ingest', 'System', 'System', now(), now());")
+    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, extraction_config, dedup_config, router_config, dataset_config, status, data_version, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d8', 'dataset', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"validate\": false, \"mode\": \"Strict\"}', '{\"is_batch_event\": true, \"extraction_key\": \"events\", \"dedup_config\": {\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}}', '{\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}', '{\"topic\":\"d1-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":" + config.getInt("redis.port") + ",\"redis_db\":2}', 'Live', 2, 'v1', 'ingest', 'System', 'System', now(), now());")
     postgresConnect.closeConnection()
   }
 
@@ -103,10 +92,8 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(pConfig)
     val task = new PipelinePreprocessorStreamTask(pConfig, kafkaConnector)
     task.process(env)
-    Future {
-      env.execute(pConfig.jobName)
-      Thread.sleep(5000)
-    }
+    env.executeAsync(pConfig.jobName)
+
     val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaUniqueTopic, 5, timeout = 30.seconds)
     val invalidEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaInvalidTopic, 7, timeout = 30.seconds)
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSystemTopic, 8, timeout = 30.seconds)
@@ -114,11 +101,7 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     validateOutputEvents(outputEvents)
     validateInvalidEvents(invalidEvents)
     validateSystemEvents(systemEvents)
-
-    val mutableMetricsMap = mutable.Map[String, Long]()
-    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### PipelinePreprocessorStreamTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
-    validateMetrics(mutableMetricsMap)
+    validateMetrics(metricsReporter)
 
   }
 
@@ -177,44 +160,55 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
      */
   }
 
-  private def validateMetrics(mutableMetricsMap: mutable.Map[String, Long]): Unit = {
-    mutableMetricsMap(s"${pConfig.jobName}.ALL.${pConfig.eventFailedMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.dX.${pConfig.eventFailedMetricsCount}") should be(1)
+  private def validateMetrics(metricsReporter: InMemoryReporter): Unit = {
+    val allMetrics = getMetrics(metricsReporter, "ALL")
+    allMetrics(pConfig.eventFailedMetricsCount) should be(1)
 
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.validationFailureMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.duplicationProcessedEventMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.duplicationEventMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.validationSuccessMetricsCount}") should be(2)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.validationTotalMetricsCount}") should be(3)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.duplicationTotalMetricsCount}") should be(2)
+    val dxMetrics = getMetrics(metricsReporter, "dX")
+    dxMetrics(pConfig.eventFailedMetricsCount) should be(1)
 
-    mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.duplicationSkippedEventMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.validationSkipMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.eventFailedMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.validationTotalMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d2.${pConfig.duplicationTotalMetricsCount}") should be(1)
+    val d1Metrics = getMetrics(metricsReporter, "d1")
+    d1Metrics(pConfig.validationFailureMetricsCount) should be(1)
+    d1Metrics(pConfig.duplicationProcessedEventMetricsCount) should be(1)
+    d1Metrics(pConfig.duplicationEventMetricsCount) should be(1)
+    d1Metrics(pConfig.validationSuccessMetricsCount) should be(2)
+    d1Metrics(pConfig.validationTotalMetricsCount) should be(3)
+    d1Metrics(pConfig.duplicationTotalMetricsCount) should be(2)
 
-    mutableMetricsMap(s"${pConfig.jobName}.d3.${pConfig.validationTotalMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d3.${pConfig.eventIgnoredMetricsCount}") should be(1)
+    val d2Metrics = getMetrics(metricsReporter, "d2")
+    d2Metrics(pConfig.duplicationSkippedEventMetricsCount) should be(1)
+    d2Metrics(pConfig.validationSkipMetricsCount) should be(1)
+    d2Metrics(pConfig.eventFailedMetricsCount) should be(1)
+    d2Metrics(pConfig.validationTotalMetricsCount) should be(1)
+    d2Metrics(pConfig.duplicationTotalMetricsCount) should be(1)
 
-    mutableMetricsMap(s"${pConfig.jobName}.d4.${pConfig.validationTotalMetricsCount}") should be(2)
-    mutableMetricsMap(s"${pConfig.jobName}.d4.${pConfig.validationFailureMetricsCount}") should be(2)
+    val d3Metrics = getMetrics(metricsReporter, "d3")
+    d3Metrics(pConfig.validationTotalMetricsCount) should be(1)
+    d3Metrics(pConfig.eventIgnoredMetricsCount) should be(1)
 
-    mutableMetricsMap(s"${pConfig.jobName}.d5.${pConfig.validationTotalMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d5.${pConfig.validationSuccessMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d5.${pConfig.duplicationTotalMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d5.${pConfig.duplicationSkippedEventMetricsCount}") should be(1)
+    val d4Metrics = getMetrics(metricsReporter, "d4")
+    d4Metrics(pConfig.validationTotalMetricsCount) should be(2)
+    d4Metrics(pConfig.validationFailureMetricsCount) should be(2)
 
-    mutableMetricsMap(s"${pConfig.jobName}.d6.${pConfig.validationTotalMetricsCount}") should be(2)
-    mutableMetricsMap(s"${pConfig.jobName}.d6.${pConfig.validationSuccessMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d6.${pConfig.validationFailureMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d6.${pConfig.duplicationTotalMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d6.${pConfig.duplicationSkippedEventMetricsCount}") should be(1)
+    val d5Metrics = getMetrics(metricsReporter, "d5")
+    d5Metrics(pConfig.validationTotalMetricsCount) should be(1)
+    d5Metrics(pConfig.validationSuccessMetricsCount) should be(1)
+    d5Metrics(pConfig.duplicationTotalMetricsCount) should be(1)
+    d5Metrics(pConfig.duplicationSkippedEventMetricsCount) should be(1)
 
-    mutableMetricsMap(s"${pConfig.jobName}.d8.${pConfig.validationTotalMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d8.${pConfig.validationSkipMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d8.${pConfig.duplicationTotalMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d8.${pConfig.duplicationProcessedEventMetricsCount}") should be(1)
+    val d6Metrics = getMetrics(metricsReporter, "d6")
+    d6Metrics(pConfig.validationTotalMetricsCount) should be(2)
+    d6Metrics(pConfig.validationSuccessMetricsCount) should be(1)
+    d6Metrics(pConfig.validationFailureMetricsCount) should be(1)
+    d6Metrics(pConfig.duplicationTotalMetricsCount) should be(1)
+    d6Metrics(pConfig.duplicationSkippedEventMetricsCount) should be(1)
+
+    val d8Metrics = getMetrics(metricsReporter, "d8")
+    d8Metrics(pConfig.validationTotalMetricsCount) should be(1)
+    d8Metrics(pConfig.validationSkipMetricsCount) should be(1)
+    d8Metrics(pConfig.duplicationTotalMetricsCount) should be(1)
+    d8Metrics(pConfig.duplicationProcessedEventMetricsCount) should be(1)
+
   }
 
 }

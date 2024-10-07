@@ -2,27 +2,25 @@ package org.sunbird.obsrv.pipeline
 
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+import org.apache.flink.runtime.testutils.{InMemoryReporter, MiniClusterResourceConfiguration}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
-import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil}
+import org.sunbird.obsrv.core.util.FlinkUtil
 import org.sunbird.obsrv.pipeline.task.{UnifiedPipelineConfig, UnifiedPipelineStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class UnifiedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
+  private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
+
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
-    .setConfiguration(testConfiguration())
+    .setConfiguration(metricsReporter.addToConfiguration(new Configuration()))
     .setNumberSlotsPerTaskManager(1)
     .setNumberTaskManagers(1)
     .build)
@@ -38,16 +36,8 @@ class UnifiedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     )
   implicit val deserializer: StringDeserializer = new StringDeserializer()
 
-  def testConfiguration(): Configuration = {
-    val config = new Configuration()
-    config.setString("metrics.reporter", "job_metrics_reporter")
-    config.setString("metrics.reporter.job_metrics_reporter.class", classOf[BaseMetricsReporter].getName)
-    config
-  }
-
   override def beforeAll(): Unit = {
     super.beforeAll()
-    BaseMetricsReporter.gaugeMetrics.clear()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     createTestTopics()
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.VALID_BATCH_EVENT_D1)
@@ -85,9 +75,7 @@ class UnifiedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(unifiedPipelineConfig)
     val task = new UnifiedPipelineStreamTask(config, unifiedPipelineConfig, kafkaConnector)
     task.process(env)
-    Future {
-      env.execute(unifiedPipelineConfig.jobName)
-    }
+    env.executeAsync(unifiedPipelineConfig.jobName)
 
     try {
       val d1Events = EmbeddedKafka.consumeNumberMessagesFrom[String]("d1-events", 1, timeout = 30.seconds)
@@ -104,42 +92,37 @@ class UnifiedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
       case ex: Exception => ex.printStackTrace()
     }
 
-    val mutableMetricsMap = mutable.Map[String, Long]();
-    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### UnifiedPipelineStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
+    val d1Metrics = getMetrics(metricsReporter, "d1")
+    d1Metrics("extractor-total-count") should be(4)
+    d1Metrics("extractor-duplicate-count") should be(1)
+    d1Metrics("extractor-event-count") should be(1)
+    d1Metrics("extractor-success-count") should be(1)
+    d1Metrics("extractor-failed-count") should be(2)
+    d1Metrics("validator-total-count") should be(1)
+    d1Metrics("validator-success-count") should be(1)
+    d1Metrics("dedup-total-count") should be(1)
+    d1Metrics("dedup-success-count") should be(1)
+    d1Metrics("denorm-total") should be(1)
+    d1Metrics("denorm-failed") should be(1)
+    d1Metrics("transform-total-count") should be(1)
+    d1Metrics("transform-success-count") should be(1)
+    d1Metrics("router-total-count") should be(1)
+    d1Metrics("router-success-count") should be(1)
 
-    mutableMetricsMap("ExtractorJob.d1.extractor-total-count") should be(4)
-    mutableMetricsMap("ExtractorJob.d1.extractor-duplicate-count") should be(1)
-    mutableMetricsMap("ExtractorJob.d1.extractor-event-count") should be(1)
-    mutableMetricsMap("ExtractorJob.d1.extractor-success-count") should be(1)
-    mutableMetricsMap("ExtractorJob.d1.extractor-failed-count") should be(2)
-    mutableMetricsMap("ExtractorJob.d2.extractor-total-count") should be(2)
-    mutableMetricsMap("ExtractorJob.d2.failed-event-count") should be(1)
-    mutableMetricsMap("ExtractorJob.d2.extractor-skipped-count") should be(1)
-
-    mutableMetricsMap("PipelinePreprocessorJob.d1.validator-total-count") should be(1)
-    mutableMetricsMap("PipelinePreprocessorJob.d1.validator-success-count") should be(1)
-    mutableMetricsMap("PipelinePreprocessorJob.d1.dedup-total-count") should be(1)
-    mutableMetricsMap("PipelinePreprocessorJob.d1.dedup-success-count") should be(1)
-    mutableMetricsMap("PipelinePreprocessorJob.d2.validator-total-count") should be(1)
-    mutableMetricsMap("PipelinePreprocessorJob.d2.validator-skipped-count") should be(1)
-    mutableMetricsMap("PipelinePreprocessorJob.d2.dedup-total-count") should be(1)
-    mutableMetricsMap("PipelinePreprocessorJob.d2.dedup-skipped-count") should be(1)
-
-    mutableMetricsMap("DenormalizerJob.d1.denorm-total") should be(1)
-    mutableMetricsMap("DenormalizerJob.d1.denorm-failed") should be(1)
-    mutableMetricsMap("DenormalizerJob.d2.denorm-total") should be(1)
-    mutableMetricsMap("DenormalizerJob.d2.denorm-skipped") should be(1)
-
-    mutableMetricsMap("TransformerJob.d1.transform-total-count") should be(1)
-    mutableMetricsMap("TransformerJob.d1.transform-success-count") should be(1)
-    mutableMetricsMap("TransformerJob.d2.transform-total-count") should be(1)
-    mutableMetricsMap("TransformerJob.d2.transform-skipped-count") should be(1)
-
-    mutableMetricsMap("DruidRouterJob.d1.router-total-count") should be(1)
-    mutableMetricsMap("DruidRouterJob.d1.router-success-count") should be(1)
-    mutableMetricsMap("DruidRouterJob.d2.router-total-count") should be(1)
-    mutableMetricsMap("DruidRouterJob.d2.router-success-count") should be(1)
+    val d2Metrics = getMetrics(metricsReporter, "d2")
+    d2Metrics("extractor-total-count") should be(2)
+    d2Metrics("failed-event-count") should be(1)
+    d2Metrics("extractor-skipped-count") should be(1)
+    d2Metrics("validator-total-count") should be(1)
+    d2Metrics("validator-skipped-count") should be(1)
+    d2Metrics("dedup-total-count") should be(1)
+    d2Metrics("dedup-skipped-count") should be(1)
+    d2Metrics("denorm-total") should be(1)
+    d2Metrics("denorm-skipped") should be(1)
+    d2Metrics("transform-total-count") should be(1)
+    d2Metrics("transform-skipped-count") should be(1)
+    d2Metrics("router-total-count") should be(1)
+    d2Metrics("router-success-count") should be(1)
 
     unifiedPipelineConfig.successTag().getId should be("processing_stats")
     unifiedPipelineConfig.failedEventsOutputTag().getId should be("failed-events")

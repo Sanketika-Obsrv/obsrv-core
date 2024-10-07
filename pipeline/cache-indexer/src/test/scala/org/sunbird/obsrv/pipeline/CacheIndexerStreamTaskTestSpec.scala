@@ -2,12 +2,11 @@ package org.sunbird.obsrv.pipeline
 
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+import org.apache.flink.runtime.testutils.{InMemoryReporter, MiniClusterResourceConfiguration}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.model.Models.SystemEvent
@@ -18,15 +17,13 @@ import org.sunbird.obsrv.pipeline.task.CacheIndexerConfig
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 import org.sunbird.obsrv.streaming.CacheIndexerStreamTask
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class CacheIndexerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
+  private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
-    .setConfiguration(testConfiguration())
+    .setConfiguration(metricsReporter.addToConfiguration(new Configuration()))
     .setNumberSlotsPerTaskManager(1)
     .setNumberTaskManagers(1)
     .build)
@@ -42,16 +39,8 @@ class CacheIndexerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     )
   implicit val deserializer: StringDeserializer = new StringDeserializer()
 
-  def testConfiguration(): Configuration = {
-    val config = new Configuration()
-    config.setString("metrics.reporter", "job_metrics_reporter")
-    config.setString("metrics.reporter.job_metrics_reporter.class", classOf[BaseMetricsReporter].getName)
-    config
-  }
-
   override def beforeAll(): Unit = {
     super.beforeAll()
-    BaseMetricsReporter.gaugeMetrics.clear()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     val postgresConnect = new PostgresConnect(postgresConfig)
     insertTestData(postgresConnect)
@@ -85,9 +74,7 @@ class CacheIndexerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(cacheIndexerConfig)
     val task = new CacheIndexerStreamTask(cacheIndexerConfig, kafkaConnector)
     task.process(env)
-    Future {
-      env.execute(cacheIndexerConfig.jobName)
-    }
+    env.executeAsync(cacheIndexerConfig.jobName)
 
     val input = EmbeddedKafka.consumeNumberMessagesFrom[String](config.getString("kafka.output.system.event.topic"), 1, timeout = 30.seconds)
     input.size should be(1)
@@ -109,20 +96,19 @@ class CacheIndexerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
         event.ctx.dataset_type should be(Some("master"))
     })
 
-    val mutableMetricsMap = mutable.Map[String, Long]();
-    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-
     cacheIndexerConfig.successTag().getId should be("processing_stats")
 
-    mutableMetricsMap(s"${cacheIndexerConfig.jobName}.dataset3.${cacheIndexerConfig.totalEventCount}") should be(3)
-    mutableMetricsMap(s"${cacheIndexerConfig.jobName}.dataset3.${cacheIndexerConfig.successEventCount}") should be(3)
-    mutableMetricsMap(s"${cacheIndexerConfig.jobName}.dataset3.${cacheIndexerConfig.successInsertCount}") should be(2)
-    mutableMetricsMap(s"${cacheIndexerConfig.jobName}.dataset3.${cacheIndexerConfig.successUpdateCount}") should be(1)
+    val dataset3Metrics = getMetrics(metricsReporter, "dataset3")
+    dataset3Metrics(cacheIndexerConfig.totalEventCount) should be(3)
+    dataset3Metrics(cacheIndexerConfig.successEventCount) should be(3)
+    dataset3Metrics(cacheIndexerConfig.successInsertCount) should be(2)
+    dataset3Metrics(cacheIndexerConfig.successUpdateCount) should be(1)
 
-    mutableMetricsMap(s"${cacheIndexerConfig.jobName}.dataset4.${cacheIndexerConfig.totalEventCount}") should be(2)
-    mutableMetricsMap(s"${cacheIndexerConfig.jobName}.dataset4.${cacheIndexerConfig.successEventCount}") should be(1)
-    mutableMetricsMap(s"${cacheIndexerConfig.jobName}.dataset4.${cacheIndexerConfig.successInsertCount}") should be(1)
-    mutableMetricsMap(s"${cacheIndexerConfig.jobName}.dataset4.${cacheIndexerConfig.eventFailedMetricsCount}") should be(1)
+    val dataset4Metrics = getMetrics(metricsReporter, "dataset4")
+    dataset4Metrics(cacheIndexerConfig.totalEventCount) should be(2)
+    dataset4Metrics(cacheIndexerConfig.successEventCount) should be(1)
+    dataset4Metrics(cacheIndexerConfig.successInsertCount) should be(1)
+    dataset4Metrics(cacheIndexerConfig.eventFailedMetricsCount) should be(1)
 
     val redisConnection = new RedisConnect(cacheIndexerConfig.redisHost, cacheIndexerConfig.redisPort, cacheIndexerConfig.redisConnectionTimeout)
     val jedis1 = redisConnection.getConnection(3)
@@ -137,6 +123,5 @@ class CacheIndexerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     event2 should be("""{"model":"Compass","price":"3800000","variant":"Model S (O) Diesel 4x4 AT","fuel":"Diesel","seatingCapacity":5,"code":"JEEP-CP-D3","currencyCode":"INR","currency":"Indian Rupee","manufacturer":"Jeep","safety":"5 Star (Euro NCAP)","modelYear":"2023","transmission":"automatic"}""")
     jedis2.close()
   }
-
 
 }

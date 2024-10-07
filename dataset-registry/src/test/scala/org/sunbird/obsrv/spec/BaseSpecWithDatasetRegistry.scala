@@ -1,9 +1,12 @@
 package org.sunbird.obsrv.spec
 
 import com.typesafe.config.{Config, ConfigFactory}
+import org.apache.flink.api.scala.metrics.ScalaGauge
+import org.apache.flink.runtime.testutils.InMemoryReporter
 import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 import org.sunbird.spec.BaseSpecWithPostgres
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
@@ -42,8 +45,8 @@ class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
   }
 
   private def insertTestData(postgresConnect: PostgresConnect): Unit = {
-    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, extraction_config, dedup_config, router_config, dataset_config, status, data_version, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d1', 'event', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"validate\": true, \"mode\": \"Strict\"}', '{\"is_batch_event\": true, \"extraction_key\": \"events\", \"dedup_config\": {\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}}', '{\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}', '{\"topic\":\"d1-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":"+config.getInt("redis.port")+",\"redis_db\":2}', 'Live', 2, 'v1', 'ingest', 'System', 'System', now(), now());")
-    postgresConnect.execute("update datasets set denorm_config = '{\"redis_db_host\":\"localhost\",\"redis_db_port\":"+config.getInt("redis.port")+",\"denorm_fields\":[{\"denorm_key\":\"vehicleCode\",\"redis_db\":2,\"denorm_out_field\":\"vehicleData\"}]}' where id='d1';")
+    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, extraction_config, dedup_config, router_config, dataset_config, status, data_version, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d1', 'event', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"validate\": true, \"mode\": \"Strict\"}', '{\"is_batch_event\": true, \"extraction_key\": \"events\", \"dedup_config\": {\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}}', '{\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}', '{\"topic\":\"d1-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":" + config.getInt("redis.port") + ",\"redis_db\":2}', 'Live', 2, 'v1', 'ingest', 'System', 'System', now(), now());")
+    postgresConnect.execute("update datasets set denorm_config = '{\"redis_db_host\":\"localhost\",\"redis_db_port\":" + config.getInt("redis.port") + ",\"denorm_fields\":[{\"denorm_key\":\"vehicleCode\",\"redis_db\":2,\"denorm_out_field\":\"vehicleData\"}]}' where id='d1';")
     postgresConnect.execute("insert into dataset_transformations values('tf1', 'd1', 'dealer.email', '{\"type\":\"mask\",\"expr\":\"dealer.email\"}', 'Strict', 'System', 'System', now(), now());")
     postgresConnect.execute("insert into dataset_transformations values('tf2', 'd1', 'dealer.maskedPhone', '{\"type\":\"mask\",\"expr\": \"dealer.phone\"}', null, 'System', 'System', now(), now());")
     postgresConnect.execute("insert into datasets(id, type, data_schema, router_config, dataset_config, status, api_version, entry_topic, created_by, updated_by, created_date, updated_date, tags) values ('d2', 'event', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"topic\":\"d2-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\"}', 'Live', 'v1', 'ingest', 'System', 'System', now(), now(), ARRAY['Tag1','Tag2']);")
@@ -58,6 +61,22 @@ class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
       val metric = keys.apply(2)
       (jobId, datasetId, metric, metricValue)
     }).groupBy(f => f._1).mapValues(f => f.map(p => (p._2, p._3, p._4))).mapValues(f => f.groupBy(p => p._1).mapValues(q => q.map(r => (r._2, r._3)).toMap))
+  }
+
+  def getMetrics(metricsReporter: InMemoryReporter, dataset: String, debug: Option[Boolean] = None): Map[String, Long] = {
+    val groups = metricsReporter.findGroups(dataset).asScala
+    groups.map(group => metricsReporter.getMetricsByGroup(group).asScala)
+      .map(group => group.map { case (k, v) =>
+        val value = if(v.isInstanceOf[ScalaGauge[Long]]) v.asInstanceOf[ScalaGauge[Long]].getValue() else 0
+        if (debug.isDefined && debug.get)
+          Console.println("Metric", k, value)
+        k -> value
+      })
+      .map(f => f.toMap)
+      .reduce((map1, map2) => {
+        val mergedMap = map2.map { case (k: String, v: Long) => k -> (v + map1.getOrElse(k, 0l)) }
+        map1 ++ mergedMap
+      })
   }
 
 }

@@ -2,12 +2,11 @@ package org.sunbird.obsrv.denormalizer
 
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+import org.apache.flink.runtime.testutils.{InMemoryReporter, MiniClusterResourceConfiguration}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model._
@@ -19,15 +18,13 @@ import org.sunbird.obsrv.model.DatasetModels._
 import org.sunbird.obsrv.model.DatasetStatus
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
+  private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
-    .setConfiguration(testConfiguration())
+    .setConfiguration(metricsReporter.addToConfiguration(new Configuration()))
     .setNumberSlotsPerTaskManager(1)
     .setNumberTaskManagers(1)
     .build)
@@ -44,16 +41,8 @@ class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     )
   implicit val deserializer: StringDeserializer = new StringDeserializer()
 
-  def testConfiguration(): Configuration = {
-    val config = new Configuration()
-    config.setString("metrics.reporter", "job_metrics_reporter")
-    config.setString("metrics.reporter.job_metrics_reporter.class", classOf[BaseMetricsReporter].getName)
-    config
-  }
-
   override def beforeAll(): Unit = {
     super.beforeAll()
-    BaseMetricsReporter.gaugeMetrics.clear()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     val postgresConnect = new PostgresConnect(postgresConfig)
     insertTestData(postgresConnect)
@@ -98,9 +87,7 @@ class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(denormConfig)
     val task = new DenormalizerStreamTask(denormConfig, kafkaConnector)
     task.process(env)
-    Future {
-      env.execute(denormConfig.jobName)
-    }
+    env.executeAsync(denormConfig.jobName)
 
     val outputs = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.denormOutputTopic, 4, timeout = 30.seconds)
     validateOutputs(outputs)
@@ -108,10 +95,7 @@ class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.kafkaSystemTopic, 3, timeout = 30.seconds)
     validateSystemEvents(systemEvents)
 
-    val mutableMetricsMap = mutable.Map[String, Long]()
-    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### DenormalizerStreamTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
-    validateMetrics(mutableMetricsMap)
+    validateMetrics(metricsReporter)
   }
 
   it should "validate dynamic cache creation within DenormCache" in {
@@ -164,13 +148,17 @@ class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     })
   }
 
-  private def validateMetrics(mutableMetricsMap: mutable.Map[String, Long]): Unit = {
-    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormTotal}") should be(3)
-    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormFailed}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormSuccess}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormPartialSuccess}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d2.${denormConfig.denormTotal}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d2.${denormConfig.eventsSkipped}") should be(1)
+  private def validateMetrics(metricsReporter: InMemoryReporter): Unit = {
+
+    val d1Metrics = getMetrics(metricsReporter, "d1")
+    d1Metrics(denormConfig.denormTotal) should be(3)
+    d1Metrics(denormConfig.denormFailed) should be(1)
+    d1Metrics(denormConfig.denormSuccess) should be(1)
+    d1Metrics(denormConfig.denormPartialSuccess) should be(1)
+
+    val d2Metrics = getMetrics(metricsReporter, "d2")
+    d2Metrics(denormConfig.denormTotal) should be(1)
+    d2Metrics(denormConfig.eventsSkipped) should be(1)
   }
 
 }

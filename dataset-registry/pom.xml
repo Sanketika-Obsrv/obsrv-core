@@ -13,6 +13,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<scala.maj.version>2.12</scala.maj.version>
 		<scala.version>2.12.11</scala.version>
+        <flink.version>1.17.2</flink.version>
 		<java.target.runtime>11</java.target.runtime>
 		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
 		<release-version>release-4.6.0</release-version>
@@ -79,6 +80,13 @@
             <version>1.0.0</version>
             <type>test-jar</type>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-runtime</artifactId>
+            <version>${flink.version}</version>
+            <scope>test</scope>
+            <classifier>tests</classifier>
         </dependency>
     </dependencies>
 

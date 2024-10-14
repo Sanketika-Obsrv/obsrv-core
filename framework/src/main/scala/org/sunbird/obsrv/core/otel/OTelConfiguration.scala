@@ -2,18 +2,18 @@ package org.sunbird.obsrv.core.otel
 
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.Attributes
-import io.opentelemetry.api.metrics.{Meter, LongCounter}
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.metrics.SdkMeterProvider
-import io.opentelemetry.sdk.metrics.export.{PeriodicMetricReader}
+import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader
 import io.opentelemetry.sdk.resources.Resource
 import io.opentelemetry.sdk.trace.SdkTracerProvider
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor
 import io.opentelemetry.semconv.ResourceAttributes
+import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter
 
-import scala.collection.mutable
+
 import java.util.concurrent.TimeUnit
 
 object OTelConfiguration {
@@ -33,10 +33,16 @@ object OTelConfiguration {
       .setTimeout(30, TimeUnit.SECONDS)
       .build()
 
+    val logExporter: OtlpGrpcLogRecordExporter = OtlpGrpcLogRecordExporter.builder()
+      .setEndpoint("http://localhost:4317") // Adjust to your collector's address
+      .build()
+
+
     // Create a service name resource for metrics and traces
     val serviceNameResource: Resource = Resource.create(
       Attributes.of(ResourceAttributes.SERVICE_NAME, "obsrv-pipeline")
     )
+    
 
     // Configure the TracerProvider with the Span Processor
     val tracerProvider: SdkTracerProvider = SdkTracerProvider.builder()
@@ -49,6 +55,8 @@ object OTelConfiguration {
       .registerMetricReader(PeriodicMetricReader.builder(otlpMetricExporter).build())
       .setResource(serviceNameResource)
       .build()
+
+
 
     // Build the OpenTelemetry SDK with both tracer and meter providers
     val openTelemetry: OpenTelemetrySdk = OpenTelemetrySdk.builder()

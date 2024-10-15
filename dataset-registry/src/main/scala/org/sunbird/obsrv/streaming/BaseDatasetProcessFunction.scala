@@ -1,5 +1,7 @@
 package org.sunbird.obsrv.streaming
 
+import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.api.metrics.{LongCounter, Meter}
 import org.apache.flink.api.scala.metrics.ScalaGauge
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
@@ -11,6 +13,7 @@ import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.model.Stats.Stats
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
 import org.sunbird.obsrv.core.model._
+import org.sunbird.obsrv.core.otel.{OTelConfiguration, OTelMetricsGenerator}
 import org.sunbird.obsrv.core.streaming._
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
@@ -43,18 +46,30 @@ trait SystemEventHandler {
     val obsrvMeta = event("obsrv_meta").asInstanceOf[Map[String, AnyRef]]
     val flags = obsrvMeta("flags").asInstanceOf[Map[String, AnyRef]]
     val timespans = obsrvMeta("timespans").asInstanceOf[Map[String, AnyRef]]
-
-    JSONUtil.serialize(SystemEvent(
-      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(producer)), dataset = dataset, dataset_type = dataset_type),
-      data = EData(error = error, pipeline_stats = Some(PipelineStats(extractor_events = None,
-        extractor_status = getStatus(flags, Producer.extractor), extractor_time = getTime(timespans, Producer.extractor),
-        validator_status = getStatus(flags, Producer.validator), validator_time = getTime(timespans, Producer.validator),
-        dedup_status = getStatus(flags, Producer.dedup), dedup_time = getTime(timespans, Producer.dedup),
-        denorm_status = getStatus(flags, Producer.denorm), denorm_time = getTime(timespans, Producer.denorm),
-        transform_status = getStatus(flags, Producer.transformer), transform_time = getTime(timespans, Producer.transformer),
-        total_processing_time = getStat(obsrvMeta, Stats.total_processing_time), latency_time = getStat(obsrvMeta, Stats.latency_time), processing_time = getStat(obsrvMeta, Stats.processing_time)
-      )))
-    ))
+    val systemEvent = SystemEvent(
+      EventID.METRIC, ctx = ContextData(module = ModuleID.processing,
+        pdata = PData(config.jobName, PDataType.flink, Some(producer)),
+        dataset = dataset, dataset_type = dataset_type),
+      data = EData(error = error,
+        pipeline_stats = Some(
+          PipelineStats(extractor_events = None,
+            extractor_status = getStatus(flags, Producer.extractor),
+            extractor_time = getTime(timespans, Producer.extractor),
+            validator_status = getStatus(flags, Producer.validator),
+            validator_time = getTime(timespans, Producer.validator),
+            dedup_status = getStatus(flags, Producer.dedup),
+            dedup_time = getTime(timespans, Producer.dedup),
+            denorm_status = getStatus(flags, Producer.denorm),
+            denorm_time = getTime(timespans, Producer.denorm),
+            transform_status = getStatus(flags, Producer.transformer),
+            transform_time = getTime(timespans, Producer.transformer),
+            total_processing_time = getStat(obsrvMeta, Stats.total_processing_time),
+            latency_time = getStat(obsrvMeta, Stats.latency_time),
+            processing_time = getStat(obsrvMeta, Stats.processing_time)
+          )))
+    )
+    OTelMetricsGenerator.generateOTelSystemEvent(systemEvent)
+    JSONUtil.serialize(systemEvent)
   }
 
   def getDatasetId(dataset: Option[String], config: BaseJobConfig[_]): String = {
@@ -78,7 +93,7 @@ abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[Stri
   }
 
   private def initMetrics(datasetId: String): Unit = {
-    if(!metrics.hasDataset(datasetId)) {
+    if (!metrics.hasDataset(datasetId)) {
       val metricMap = new ConcurrentHashMap[String, AtomicLong]()
       metricsList.metrics.map(metric => {
         metricMap.put(metric, new AtomicLong(0L))
@@ -90,7 +105,7 @@ abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[Stri
   }
 
   def markFailure(datasetId: Option[String], event: mutable.Map[String, AnyRef], ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
-                 metrics: Metrics, error: ErrorConstants.Error, producer: Producer, functionalError: FunctionalError, datasetType: Option[String] = None): Unit = {
+                  metrics: Metrics, error: ErrorConstants.Error, producer: Producer, functionalError: FunctionalError, datasetType: Option[String] = None): Unit = {
 
     metrics.incCounter(getDatasetId(datasetId, config), config.eventFailedMetricsCount)
     ctx.output(config.failedEventsOutputTag(), super.markFailed(event, error, producer))
@@ -103,7 +118,8 @@ abstract class BaseDatasetProcessFunction(config: BaseJobConfig[mutable.Map[Stri
     ctx.output(config.systemEventsOutputTag, generateSystemEvent(Some(dataset.id), super.markComplete(event, dataset.dataVersion), config, producer, dataset_type = Some(dataset.datasetType)))
   }
 
-  def processElement(dataset: Dataset, event: mutable.Map[String, AnyRef],context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit
+  def processElement(dataset: Dataset, event: mutable.Map[String, AnyRef], context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit
+
   override def processElement(event: mutable.Map[String, AnyRef], context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit = {
 
     val datasetIdOpt = event.get(config.CONST_DATASET)
@@ -142,7 +158,7 @@ abstract class BaseDatasetWindowProcessFunction(config: BaseJobConfig[mutable.Ma
   }
 
   private def initMetrics(datasetId: String): Unit = {
-    if(!metrics.hasDataset(datasetId)) {
+    if (!metrics.hasDataset(datasetId)) {
       val metricMap = new ConcurrentHashMap[String, AtomicLong]()
       metricsList.metrics.map(metric => {
         metricMap.put(metric, new AtomicLong(0L))
@@ -167,6 +183,7 @@ abstract class BaseDatasetWindowProcessFunction(config: BaseJobConfig[mutable.Ma
   }
 
   def processWindow(dataset: Dataset, context: ProcessWindowFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], String, TimeWindow]#Context, elements: List[mutable.Map[String, AnyRef]], metrics: Metrics): Unit
+
   override def process(datasetId: String, context: ProcessWindowFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], String, TimeWindow]#Context, elements: lang.Iterable[mutable.Map[String, AnyRef]], metrics: Metrics): Unit = {
 
     initMetrics(datasetId)
@@ -188,7 +205,7 @@ abstract class BaseDatasetWindowProcessFunction(config: BaseJobConfig[mutable.Ma
       }
     })
 
-    if(buffer.nonEmpty) {
+    if (buffer.nonEmpty) {
       processWindow(dataset, context, buffer.toList, metrics)
     }
   }

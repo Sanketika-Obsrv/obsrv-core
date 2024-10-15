@@ -1,23 +1,40 @@
 package org.sunbird.obsrv.core.otel
 
+import com.sun.org.slf4j.internal.LoggerFactory
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.metrics.{LongCounter, Meter}
 import io.opentelemetry.api.common.Attributes
+import io.opentelemetry.instrumentation.log4j.appender.v2_17.OpenTelemetryAppender
+import org.slf4j.LoggerFactory
+
 import scala.collection.mutable
 import org.sunbird.obsrv.core.model.Models.ErrorLog
 import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.streaming.BaseJobConfig
 import org.sunbird.obsrv.core.util.JSONUtil
+import org._
+
+import java.util.logging.LogManager
 
 object OTelExecutor {
   def main(args: Array[String]): Unit = {
     println("Starting OpenTelemetry Metrics Generation...")
 
+
+    //val log4jLogger = LogManager.getLogManager.getLogger("log4j-logger")
+    //lazy val slf4jLogger = LoggerFactory.getILoggerFactory.getLogger("slf4j-logger")
+
     // Initialize OpenTelemetry
     val openTelemetry: OpenTelemetry = OTelConfiguration.initOpenTelemetry("http://0.0.0.0:4317")
-    val meter: Meter = openTelemetry.meterBuilder("obsrv-pipeline").build()
 
-    // Create a counter metric for HTTP requests
+    //OpenTelemetryAppender.install(openTelemetry)
+
+
+    val meter: Meter = openTelemetry.meterBuilder("obsrv-pipeline").build()
+    OTelConfiguration.logMessage("Hello, This is example data")
+
+
+     //Create a counter metric for HTTP requests
     val requestCounter: LongCounter = meter.counterBuilder("http.server.requests.count")
       .setDescription("Count of HTTP server requests")
       .setUnit("1")

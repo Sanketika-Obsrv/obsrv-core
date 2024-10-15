@@ -1,0 +1,26 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  kafka:
+    brokers: ["localhost:9092"]
+    topic: "quickstart-events"
+    encoding: otlp_json
+    protocol_version: 2.0.0
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [kafka]
+    metrics:
+      receivers: [otlp]
+      exporters: [kafka]
+    logs:
+      receivers: [otlp]
+      exporters: [kafka]

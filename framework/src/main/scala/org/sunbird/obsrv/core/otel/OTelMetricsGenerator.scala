@@ -17,19 +17,8 @@ import scala.collection.mutable
 object OTelMetricsGenerator {
 
   def generateOTelSystemEvent(systemEvent: SystemEvent): Unit = {
-    val openTelemetry: OpenTelemetry = OTelConfiguration.initOpenTelemetry("http://0.0.0.0:4317")
-    val meter: Meter = openTelemetry.meterBuilder("obsrv-pipeline").build()
-
-
-//    val resource: Resource = Resource.create(Attributes.of(
-//      AttributeKey.stringKey("service.name"), "obsrv-service",
-//      AttributeKey.stringKey("service.version"), "1.0.0",
-//      AttributeKey.stringKey("environment"), "production"
-//    ))
-//
-//    val logEmitterProvider: SdkLoggerProvider = SdkLoggerProvider.builder()
-//      .setResource(resource)
-//      .build()
+    val oTel: OpenTelemetry = OTelService.init("http://0.0.0.0:4317")
+    val meter: Meter = oTel.meterBuilder("obsrv-pipeline").build()
 
 
     val errorCount: LongCounter = meter.counterBuilder("event.error.count")

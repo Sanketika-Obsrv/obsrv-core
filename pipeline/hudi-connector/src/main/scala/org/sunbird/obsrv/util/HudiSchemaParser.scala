@@ -5,11 +5,13 @@ import com.fasterxml.jackson.core.JsonGenerator.Feature
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.{DeserializationFeature, JsonNode, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DoubleType, IntType, LogicalType, MapType, RowType, VarCharType, TimestampType, DateType}
+import org.apache.flink.table.types.logical.{BigIntType, BooleanType, DateType, DoubleType, IntType, LogicalType, MapType, RowType, TimestampType, VarCharType}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.Constants
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.registry.DatasetRegistry
+
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -25,7 +27,9 @@ case class JsonFieldParserSpec(`type`: String, name: String, expr: Option[String
 
 class HudiSchemaParser {
 
-  private val logger = LoggerFactory.getLogger(classOf[HudiSchemaParser])
+  //private val logger = LoggerFactory.getLogger(classOf[HudiSchemaParser])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[HudiSchemaParser]))
+
 
   @transient private val objectMapper = JsonMapper.builder()
     .addModule(DefaultScalaModule)

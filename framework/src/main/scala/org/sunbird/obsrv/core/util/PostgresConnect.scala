@@ -2,6 +2,7 @@ package org.sunbird.obsrv.core.util
 
 import org.postgresql.ds.PGSimpleDataSource
 import org.slf4j.LoggerFactory
+import org.sunbird.obsrv.core.otel.OTelLogger
 
 import java.sql.{Connection, PreparedStatement, ResultSet, SQLException, Statement}
 
@@ -9,7 +10,8 @@ final case class PostgresConnectionConfig(user: String, password: String, databa
 
 class PostgresConnect(config: PostgresConnectionConfig) {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[PostgresConnect])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[PostgresConnect])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[PostgresConnect]))
 
   private var source: PGSimpleDataSource = null
 

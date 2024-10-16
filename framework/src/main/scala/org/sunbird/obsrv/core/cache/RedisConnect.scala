@@ -1,13 +1,15 @@
 package org.sunbird.obsrv.core.cache
 
 import org.slf4j.LoggerFactory
+import org.sunbird.obsrv.core.otel.OTelLogger
 import redis.clients.jedis.Jedis
 
 class RedisConnect(redisHost: String, redisPort: Int, defaultTimeOut: Int) extends java.io.Serializable {
 
   private val serialVersionUID = -396824011996012513L
 
-  private val logger = LoggerFactory.getLogger(classOf[RedisConnect])
+  //private val logger = LoggerFactory.getLogger(classOf[RedisConnect])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[RedisConnect]))
 
 
   private def getConnection(backoffTimeInMillis: Long): Jedis = {

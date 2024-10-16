@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.MissingNode
 import org.json4s.{DefaultFormats, Formats, JValue, MappingException}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.ErrorConstants
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.DatasetTransformation
 
@@ -14,7 +15,8 @@ import java.util.regex.Pattern
 class MaskTransformer extends ITransformer[String] {
 
   implicit val jsonFormats: Formats = DefaultFormats.withLong
-  private val logger = LoggerFactory.getLogger(classOf[EncryptTransformer])
+  //private val logger = LoggerFactory.getLogger(classOf[EncryptTransformer])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[EncryptTransformer]))
 
   implicit class JsonHelper(json: JValue) {
     def customExtract[T](path: String)(implicit mf: Manifest[T]): T = {

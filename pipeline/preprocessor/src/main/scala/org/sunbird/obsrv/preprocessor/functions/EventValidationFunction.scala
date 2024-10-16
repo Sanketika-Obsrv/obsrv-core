@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.FunctionalError.FunctionalError
 import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model._
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.streaming.Metrics
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
@@ -21,7 +22,8 @@ import scala.collection.mutable
 
 class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val eventTypeInfo: TypeInformation[mutable.Map[String, AnyRef]])
   extends BaseDatasetProcessFunction(config) {
-  private[this] val logger = LoggerFactory.getLogger(classOf[EventValidationFunction])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[EventValidationFunction])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[EventValidationFunction]))
 
   @transient private var schemaValidator: SchemaValidator = null
   override def getMetrics(): List[String] = {

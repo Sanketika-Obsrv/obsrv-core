@@ -9,6 +9,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.Constants
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.util.JSONUtil
 
 import java.nio.charset.StandardCharsets
@@ -83,7 +84,8 @@ class TopicDeserializationSchema extends KafkaRecordDeserializationSchema[mutabl
 class StringDeserializationSchema extends KafkaRecordDeserializationSchema[String] {
 
   private val serialVersionUID = -3224825136576915426L
-  private[this] val logger = LoggerFactory.getLogger(classOf[StringDeserializationSchema])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[StringDeserializationSchema])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[StringDeserializationSchema]))
 
   override def getProducedType: TypeInformation[String] = TypeExtractor.getForClass(classOf[String])
 

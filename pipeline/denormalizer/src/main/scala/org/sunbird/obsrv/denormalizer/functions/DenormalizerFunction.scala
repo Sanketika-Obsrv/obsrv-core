@@ -7,6 +7,7 @@ import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
 import org.sunbird.obsrv.core.model._
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.streaming.Metrics
 import org.sunbird.obsrv.core.util.{JSONUtil, Util}
 import org.sunbird.obsrv.denormalizer.task.DenormalizerConfig
@@ -19,7 +20,8 @@ import scala.collection.mutable
 
 class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProcessFunction(config) {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[DenormalizerFunction])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[DenormalizerFunction])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[DenormalizerFunction]))
 
   private[this] var denormCache: DenormCache = _
 

@@ -8,6 +8,7 @@ import org.sunbird.obsrv.core.cache._
 import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model._
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.streaming._
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
@@ -19,7 +20,9 @@ import scala.collection.mutable
 class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eventTypeInfo: TypeInformation[mutable.Map[String, AnyRef]])
   extends BaseDatasetProcessFunction(config) with BaseDeduplication {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[DeduplicationFunction])
+ //private[this] val logger = LoggerFactory.getLogger(classOf[DeduplicationFunction])
+ private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[DeduplicationFunction]))
+
   @transient private var dedupEngine: DedupEngine = null
 
   override def getMetrics(): List[String] = {
@@ -40,7 +43,6 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
   override def processElement(dataset: Dataset, msg: mutable.Map[String, AnyRef],
                               context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
                               metrics: Metrics): Unit = {
-
     metrics.incCounter(dataset.id, config.duplicationTotalMetricsCount)
     val dedupConfig = dataset.dedupConfig
     if (dedupConfig.isDefined && dedupConfig.get.dropDuplicates.get) {
@@ -71,7 +73,7 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
           ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.dedup)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
           data = EData(error = Some(ErrorLog(pdata_id = Producer.dedup, pdata_status = StatusCode.skipped, error_type = FunctionalError.DedupFailed, error_code = ex.error.errorCode, error_message = ex.error.errorMsg, error_level = ErrorLevel.warn)))
         ))
-        logger.warn("BaseDeduplication:isDuplicate() | Exception", ex)
+        logger.warn("BaseDeduplication:isDuplicate() | Exception")
         context.output(config.systemEventsOutputTag, sysEvent)
         false
     }

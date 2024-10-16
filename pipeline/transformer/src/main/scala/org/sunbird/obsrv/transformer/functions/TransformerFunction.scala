@@ -11,6 +11,7 @@ import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
 import org.sunbird.obsrv.core.model._
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.streaming.Metrics
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.{Dataset, DatasetTransformation}
@@ -24,7 +25,9 @@ case class TransformationStatus(resultJson: JValue, status: StatusCode, fieldSta
 
 class TransformerFunction(config: TransformerConfig) extends BaseDatasetProcessFunction(config) {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[TransformerFunction])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[TransformerFunction])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[TransformerFunction]))
+
 
   override def getMetrics(): List[String] = {
     List(config.totalEventCount, config.transformSuccessCount, config.transformPartialCount, config.transformFailedCount, config.transformSkippedCount)

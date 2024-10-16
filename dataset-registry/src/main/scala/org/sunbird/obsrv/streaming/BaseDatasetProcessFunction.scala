@@ -1,7 +1,5 @@
 package org.sunbird.obsrv.streaming
 
-import io.opentelemetry.api.OpenTelemetry
-import io.opentelemetry.api.metrics.{LongCounter, Meter}
 import org.apache.flink.api.scala.metrics.ScalaGauge
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
@@ -13,7 +11,7 @@ import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.model.Stats.Stats
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
 import org.sunbird.obsrv.core.model._
-import org.sunbird.obsrv.core.otel.{OTelConfiguration, OTelMetricsGenerator}
+import org.sunbird.obsrv.core.otel.{OTelService, OTelMetricsGenerator}
 import org.sunbird.obsrv.core.streaming._
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset

@@ -19,7 +19,9 @@ import scala.collection.mutable
 
 class MasterDataProcessorFunction(config: MasterDataProcessorConfig) extends BaseDatasetWindowProcessFunction(config) {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[MasterDataProcessorFunction])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[MasterDataProcessorFunction])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[MasterDataProcessorFunction]))
+
   private[this] var masterDataCache: MasterDataCache = _
 
   override def open(parameters: Configuration): Unit = {

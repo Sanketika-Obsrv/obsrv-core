@@ -6,6 +6,7 @@ import com.networknt.schema._
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.model.ErrorConstants
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
 
@@ -30,7 +31,8 @@ case class ValidationMsg(
 class SchemaValidator() extends java.io.Serializable {
 
   private val serialVersionUID = 8780940932759659175L
-  private[this] val logger = LoggerFactory.getLogger(classOf[SchemaValidator])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[SchemaValidator])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[SchemaValidator]))
   private[this] val schemaMap = mutable.Map[String, (JsonSchema, Boolean)]()
   // This creates a schema factory that will use Draft 2020-12 as the default if $schema is not specified
   // in the schema data. If $schema is specified in the schema data then that schema dialect will be used

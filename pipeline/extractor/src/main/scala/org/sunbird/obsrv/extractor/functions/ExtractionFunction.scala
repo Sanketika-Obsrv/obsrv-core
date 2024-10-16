@@ -9,6 +9,7 @@ import org.sunbird.obsrv.core.model.ErrorConstants.Error
 import org.sunbird.obsrv.core.model.FunctionalError.FunctionalError
 import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model._
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.streaming.{BaseDeduplication, BaseProcessFunction, Metrics, MetricsList}
 import org.sunbird.obsrv.core.util.Util.getMutableMap
 import org.sunbird.obsrv.core.util.{JSONUtil, Util}
@@ -22,7 +23,8 @@ class ExtractionFunction(config: ExtractorConfig)
   extends BaseProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]](config) with BaseDeduplication {
 
   @transient private var dedupEngine: DedupEngine = null
-  private[this] val logger = LoggerFactory.getLogger(classOf[ExtractionFunction])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[ExtractionFunction])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[ExtractionFunction]))
 
   override def getMetricsList(): MetricsList = {
     val metrics = List(config.successEventCount, config.systemEventCount, config.eventFailedMetricsCount, config.failedExtractionCount,

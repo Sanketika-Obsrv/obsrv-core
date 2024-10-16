@@ -8,6 +8,7 @@ import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, DateTimeZone}
 import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.model.{Constants, ErrorConstants, FunctionalError, Producer}
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.streaming.Metrics
 import org.sunbird.obsrv.core.util.{JSONUtil, Util}
 import org.sunbird.obsrv.model.DatasetModels.{Dataset, DatasetConfig}
@@ -22,7 +23,8 @@ case class TimestampKey(isValid: Boolean, value: AnyRef)
 
 class DynamicRouterFunction(config: DynamicRouterConfig) extends BaseDatasetProcessFunction(config) {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[DynamicRouterFunction])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[DynamicRouterFunction])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[DynamicRouterFunction]))
 
   override def open(parameters: Configuration): Unit = {
     super.open(parameters)

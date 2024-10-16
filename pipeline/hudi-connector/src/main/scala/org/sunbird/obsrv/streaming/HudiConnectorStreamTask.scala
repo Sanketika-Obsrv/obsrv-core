@@ -23,6 +23,7 @@ import org.sunbird.obsrv.util.HudiSchemaParser
 import org.apache.hudi.config.HoodieWriteConfig.SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP
 import org.apache.hudi.common.config.HoodieCommonConfig.SCHEMA_EVOLUTION_ENABLE
 import org.apache.hudi.common.table.HoodieTableConfig.DROP_PARTITION_COLUMNS
+import org.sunbird.obsrv.core.otel.OTelLogger
 
 import java.io.File
 import java.sql.Timestamp
@@ -34,7 +35,8 @@ import scala.collection.mutable.{Map => MMap}
 class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTask[mutable.Map[String, AnyRef]] {
 
   implicit val mutableMapTypeInfo: TypeInformation[MMap[String, AnyRef]] = TypeExtractor.getForClass(classOf[MMap[String, AnyRef]])
-  private val logger = LoggerFactory.getLogger(classOf[HudiConnectorStreamTask])
+  //private val logger = LoggerFactory.getLogger(classOf[HudiConnectorStreamTask])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[HudiConnectorStreamTask]))
   def process(): Unit = {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(config)
     env.setStateBackend(new EmbeddedRocksDBStateBackend)

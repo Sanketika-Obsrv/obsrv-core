@@ -12,7 +12,8 @@ import scala.collection.mutable
 
 class MasterDataCache(val config: MasterDataProcessorConfig) {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[MasterDataCache])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[MasterDataCache])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[MasterDataCache]))
   private val datasetPipelineMap: mutable.Map[String, Pipeline] = mutable.Map[String, Pipeline]()
 
   def close(): Unit = {

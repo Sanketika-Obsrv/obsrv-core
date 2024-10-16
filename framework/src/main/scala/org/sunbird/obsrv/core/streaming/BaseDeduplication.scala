@@ -4,11 +4,13 @@ import org.slf4j.LoggerFactory
 import org.sunbird.obsrv.core.cache.DedupEngine
 import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.model._
+import org.sunbird.obsrv.core.otel.OTelLogger
 import org.sunbird.obsrv.core.util.JSONUtil
 
 trait BaseDeduplication {
 
-  private[this] val logger = LoggerFactory.getLogger(classOf[BaseDeduplication])
+  //private[this] val logger = LoggerFactory.getLogger(classOf[BaseDeduplication])
+  private[this] lazy val logger: OTelLogger = new OTelLogger(LoggerFactory.getLogger(classOf[BaseDeduplication]))
 
   def isDuplicate(datasetId: String, dedupKey: Option[String], event: String)
                  (implicit deDupEngine: DedupEngine): Boolean = {

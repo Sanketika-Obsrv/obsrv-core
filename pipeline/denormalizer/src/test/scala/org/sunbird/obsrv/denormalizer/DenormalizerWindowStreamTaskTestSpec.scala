@@ -2,12 +2,11 @@ package org.sunbird.obsrv.denormalizer
 
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+import org.apache.flink.runtime.testutils.{InMemoryReporter, MiniClusterResourceConfiguration}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model._
@@ -16,15 +15,13 @@ import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil, PostgresConnect}
 import org.sunbird.obsrv.denormalizer.task.{DenormalizerConfig, DenormalizerWindowStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
+  private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
-    .setConfiguration(testConfiguration())
+    .setConfiguration(metricsReporter.addToConfiguration(new Configuration()))
     .setNumberSlotsPerTaskManager(1)
     .setNumberTaskManagers(1)
     .build)
@@ -41,16 +38,8 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     )
   implicit val deserializer: StringDeserializer = new StringDeserializer()
 
-  def testConfiguration(): Configuration = {
-    val config = new Configuration()
-    config.setString("metrics.reporter", "job_metrics_reporter")
-    config.setString("metrics.reporter.job_metrics_reporter.class", classOf[BaseMetricsReporter].getName)
-    config
-  }
-
   override def beforeAll(): Unit = {
     super.beforeAll()
-    BaseMetricsReporter.gaugeMetrics.clear()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     val postgresConnect = new PostgresConnect(postgresConfig)
     insertTestData(postgresConnect)
@@ -70,7 +59,7 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
   }
 
   private def insertTestData(postgresConnect: PostgresConnect): Unit = {
-    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, extraction_config, dedup_config, router_config, dataset_config, status, data_version, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d3', 'dataset', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"validate\": true, \"mode\": \"Strict\"}', '{\"is_batch_event\": true, \"extraction_key\": \"events\", \"dedup_config\": {\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}}', '{\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}', '{\"topic\":\"d1-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":"+config.getInt("redis.port")+",\"redis_db\":2}', 'Live', 2, 'v1', 'ingest', 'System', 'System', now(), now());")
+    postgresConnect.execute("insert into datasets(id, type, data_schema, validation_config, extraction_config, dedup_config, router_config, dataset_config, status, data_version, api_version, entry_topic, created_by, updated_by, created_date, updated_date) values ('d3', 'dataset', '{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"https://sunbird.obsrv.com/test.json\",\"title\":\"Test Schema\",\"description\":\"Test Schema\",\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"vehicleCode\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"dealer\":{\"type\":\"object\",\"properties\":{\"dealerCode\":{\"type\":\"string\"},\"locationId\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"dealerCode\",\"locationId\"]},\"metrics\":{\"type\":\"object\",\"properties\":{\"bookingsTaken\":{\"type\":\"number\"},\"deliveriesPromised\":{\"type\":\"number\"},\"deliveriesDone\":{\"type\":\"number\"}}}},\"required\":[\"id\",\"vehicleCode\",\"date\",\"dealer\",\"metrics\"]}', '{\"validate\": true, \"mode\": \"Strict\"}', '{\"is_batch_event\": true, \"extraction_key\": \"events\", \"dedup_config\": {\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}}', '{\"drop_duplicates\": true, \"dedup_key\": \"id\", \"dedup_period\": 3}', '{\"topic\":\"d1-events\"}', '{\"data_key\":\"id\",\"timestamp_key\":\"date\",\"entry_topic\":\"ingest\",\"redis_db_host\":\"localhost\",\"redis_db_port\":" + config.getInt("redis.port") + ",\"redis_db\":2}', 'Live', 2, 'v1', 'ingest', 'System', 'System', now(), now());")
     postgresConnect.execute("update datasets set denorm_config = '" + s"""{"redis_db_host":"localhost","redis_db_port":$redisPort,"denorm_fields":[{"denorm_key":"vehicleCode","redis_db":3,"denorm_out_field":"vehicle_data"},{"denorm_key":"dealer.dealerCode","redis_db":4,"denorm_out_field":"dealer_data"}]}""" + "' where id='d1';")
     val redisConnection = new RedisConnect(denormConfig.redisHost, denormConfig.redisPort, denormConfig.redisConnectionTimeout)
     redisConnection.getConnection(3).set("HYUN-CRE-D6", EventFixture.DENORM_DATA_1)
@@ -98,9 +87,7 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(denormConfig)
     val task = new DenormalizerWindowStreamTask(denormConfig, kafkaConnector)
     task.process(env)
-    Future {
-      env.execute(denormConfig.jobName)
-    }
+    env.executeAsync(denormConfig.jobName)
 
     val outputs = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.denormOutputTopic, 4, timeout = 30.seconds)
     validateOutputs(outputs)
@@ -108,10 +95,7 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.kafkaSystemTopic, 5, timeout = 30.seconds)
     validateSystemEvents(systemEvents)
 
-    val mutableMetricsMap = mutable.Map[String, Long]()
-    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### DenormalizerStreamWindowTaskTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
-    validateMetrics(mutableMetricsMap)
+    validateMetrics(metricsReporter)
   }
 
   private def validateOutputs(outputs: List[String]): Unit = {
@@ -136,7 +120,7 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     systemEvents.count(f => {
       val event = JSONUtil.deserialize[SystemEvent](f)
       Producer.validator.equals(event.ctx.pdata.pid.get)
-    }) should be (2)
+    }) should be(2)
     systemEvents.count(f => {
       val event = JSONUtil.deserialize[SystemEvent](f)
       FunctionalError.MissingEventData.equals(event.data.error.get.error_type)
@@ -199,15 +183,23 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     })
   }
 
-  private def validateMetrics(mutableMetricsMap: mutable.Map[String, Long]): Unit = {
-    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormTotal}") should be(3)
-    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormFailed}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormSuccess}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d1.${denormConfig.denormPartialSuccess}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d2.${denormConfig.denormTotal}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d2.${denormConfig.eventsSkipped}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.d3.${denormConfig.eventFailedMetricsCount}") should be(1)
-    mutableMetricsMap(s"${denormConfig.jobName}.dxyz.${denormConfig.eventFailedMetricsCount}") should be(1)
+  private def validateMetrics(metricsReporter: InMemoryReporter): Unit = {
+
+    val d1Metrics = getMetrics(metricsReporter, "d1")
+    d1Metrics(denormConfig.denormTotal) should be(3)
+    d1Metrics(denormConfig.denormFailed) should be(1)
+    d1Metrics(denormConfig.denormSuccess) should be(1)
+    d1Metrics(denormConfig.denormPartialSuccess) should be(1)
+
+    val d2Metrics = getMetrics(metricsReporter, "d2")
+    d2Metrics(denormConfig.denormTotal) should be(1)
+    d2Metrics(denormConfig.eventsSkipped) should be(1)
+
+    val d3Metrics = getMetrics(metricsReporter, "d3")
+    d3Metrics(denormConfig.eventFailedMetricsCount) should be(1)
+
+    val dxyzMetrics = getMetrics(metricsReporter, "dxyz")
+    dxyzMetrics(denormConfig.eventFailedMetricsCount) should be(1)
   }
 
 }

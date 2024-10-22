@@ -3,12 +3,11 @@ package org.sunbird.obsrv.extractor
 import com.typesafe.config.{Config, ConfigFactory}
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+import org.apache.flink.runtime.testutils.{InMemoryReporter, MiniClusterResourceConfiguration}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.BaseMetricsReporter
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model.SystemConfig
@@ -17,15 +16,13 @@ import org.sunbird.obsrv.core.util.{FlinkUtil, JSONUtil}
 import org.sunbird.obsrv.extractor.task.{ExtractorConfig, ExtractorStreamTask}
 import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
+  private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
-    .setConfiguration(testConfiguration())
+    .setConfiguration(metricsReporter.addToConfiguration(new Configuration()))
     .setNumberSlotsPerTaskManager(1)
     .setNumberTaskManagers(1)
     .build)
@@ -41,16 +38,8 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     )
   implicit val deserializer: StringDeserializer = new StringDeserializer()
 
-  def testConfiguration(): Configuration = {
-    val config = new Configuration()
-    config.setString("metrics.reporter", "job_metrics_reporter")
-    config.setString("metrics.reporter.job_metrics_reporter.class", classOf[BaseMetricsReporter].getName)
-    config
-  }
-
   override def beforeAll(): Unit = {
     super.beforeAll()
-    BaseMetricsReporter.gaugeMetrics.clear()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     createTestTopics()
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.INVALID_JSON)
@@ -82,9 +71,8 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(pConfig)
     val task = new ExtractorStreamTask(pConfig, kafkaConnector)
     task.process(env)
-    Future {
-      env.execute(pConfig.jobName)
-    }
+    env.executeAsync(pConfig.jobName)
+
     val batchFailedEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaBatchFailedTopic, 1, timeout = 30.seconds)
     val invalidEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaFailedTopic, 2, timeout = 30.seconds)
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSystemTopic, 6, timeout = 30.seconds)
@@ -95,18 +83,15 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     validateInvalidEvents(invalidEvents)
     validateSystemEvents(systemEvents)
 
-    val mutableMetricsMap = mutable.Map[String, Long]()
-    BaseMetricsReporter.gaugeMetrics.toMap.mapValues(f => f.getValue()).map(f => mutableMetricsMap.put(f._1, f._2))
-    Console.println("### ExtractorStreamTestSpec:metrics ###", JSONUtil.serialize(getPrintableMetrics(mutableMetricsMap)))
-    validateMetrics(mutableMetricsMap)
+    validateMetrics(metricsReporter)
 
     val config2: Config = ConfigFactory.load("test2.conf")
     val extractorConfig = new ExtractorConfig(config2)
-    extractorConfig.eventMaxSize should be (SystemConfig.getLong("maxEventSize", 1048576L))
+    extractorConfig.eventMaxSize should be(SystemConfig.getLong("maxEventSize", 1048576L))
   }
 
   private def validateOutputEvents(outputEvents: List[String]) = {
-    outputEvents.size should be (3)
+    outputEvents.size should be(3)
     //TODO: Add assertions for all 3 events
     /*
     (OutEvent,{"event":{"dealer":{"dealerCode":"KUNUnited","locationId":"KUN1","email":"dealer1@gmail.com","phone":"9849012345"},"vehicleCode":"HYUN-CRE-D6","id":"1","date":"2023-03-01","metrics":{"bookingsTaken":50,"deliveriesPromised":20,"deliveriesDone":19}},"obsrv_meta":{"flags":{"extractor":"success"},"syncts":1701760331686,"prevProcessingTime":1701760337492,"error":{},"processingStartTime":1701760337087,"timespans":{"extractor":405}},"dataset":"d1"})
@@ -137,7 +122,7 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
     systemEvents.foreach(se => {
       val event = JSONUtil.deserialize[SystemEvent](se)
-      if(event.ctx.dataset.getOrElse("ALL").equals("ALL"))
+      if (event.ctx.dataset.getOrElse("ALL").equals("ALL"))
         event.ctx.dataset_type should be(None)
       else
         event.ctx.dataset_type should be(Some("event"))
@@ -154,14 +139,18 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
      */
   }
 
-  private def validateMetrics(mutableMetricsMap: mutable.Map[String, Long]): Unit = {
+  private def validateMetrics(metricsReporter: InMemoryReporter): Unit = {
 
-    mutableMetricsMap(s"${pConfig.jobName}.ALL.${pConfig.eventFailedMetricsCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.totalEventCount}") should be(5)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.eventFailedMetricsCount}") should be(2)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.skippedExtractionCount}") should be(1)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.successEventCount}") should be(2)
-    mutableMetricsMap(s"${pConfig.jobName}.d1.${pConfig.successExtractionCount}") should be(3)
+    val allMetrics = getMetrics(metricsReporter, "ALL")
+    allMetrics(pConfig.eventFailedMetricsCount) should be(1)
+
+    val d1Metrics = getMetrics(metricsReporter, "d1")
+    d1Metrics(pConfig.totalEventCount) should be(5)
+    d1Metrics(pConfig.eventFailedMetricsCount) should be(2)
+    d1Metrics(pConfig.skippedExtractionCount) should be(1)
+    d1Metrics(pConfig.successEventCount) should be(2)
+    d1Metrics(pConfig.successExtractionCount) should be(3)
+
   }
 
 }

@@ -29,9 +29,7 @@ object OTelService {
   }
 
   def init(): OpenTelemetry = {
-
     val collectorEndpoint: String = config.getString("otel.collector.endpoint")
-    println("endpint" + collectorEndpoint)
     val tracerProvider = createTracerProvider()
     val meterProvider = createMeterProvider(createOtlpMetricExporter(collectorEndpoint))
     val loggerProvider = createLoggerProvider(collectorEndpoint)
@@ -43,7 +41,6 @@ object OTelService {
       .setLoggerProvider(loggerProvider)
       .build()
 
-    // Add a shutdown hook to close SDK and flush logs
     sys.addShutdownHook(openTelemetry.close())
     openTelemetry
   }

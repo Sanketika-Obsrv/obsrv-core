@@ -56,7 +56,7 @@ trait SystemEventHandler {
         total_processing_time = getStat(obsrvMeta, Stats.total_processing_time), latency_time = getStat(obsrvMeta, Stats.latency_time), processing_time = getStat(obsrvMeta, Stats.processing_time)
       )))
     )
-    OTelMetricsGenerator.generateOTelSystemEvent(systemEvent)
+    OTelMetricsGenerator.generateOTelSystemEventMetric(systemEvent = systemEvent)
     JSONUtil.serialize(systemEvent)
   }
 

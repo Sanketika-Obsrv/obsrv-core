@@ -39,10 +39,10 @@ USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar $FLINK_HOME/usrlib/
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS master-data-processor-image
-USER flink
-RUN mkdir -p $FLINK_HOME/usrlib
-COPY --from=build-pipeline /app/pipeline/master-data-processor/target/master-data-processor-1.0.0.jar $FLINK_HOME/usrlib/
+# FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS master-data-processor-image
+# USER flink
+# RUN mkdir -p $FLINK_HOME/usrlib
+# COPY --from=build-pipeline /app/pipeline/master-data-processor/target/master-data-processor-1.0.0.jar $FLINK_HOME/usrlib/
 
 FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS lakehouse-connector-image
 USER flink

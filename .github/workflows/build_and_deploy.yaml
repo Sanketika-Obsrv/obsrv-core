@@ -29,8 +29,6 @@ jobs:
             target: "router-image"
           - image: "unified-pipeline"
             target: "unified-image"
-          - image: "master-data-processor"
-            target: "master-data-processor-image"
           - image: "lakehouse-connector"
             target: "lakehouse-connector-image"
           - image: "cache-indexer"

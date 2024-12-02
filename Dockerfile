@@ -29,10 +29,10 @@ USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/transformer/target/transformer-1.0.0.jar $FLINK_HOME/usrlib/
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS router-image
+FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS dataset-router-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
-COPY --from=build-pipeline /app/pipeline/druid-router/target/druid-router-1.0.0.jar $FLINK_HOME/usrlib/
+COPY --from=build-pipeline /app/pipeline/dataset-router/target/dataset-router-1.0.0.jar $FLINK_HOME/usrlib/
 
 # unified image build
 FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS unified-image

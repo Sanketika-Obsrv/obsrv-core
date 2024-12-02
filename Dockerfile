@@ -29,21 +29,18 @@ USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/transformer/target/transformer-1.0.0.jar $FLINK_HOME/usrlib/
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS router-image
+FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS dataset-router-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
-COPY --from=build-pipeline /app/pipeline/druid-router/target/druid-router-1.0.0.jar $FLINK_HOME/usrlib/
+COPY --from=build-pipeline /app/pipeline/dataset-router/target/dataset-router-1.0.0.jar $FLINK_HOME/usrlib/
 
+# unified image build
 FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS unified-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar $FLINK_HOME/usrlib/
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS master-data-processor-image
-USER flink
-RUN mkdir -p $FLINK_HOME/usrlib
-COPY --from=build-pipeline /app/pipeline/master-data-processor/target/master-data-processor-1.0.0.jar $FLINK_HOME/usrlib/
-
+# Lakehouse connector image build
 FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS lakehouse-connector-image
 USER flink
 RUN wget https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
@@ -55,6 +52,7 @@ RUN mv hudi-flink1.17-bundle-0.15.0.jar $FLINK_HOME/lib
 # RUN mkdir $FLINK_HOME/custom-lib
 COPY --from=build-pipeline /app/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
 
+# cache indexer image build
 FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS cache-indexer-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib

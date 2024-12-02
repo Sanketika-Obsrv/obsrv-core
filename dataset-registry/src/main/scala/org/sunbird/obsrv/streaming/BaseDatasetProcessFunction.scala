@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import org.sunbird.obsrv.core.otel.{OTelMetricsGenerator, OTelService}
 
 trait SystemEventHandler {
   private def getStatus(flags: Map[String, AnyRef], producer: Producer): Option[StatusCode] = {
@@ -44,7 +45,7 @@ trait SystemEventHandler {
     val flags = obsrvMeta("flags").asInstanceOf[Map[String, AnyRef]]
     val timespans = obsrvMeta("timespans").asInstanceOf[Map[String, AnyRef]]
 
-    JSONUtil.serialize(SystemEvent(
+    val systemEvent: SystemEvent = SystemEvent(
       EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(producer)), dataset = dataset, dataset_type = dataset_type),
       data = EData(error = error, pipeline_stats = Some(PipelineStats(extractor_events = None,
         extractor_status = getStatus(flags, Producer.extractor), extractor_time = getTime(timespans, Producer.extractor),
@@ -54,7 +55,9 @@ trait SystemEventHandler {
         transform_status = getStatus(flags, Producer.transformer), transform_time = getTime(timespans, Producer.transformer),
         total_processing_time = getStat(obsrvMeta, Stats.total_processing_time), latency_time = getStat(obsrvMeta, Stats.latency_time), processing_time = getStat(obsrvMeta, Stats.processing_time)
       )))
-    ))
+    )
+    OTelMetricsGenerator.generateOTelSystemEventMetric(systemEvent = systemEvent)
+    JSONUtil.serialize(systemEvent)
   }
 
   def getDatasetId(dataset: Option[String], config: BaseJobConfig[_]): String = {

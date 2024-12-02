@@ -28,22 +28,30 @@ object OTelService {
     ConfigFactory.load("baseconfig.conf").withFallback(ConfigFactory.systemEnvironment())
   }
 
-  def init(): OpenTelemetry = {
+  def init(): Option[OpenTelemetry] = {
     val collectorEndpoint: String = config.getString("otel.collector.endpoint")
-    val tracerProvider = createTracerProvider()
-    val meterProvider = createMeterProvider(createOtlpMetricExporter(collectorEndpoint))
-    val loggerProvider = createLoggerProvider(collectorEndpoint)
+    val enable: Boolean = config.getBoolean("otel.enable")
+    if (enable) {
+      val tracerProvider = createTracerProvider()
+      val meterProvider = createMeterProvider(createOtlpMetricExporter(collectorEndpoint))
+      val loggerProvider = createLoggerProvider(collectorEndpoint)
 
-    // Build the OpenTelemetry SDK
-    val openTelemetry = OpenTelemetrySdk.builder()
-      .setTracerProvider(tracerProvider)
-      .setMeterProvider(meterProvider)
-      .setLoggerProvider(loggerProvider)
-      .build()
+      // Build the OpenTelemetry SDK
+      val openTelemetry = OpenTelemetrySdk.builder()
+        .setTracerProvider(tracerProvider)
+        .setMeterProvider(meterProvider)
+        .setLoggerProvider(loggerProvider)
+        .build()
 
-    sys.addShutdownHook(openTelemetry.close())
-    openTelemetry
+      sys.addShutdownHook(openTelemetry.close())
+      println("Open Telemetry is Enabled")
+      Some(openTelemetry)
+    } else {
+      println("Open Telemetry is Disabled")
+      None // Return None if OpenTelemetry is not enabled
+    }
   }
+
 
   private def createOtlpMetricExporter(endpoint: String): OtlpGrpcMetricExporter = {
     OtlpGrpcMetricExporter.builder()
@@ -83,5 +91,9 @@ object OTelService {
     Resource.getDefault().toBuilder()
       .put(ResourceAttributes.SERVICE_NAME, serviceName)
       .build()
+  }
+
+  def getConfig: Config = {
+    this.config
   }
 }

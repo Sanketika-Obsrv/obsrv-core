@@ -4,13 +4,24 @@ import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.metrics.{LongCounter, Meter}
 import org.sunbird.obsrv.core.model.Models.SystemEvent
+import com.typesafe.config.{Config, ConfigFactory}
 
 object OTelMetricsGenerator {
 
-  private val oTel: OpenTelemetry = OTelService.init()
+  private val config: Config = OTelService.getConfig
+  private val oTel: Option[OpenTelemetry] = if (config.getBoolean("otel.enable")) OTelService.init() else None
 
   def generateOTelSystemEventMetric(systemEvent: SystemEvent): Unit = {
-    val meter: Meter = oTel.meterBuilder("obsrv-pipeline").build()
+    oTel match {
+      case Some(openTelemetry) =>
+        generate(systemEvent, openTelemetry)
+      case None =>
+        println("OpenTelemetry is disabled. No metrics generated.")
+    }
+  }
+
+  def generate(systemEvent: SystemEvent, openTelemetry: OpenTelemetry): Unit = {
+    val meter: Meter = openTelemetry.meterBuilder("obsrv-pipeline").build()
     val errorCount: LongCounter = meter.counterBuilder("event.error.count")
       .setDescription("Dataset Error Event Count")
       .setUnit("1")
@@ -25,8 +36,8 @@ object OTelMetricsGenerator {
       .put("ctx.dataset_type", systemEvent.ctx.dataset_type.getOrElse("unknown"))
       .build()
 
+    // Handle error events and add them to the error count
     systemEvent.data.error.foreach { errorLog =>
-      // Create attributes from the ErrorLog
       val errorAttributes: Attributes = Attributes.builder()
         .put("error.pdata_id", errorLog.pdata_id.toString)
         .put("error.pdata_status", errorLog.pdata_status.toString)
@@ -41,69 +52,95 @@ object OTelMetricsGenerator {
       errorCount.add(1, errorAttributes)
     }
 
+    // Handle pipeline stats
     systemEvent.data.pipeline_stats.foreach { stats =>
-
       // Extractor Job Metrics
       stats.extractor_events.foreach { events =>
-        MetricRegistry.extractorEventCounter.add(events.toLong, contextAttributes)
+        MetricRegistry.extractorEventCounter.foreach { counter =>
+          counter.add(events.toLong, contextAttributes) // Correct way to add to counter
+        }
       }
+
       stats.extractor_time.foreach { time =>
-        MetricRegistry.extractorTimeCounter.add(time, contextAttributes)
+        MetricRegistry.extractorTimeCounter.foreach { counter =>
+          counter.add(time, contextAttributes)
+        }
       }
+
       stats.extractor_status.foreach { status =>
-        MetricRegistry.extractorStatusCounter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        MetricRegistry.extractorStatusCounter.foreach { counter =>
+          counter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        }
       }
 
       // Schema Validator Metrics
       stats.validator_status.foreach { status =>
-        MetricRegistry.validatorStatusCounter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        MetricRegistry.validatorStatusCounter.foreach { counter =>
+          counter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        }
       }
       stats.validator_time.foreach { time =>
-        MetricRegistry.validatorTimeCounter.add(time, contextAttributes)
+        MetricRegistry.validatorTimeCounter.foreach { counter =>
+          counter.add(time, contextAttributes)
+        }
       }
 
       // De-Duplication Metrics
       stats.dedup_time.foreach { time =>
-        MetricRegistry.dedupTimeCounter.add(time, contextAttributes)
+        MetricRegistry.dedupTimeCounter.foreach { counter =>
+          counter.add(time, contextAttributes)
+        }
       }
+
       stats.dedup_status.foreach { status =>
-        MetricRegistry.dedupStatusCounter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build()
-        )
+        MetricRegistry.dedupStatusCounter.foreach { counter =>
+          counter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        }
       }
 
       // De-normalisation Metrics
-
       stats.denorm_time.foreach { time =>
-        MetricRegistry.denormTimeCounter.add(time, contextAttributes)
+        MetricRegistry.denormTimeCounter.foreach { counter =>
+          counter.add(time, contextAttributes)
+        }
       }
 
       stats.denorm_status.foreach { status =>
-        MetricRegistry.denormStatusCounter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        MetricRegistry.denormStatusCounter.foreach { counter =>
+          counter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        }
       }
 
       // Data transformation Metrics
       stats.transform_time.foreach { time =>
-        MetricRegistry.transformTimeCounter.add(time, contextAttributes)
+        MetricRegistry.transformTimeCounter.foreach { counter =>
+          counter.add(time, contextAttributes)
+        }
       }
       stats.transform_status.foreach { status =>
-        MetricRegistry.transformStatusCounter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        MetricRegistry.transformStatusCounter.foreach { counter =>
+          counter.add(1, Attributes.builder().put("status", status.toString).putAll(contextAttributes).build())
+        }
       }
 
       // Common timestamp Metrics
       stats.total_processing_time.foreach { time =>
-        //val totalProcessingTimeCounter: LongCounter = meter.counterBuilder("pipeline.total.processing.time").setDescription("Total Processing Time").setUnit("ms").build()
-        MetricRegistry.totalProcessingTimeCounter.add(time, contextAttributes)
+        MetricRegistry.totalProcessingTimeCounter.foreach { counter =>
+          counter.add(time, contextAttributes)
+        }
       }
 
       stats.latency_time.foreach { time =>
-        MetricRegistry.latencyTimeCounter.add(time, contextAttributes)
+        MetricRegistry.latencyTimeCounter.foreach { counter =>
+          counter.add(time, contextAttributes)
+        }
       }
 
       stats.processing_time.foreach { time =>
-        //val processingTimeCounter: LongCounter = meter.counterBuilder("pipeline.processing.time").setDescription("Processing Time").setUnit("ms").build()
-        MetricRegistry.processingTimeCounter.add(time, contextAttributes)
+        MetricRegistry.processingTimeCounter.foreach { counter =>
+          counter.add(time, contextAttributes)
+        }
       }
     }
-
   }
 }

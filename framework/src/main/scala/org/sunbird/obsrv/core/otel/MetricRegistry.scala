@@ -2,85 +2,38 @@ package org.sunbird.obsrv.core.otel
 
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.metrics.{LongCounter, Meter}
+import com.typesafe.config.Config
 
 object MetricRegistry {
-  private val oTel: OpenTelemetry = OTelService.init()
-  private val meter: Meter = oTel.meterBuilder("obsrv-pipeline").build()
+  private val config: Config = OTelService.getConfig
+  private val oTel: Option[OpenTelemetry] =
+    if (config.getBoolean("otel.enable")) OTelService.init()
+    else None
 
-  val errorCount: LongCounter = meter.counterBuilder("event.error.count")
-    .setDescription("Dataset Error Event Count")
-    .setUnit("1")
-    .build()
+  private val meter: Option[Meter] = oTel.map(_.meterBuilder("obsrv-pipeline").build())
 
-  val processingTimeCounter: LongCounter = meter.counterBuilder("pipeline.processing.time")
-    .setDescription("Processing Time")
-    .setUnit("ms")
-    .build()
+  // Helper method to register a metric
+  private def register(name: String, description: String, unit: String): Option[LongCounter] = {
+    meter.map(_.counterBuilder(name)
+      .setDescription(description)
+      .setUnit(unit)
+      .build())
+  }
 
-  val totalProcessingTimeCounter: LongCounter = meter.counterBuilder("pipeline.total.processing.time")
-    .setDescription("Total Processing Time")
-    .setUnit("ms")
-    .build()
-
-  val latencyTimeCounter: LongCounter = meter.counterBuilder("pipeline.latency.time")
-    .setDescription("Latency Time")
-    .setUnit("ms")
-    .build()
-
-  val extractorEventCounter: LongCounter = meter.counterBuilder("pipeline.extractor.events.count")
-    .setDescription("Count of Extractor Events")
-    .setUnit("1")
-    .build()
-
-  val extractorTimeCounter: LongCounter = meter.counterBuilder("pipeline.extractor.time")
-    .setDescription("Extractor Processing Time")
-    .setUnit("ms")
-    .build()
-
-  val transformStatusCounter: LongCounter = meter.counterBuilder("pipeline.transform.status")
-    .setDescription("Data transform Status")
-    .setUnit("1")
-    .build()
-
-  val transformTimeCounter: LongCounter = meter.counterBuilder("pipeline.transform.time")
-    .setDescription("Transformation Processing Time")
-    .setUnit("ms")
-    .build()
-
-  val denormStatusCounter: LongCounter = meter.counterBuilder("pipeline.denorm.status")
-    .setDescription("Denorm Status")
-    .setUnit("1")
-    .build()
-
-  val denormTimeCounter: LongCounter = meter.counterBuilder("pipeline.denorm.time")
-    .setDescription("Denormalization Processing Time")
-    .setUnit("ms")
-    .build()
-
-  val dedupStatusCounter: LongCounter = meter.counterBuilder("pipeline.de-dup.status")
-    .setDescription("De-dup Status")
-    .setUnit("1")
-    .build()
-
-  val dedupTimeCounter: LongCounter = meter.counterBuilder("pipeline.dedup.time")
-    .setDescription("Deduplication Processing Time")
-    .setUnit("ms")
-    .build()
-
-  val validatorTimeCounter: LongCounter = meter.counterBuilder("pipeline.validator.time")
-    .setDescription("Validator Processing Time")
-    .setUnit("ms")
-    .build()
-
-  val validatorStatusCounter: LongCounter = meter.counterBuilder("pipeline.validator.status")
-    .setDescription("Validator Status")
-    .setUnit("1")
-    .build()
-
-  val extractorStatusCounter: LongCounter = meter.counterBuilder("pipeline.extractor.status")
-    .setDescription("Extractor Status")
-    .setUnit("1")
-    .build()
-
+  // Metric definitions using the helper method
+  val errorCount: Option[LongCounter] = register("event.error.count", "Dataset Error Event Count", "1")
+  val processingTimeCounter: Option[LongCounter] = register("pipeline.processing.time", "Processing Time", "ms")
+  val totalProcessingTimeCounter: Option[LongCounter] = register("pipeline.total.processing.time", "Total Processing Time", "ms")
+  val latencyTimeCounter: Option[LongCounter] = register("pipeline.latency.time", "Latency Time", "ms")
+  val extractorEventCounter: Option[LongCounter] = register("pipeline.extractor.events.count", "Count of Extractor Events", "1")
+  val extractorTimeCounter: Option[LongCounter] = register("pipeline.extractor.time", "Extractor Processing Time", "ms")
+  val transformStatusCounter: Option[LongCounter] = register("pipeline.transform.status", "Data Transform Status", "1")
+  val transformTimeCounter: Option[LongCounter] = register("pipeline.transform.time", "Transformation Processing Time", "ms")
+  val denormStatusCounter: Option[LongCounter] = register("pipeline.denorm.status", "Denormalization Status", "1")
+  val denormTimeCounter: Option[LongCounter] = register("pipeline.denorm.time", "Denormalization Processing Time", "ms")
+  val dedupStatusCounter: Option[LongCounter] = register("pipeline.dedup.status", "Deduplication Status", "1")
+  val dedupTimeCounter: Option[LongCounter] = register("pipeline.dedup.time", "Deduplication Processing Time", "ms")
+  val validatorTimeCounter: Option[LongCounter] = register("pipeline.validator.time", "Validator Processing Time", "ms")
+  val validatorStatusCounter: Option[LongCounter] = register("pipeline.validator.status", "Validator Status", "1")
+  val extractorStatusCounter: Option[LongCounter] = register("pipeline.extractor.status", "Extractor Status", "1")
 }
-

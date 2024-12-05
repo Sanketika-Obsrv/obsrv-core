@@ -36,6 +36,13 @@ trait SystemEventHandler {
     obsrvMeta.get(stat.toString).map(f => f.asInstanceOf[Number].longValue())
   }
 
+  private def getSource(obsrvMeta: Map[String, AnyRef]): Option[Source] = {
+    if(obsrvMeta.get("source").isDefined) {
+      val source = obsrvMeta("source").asInstanceOf[Map[String, String]]
+      Some(Source(source.get("connector").getOrElse("api"), source.get("connectorInstance").getOrElse("api")))
+    } else None
+  }
+
   def getError(error: ErrorConstants.Error, producer: Producer, functionalError: FunctionalError): Option[ErrorLog] = {
     Some(ErrorLog(pdata_id = producer, pdata_status = StatusCode.failed, error_type = functionalError, error_code = error.errorCode, error_message = error.errorMsg, error_level = ErrorLevel.critical, error_count = Some(1)))
   }
@@ -46,7 +53,7 @@ trait SystemEventHandler {
     val timespans = obsrvMeta("timespans").asInstanceOf[Map[String, AnyRef]]
 
     val systemEvent: SystemEvent = SystemEvent(
-      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(producer)), dataset = dataset, dataset_type = dataset_type),
+      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(producer)), dataset = dataset, dataset_type = dataset_type, eid = None, source = getSource(obsrvMeta)),
       data = EData(error = error, pipeline_stats = Some(PipelineStats(extractor_events = None,
         extractor_status = getStatus(flags, Producer.extractor), extractor_time = getTime(timespans, Producer.extractor),
         validator_status = getStatus(flags, Producer.validator), validator_time = getTime(timespans, Producer.validator),

@@ -39,7 +39,11 @@ class MapDeserializationSchema extends KafkaRecordDeserializationSchema[mutable.
         "processingStartTime" -> System.currentTimeMillis(),
         "flags" -> Map(),
         "timespans" -> Map(),
-        "error" -> Map()
+        "error" -> Map(),
+        "source" -> Map(
+          "connector" -> "api",
+          "connectorInstance" -> "api",
+        )
       ))
     }
   }

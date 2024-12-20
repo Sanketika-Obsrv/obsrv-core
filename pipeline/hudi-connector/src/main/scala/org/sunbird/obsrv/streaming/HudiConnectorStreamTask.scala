@@ -95,6 +95,11 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       conf.setString("hoodie.metrics.pushgateway.host", config.metricsReporterHost)
       conf.setString("hoodie.metrics.pushgateway.port", config.metricsReporterPort)
     }
+    if (config.metricsReportType.equalsIgnoreCase("JMX")) {
+      conf.setString("hoodie.metrics.reporter.type", config.metricsReportType)
+      conf.setString("hoodie.metrics.jmx.host", config.metricsReporterHost)
+      conf.setString("hoodie.metrics.jmx.port", config.metricsReporterPort)
+    }
     val partitionField = datasetSchema.schema.columnSpec.filter(f => f.name.equalsIgnoreCase(datasetSchema.schema.partitionColumn)).head
     if(partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch")) {
       conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")

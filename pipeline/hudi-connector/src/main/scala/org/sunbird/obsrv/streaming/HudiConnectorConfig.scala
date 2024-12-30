@@ -61,4 +61,15 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
   val hudiCompactionTaskMemory: Int = config.getInt("hudi.write.compaction.max.memory")
   val hudiFsAtomicCreationSupport: String = config.getString("hudi.fs.atomic_creation.support")
 
+  // Metrics
+
+  val inputEventCountMetric = "inputEventCount"
+  val failedEventCountMetric = "failedEventCount"
+
+  // Metrics Exporter
+  val metricsReportType =  config.getString("metrics.reporter.type")
+  val metricsReporterHost = config.getString("metrics.reporter.host")
+  val metricsReporterPort = config.getString("metrics.reporter.port")
+
+
 }

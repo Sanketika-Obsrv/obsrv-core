@@ -47,10 +47,14 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
   override def map(event: MMap[String, AnyRef]): RowData = {
     try {
       println("======= map method..")
+      println(s"Event size: ${event.size}")
+
       if (event.nonEmpty) {
         inputEventCount.inc(event.size)  // Increment by the event size
       }
       val rowData = convertToRowData(event)
+      println(s"Current inputEventCount: ${inputEventCount.getCount}")
+
       rowData
     } catch {
       case ex: Exception =>

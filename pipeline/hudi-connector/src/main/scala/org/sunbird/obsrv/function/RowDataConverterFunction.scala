@@ -16,51 +16,40 @@ import scala.collection.mutable.{Map => MMap}
 
 class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) extends RichMapFunction[MMap[String, AnyRef], RowData] {
 
-  // Logger for logging
   private val logger = LoggerFactory.getLogger(classOf[RowDataConverterFunction])
 
-  // Initialize counters for input and failed events
   private var inputEventCount: Counter = _
   private var failedEventCount: Counter = _
 
-  // Variables for converters and object mapper
   var jsonToRowDataConverters: JsonToRowDataConverters = _
   var objectMapper: ObjectMapper = _
   var hudiSchemaParser: HudiSchemaParser = _
 
-  // Initialize the start time
-  private var startTime: Long = _
-
   override def open(parameters: Configuration): Unit = {
     super.open(parameters)
 
-    // Initialize required converters and parsers
     jsonToRowDataConverters = new JsonToRowDataConverters(false, true, TimestampFormat.SQL)
     objectMapper = new ObjectMapper()
     hudiSchemaParser = new HudiSchemaParser()
 
     // Register Flink metrics for inputEventCount and failedEventCount
-    inputEventCount = getRuntimeContext.getMetricGroup.counter("input-event-count")
-    failedEventCount = getRuntimeContext.getMetricGroup.counter("input-event-count")
+    inputEventCount = getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(datasetId).counter(config.inputEventCountMetric)
+    failedEventCount = getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(datasetId).counter(config.failedEventCountMetric)
   }
 
   override def map(event: MMap[String, AnyRef]): RowData = {
-    startTime = System.currentTimeMillis()
-
     try {
       inputEventCount.inc(event.size)
       val rowData = convertToRowData(event)
       rowData
     } catch {
       case ex: Exception =>
-        // Increment the failed event count in case of failure
         failedEventCount.inc()
         logger.error("Failed to process record", ex)
         throw ex
     }
   }
 
-  // Method to convert event data into RowData
   def convertToRowData(data: MMap[String, AnyRef]): RowData = {
     val eventJson = JSONUtil.serialize(data)
     val flattenedData = hudiSchemaParser.parseJson(datasetId, eventJson)
@@ -70,7 +59,6 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
     rowData
   }
 
-  // Custom method to retrieve the metric values (e.g., for exposing them in a monitoring system)
   def getMetrics: Map[String, Long] = {
     Map(
       "input-event-count" -> inputEventCount.getCount,

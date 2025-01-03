@@ -63,8 +63,8 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
 
   // Metrics
 
-  val inputEventCountMetric = "inputEventCount"
-  val failedEventCountMetric = "failedEventCount"
+  val inputEventCountMetric = "input-event-count"
+  val failedEventCountMetric = "failed-event-count"
 
   // Metrics Exporter
   val metricsReportType =  config.getString("metrics.reporter.type")

@@ -26,8 +26,8 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
   // Logger for logging
   private val logger = LoggerFactory.getLogger(classOf[RowDataConverterFunction])
 
-  protected val metricsList: MetricsList = getMetricsList()
-  protected val metrics: Metrics = registerMetrics(metricsList.datasets, metricsList.metrics)
+  private val metricsList: MetricsList = getMetricsList()
+  private val metrics: Metrics = registerMetrics(metricsList.datasets, metricsList.metrics)
 
 
 
@@ -51,6 +51,7 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
 
   override def map(event: MMap[String, AnyRef]): RowData = {
     startTime = System.currentTimeMillis()
+    metrics.incCounter(datasetId, config.inputEventCountMetric)
     try {
       metrics.incCounter(datasetId, config.inputEventCountMetric, event.size)
       val rowData = convertToRowData(event)

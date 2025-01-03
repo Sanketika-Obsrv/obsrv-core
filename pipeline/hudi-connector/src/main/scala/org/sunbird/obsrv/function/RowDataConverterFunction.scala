@@ -56,6 +56,16 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
 
       // Convert the event data into RowData for further processing
       val rowData = convertToRowData(event)
+
+      logger.info("Metric inputEventCount: " + inputEventCount)
+      logger.info("Metric failedEventCount: " + failedEventCount)
+
+      logger.info("Before increment: inputEventCount=" + inputEventCount.getCount)
+      inputEventCount.inc()
+      logger.info("After increment: inputEventCount=" + inputEventCount.getCount)
+
+
+
       rowData
     } catch {
       case ex: Exception =>

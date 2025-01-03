@@ -33,15 +33,21 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
     hudiSchemaParser = new HudiSchemaParser()
 
     // Register Flink metrics for inputEventCount and failedEventCount
-    inputEventCount = getRuntimeContext.getMetricGroup
-      .addGroup(config.jobName)
-      .addGroup(datasetId)
-      .counter(config.inputEventCountMetric)
 
-    failedEventCount = getRuntimeContext.getMetricGroup
-      .addGroup(config.jobName)
-      .addGroup(datasetId)
-      .counter(config.failedEventCountMetric)
+    if (inputEventCount == null) {
+      inputEventCount = getRuntimeContext.getMetricGroup
+        .addGroup(config.jobName)
+        .addGroup(datasetId)
+        .counter(config.inputEventCountMetric)
+    }
+
+    if (failedEventCount == null) {
+      failedEventCount = getRuntimeContext.getMetricGroup
+        .addGroup(config.jobName)
+        .addGroup(datasetId)
+        .counter(config.failedEventCountMetric)
+    }
+
   }
 
   override def map(event: MMap[String, AnyRef]): RowData = {

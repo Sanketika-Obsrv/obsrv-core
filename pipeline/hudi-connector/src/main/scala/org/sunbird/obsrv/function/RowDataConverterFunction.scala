@@ -42,11 +42,11 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
     objectMapper = new ObjectMapper()
     hudiSchemaParser = new HudiSchemaParser()
 
-    // Register metrics
-    getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(datasetId)
-      .counter(config.inputEventCountMetric, new SimpleCounter())
-    getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(datasetId)
-      .counter(config.failedEventCountMetric, new SimpleCounter())
+//    // Register metrics
+//    getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(datasetId)
+//      .counter(config.inputEventCountMetric, new SimpleCounter())
+//    getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(datasetId)
+//      .counter(config.failedEventCountMetric, new SimpleCounter())
   }
 
   override def map(event: MMap[String, AnyRef]): RowData = {

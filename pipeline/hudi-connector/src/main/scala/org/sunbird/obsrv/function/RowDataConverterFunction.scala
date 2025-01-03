@@ -14,12 +14,9 @@ import org.sunbird.obsrv.streaming.HudiConnectorConfig
 
 import scala.collection.mutable.{Map => MMap}
 
-class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) extends RichMapFunction[MMap[String, AnyRef], RowData] {
+class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String, inputEventCount: Counter, failedEventCount: Counter) extends RichMapFunction[MMap[String, AnyRef], RowData] {
 
   private val logger = LoggerFactory.getLogger(classOf[RowDataConverterFunction])
-
-  private var inputEventCount: Counter = _
-  private var failedEventCount: Counter = _
 
   var jsonToRowDataConverters: JsonToRowDataConverters = _
   var objectMapper: ObjectMapper = _
@@ -32,22 +29,7 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
     objectMapper = new ObjectMapper()
     hudiSchemaParser = new HudiSchemaParser()
 
-    // Register Flink metrics for inputEventCount and failedEventCount
-
-    if (inputEventCount == null) {
-      inputEventCount = getRuntimeContext.getMetricGroup
-        .addGroup(config.jobName)
-        .addGroup(datasetId)
-        .counter(config.inputEventCountMetric)
-    }
-
-    if (failedEventCount == null) {
-      failedEventCount = getRuntimeContext.getMetricGroup
-        .addGroup(config.jobName)
-        .addGroup(datasetId)
-        .counter(config.failedEventCountMetric)
-    }
-
+    // No need to initialize the counters here as they are passed in the constructor
   }
 
   override def map(event: MMap[String, AnyRef]): RowData = {
@@ -56,7 +38,6 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
         inputEventCount.inc()
       }
       val rowData = convertToRowData(event)
-      println(s"Current inputEventCount: ${inputEventCount.getCount}")
       rowData
     } catch {
       case ex: Exception =>
@@ -75,7 +56,6 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
     rowData
   }
 
-  // Custom method to retrieve the metric values
   def getMetrics: Map[String, Long] = {
     Map(
       "input-event-count" -> inputEventCount.getCount,
@@ -83,3 +63,4 @@ class RowDataConverterFunction(config: HudiConnectorConfig, datasetId: String) e
     )
   }
 }
+

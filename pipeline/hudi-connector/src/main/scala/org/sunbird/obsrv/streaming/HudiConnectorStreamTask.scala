@@ -9,6 +9,8 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.contrib.streaming.state.EmbeddedRocksDBStateBackend
 import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSink}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
+import org.apache.flink.streaming.api.functions.ProcessFunction
+import org.apache.flink.table.data.RowData
 import org.apache.hudi.common.config.TimestampKeyGeneratorConfig
 import org.apache.hudi.configuration.{FlinkOptions, OptionsResolver}
 import org.apache.hudi.sink.utils.Pipelines

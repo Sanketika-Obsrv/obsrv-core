@@ -5,6 +5,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.slf4j.LoggerFactory
+import org.sunbird.obsrv.core.model.ErrorConstants.ErrorValue
 import org.sunbird.obsrv.core.model.FunctionalError.FunctionalError
 import org.sunbird.obsrv.core.model.Models._
 import org.sunbird.obsrv.core.model._
@@ -150,7 +151,11 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
                                 context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context,
                                 validationFailureMsgs: List[ValidationMsg]): Unit = {
     metrics.incCounter(dataset.id, config.validationFailureMetricsCount)
-    context.output(config.invalidEventsOutputTag, markFailed(event, ErrorConstants.SCHEMA_VALIDATION_FAILED, Producer.validator))
+    val errorWithDetails = ErrorValue(
+      ErrorConstants.SCHEMA_VALIDATION_FAILED.errorCode,
+      ErrorConstants.SCHEMA_VALIDATION_FAILED.errorMsg + ": " + JSONUtil.serialize(validationFailureMsgs)
+    )
+    context.output(config.invalidEventsOutputTag, markFailed(event, errorWithDetails, Producer.validator))
     generateSystemEvents(dataset, validationFailureMsgs, context)
   }
 

@@ -46,18 +46,18 @@ class TransformerFunction(config: TransformerConfig) extends BaseDatasetProcessF
       case StatusCode.failed =>
         metrics.incCounter(dataset.id, config.transformFailedCount)
         context.output(config.transformerFailedOutputTag, markFailed(msg, ErrorConstants.ERR_TRANSFORMATION_FAILED, Producer.transformer))
-        logSystemEvents(dataset, result, context)
+        logSystemEvents(dataset, msg, result, context)
       case StatusCode.partial =>
         metrics.incCounter(dataset.id, config.transformPartialCount)
         context.output(config.transformerOutputTag, markPartial(msg, Producer.transformer))
-        logSystemEvents(dataset, result, context)
+        logSystemEvents(dataset, msg, result, context)
       case StatusCode.success =>
         metrics.incCounter(dataset.id, config.transformSuccessCount)
         context.output(config.transformerOutputTag, markSuccess(msg, Producer.transformer))
     }
   }
 
-  private def logSystemEvents(dataset: Dataset, result: TransformationStatus, ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
+  private def logSystemEvents(dataset: Dataset, msg: mutable.Map[String, AnyRef], result: TransformationStatus, ctx: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
     result.fieldStatus.filter(p => !p.success).groupBy(f => f.error.get).map(f => (f._1, f._2.size))
       .foreach(errCount => {
         val err = errCount._1
@@ -70,7 +70,7 @@ class TransformerFunction(config: TransformerConfig) extends BaseDatasetProcessF
 
         ctx.output(config.systemEventsOutputTag, JSONUtil.serialize(SystemEvent(
           EventID.METRIC,
-          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType), eid = None, source = getSourceFromEvent(msg)),
           data = EData(error = Some(ErrorLog(pdata_id = Producer.denorm, pdata_status = StatusCode.failed, error_type = functionalError, error_code = err.errorCode, error_message = err.errorMsg, error_level = ErrorLevel.critical, error_count = Some(errCount._2))))
         )))
       })

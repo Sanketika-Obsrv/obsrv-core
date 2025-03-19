@@ -46,7 +46,7 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
     if (dedupConfig.isDefined && dedupConfig.get.dropDuplicates.get) {
       val event = msg(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]]
       val eventAsText = JSONUtil.serialize(event)
-      val isDup = isDuplicate(dataset, dedupConfig.get.dedupKey, eventAsText, context)
+      val isDup = isDuplicate(dataset, dedupConfig.get.dedupKey, eventAsText, msg, context)
       if (isDup) {
         metrics.incCounter(dataset.id, config.duplicationEventMetricsCount)
         context.output(config.duplicateEventsOutputTag, markFailed(msg, ErrorConstants.DUPLICATE_EVENT_FOUND, Producer.dedup))
@@ -60,7 +60,7 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
     }
   }
 
-  private def isDuplicate(dataset: Dataset, dedupKey: Option[String], event: String,
+  private def isDuplicate(dataset: Dataset, dedupKey: Option[String], event: String, msg: mutable.Map[String, AnyRef],
                           context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Boolean = {
     try {
       super.isDuplicate(dataset.id, dedupKey, event)(dedupEngine)
@@ -68,7 +68,7 @@ class DeduplicationFunction(config: PipelinePreprocessorConfig)(implicit val eve
       case ex: ObsrvException =>
         val sysEvent = JSONUtil.serialize(SystemEvent(
           EventID.METRIC,
-          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.dedup)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.dedup)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType), eid = None, source = getSourceFromEvent(msg)),
           data = EData(error = Some(ErrorLog(pdata_id = Producer.dedup, pdata_status = StatusCode.skipped, error_type = FunctionalError.DedupFailed, error_code = ex.error.errorCode, error_message = ex.error.errorMsg, error_level = ErrorLevel.warn)))
         ))
         logger.warn("BaseDeduplication:isDuplicate() | Exception", ex)

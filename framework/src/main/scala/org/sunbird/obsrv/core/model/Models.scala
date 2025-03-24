@@ -57,7 +57,7 @@ object FunctionalError extends Enumeration {
 class ProducerType extends TypeReference[Producer.type]
 object Producer extends Enumeration {
   type Producer = Value
-  val extractor, dedup, validator, denorm, transformer, router, masterdataprocessor = Value
+  val extractor, dedup, validator, denorm, transformer, summarizer, router, masterdataprocessor = Value
 }
 
 class ModuleIDType extends TypeReference[ModuleID.type]

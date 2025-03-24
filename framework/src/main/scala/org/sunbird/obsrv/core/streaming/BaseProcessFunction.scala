@@ -16,6 +16,7 @@ import java.lang
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 
 case class MetricsList(datasets: List[String], metrics: List[String])
 
@@ -210,5 +211,41 @@ abstract class WindowBaseProcessFunction[I, O, K](config: BaseJobConfig[O]) exte
   override def process(key: K, context: ProcessWindowFunction[I, O, K, TimeWindow]#Context, elements: lang.Iterable[I], out: Collector[O]): Unit = {
     process(key, context, elements, metrics)
   }
+
+}
+
+abstract class BaseKeyedProcessFunction[K, I, O](config: BaseJobConfig[O]) extends KeyedProcessFunction[K, I, O] with JobMetrics with BaseFunction {
+  protected val metricsList: MetricsList = getMetricsList()
+  protected val metrics: Metrics = registerMetrics(metricsList.datasets, metricsList.metrics)
+
+  def getMetricsList(): MetricsList
+
+  override def open(parameters: Configuration): Unit = {
+    metricsList.datasets.map { dataset =>
+      metricsList.metrics.map(metric => {
+        getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(dataset)
+          .gauge[Long, ScalaGauge[Long]](metric, ScalaGauge[Long](() =>
+            // $COVERAGE-OFF$
+            metrics.getAndReset(dataset, metric)
+            // $COVERAGE-ON$
+          ))
+      })
+    }
+    val defaultDatasetId = SystemConfig.getString("defaultDatasetId", "ALL")
+    getRuntimeContext.getMetricGroup.addGroup(config.jobName).addGroup(defaultDatasetId)
+      .gauge[Long, ScalaGauge[Long]](config.eventFailedMetricsCount, ScalaGauge[Long](() =>
+        // $COVERAGE-OFF$
+        metrics.getAndReset(defaultDatasetId, config.eventFailedMetricsCount)
+        // $COVERAGE-ON$
+      ))
+  }
+
+  def processElement(event: I, context: KeyedProcessFunction[K, I, O]#Context, metrics: Metrics): Unit
+
+  override def processElement(event: I, context: KeyedProcessFunction[K, I, O]#Context, out: Collector[O]): Unit = {
+    processElement(event, context, metrics)
+  }
+
+  override def onTimer(timestamp: Long, context: KeyedProcessFunction[K, I, O]#OnTimerContext, out: Collector[O])
 
 }

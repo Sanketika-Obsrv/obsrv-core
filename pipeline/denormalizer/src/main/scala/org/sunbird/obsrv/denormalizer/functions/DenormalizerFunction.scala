@@ -44,7 +44,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
 
     metrics.incCounter(dataset.id, config.denormTotal)
     denormCache.open(dataset)
-    if (dataset.denormConfig.isDefined) {
+    if (dataset.denormConfig.exists(_.denormFields.nonEmpty)) {
       val event = DenormEvent(msg)
       val denormEvent = denormCache.denormEvent(dataset.id, event, dataset.denormConfig.get.denormFields)
       val status = getDenormStatus(denormEvent)

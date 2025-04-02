@@ -22,7 +22,6 @@
 		<module>transformer</module>
 		<module>dataset-router</module>
 		<module>unified-pipeline</module>
-		<!-- <module>master-data-processor</module> -->
 		<module>hudi-connector</module>
 		<module>cache-indexer</module>
 	</modules>

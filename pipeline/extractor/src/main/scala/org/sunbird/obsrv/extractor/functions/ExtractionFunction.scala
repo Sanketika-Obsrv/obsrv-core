@@ -43,7 +43,7 @@ class ExtractionFunction(config: ExtractorConfig)
     if (batchEvent.contains(Constants.INVALID_JSON)) {
       context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.ERR_INVALID_EVENT))
       metrics.incCounter(config.defaultDatasetID, config.eventFailedMetricsCount)
-      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), ErrorConstants.ERR_INVALID_EVENT, FunctionalError.InvalidJsonData))
+      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), batchEvent, ErrorConstants.ERR_INVALID_EVENT, FunctionalError.InvalidJsonData))
       return
     }
     addStartProcessingTimeIfMissing(batchEvent)
@@ -52,7 +52,7 @@ class ExtractionFunction(config: ExtractorConfig)
     if (datasetIdOpt.isEmpty) {
       context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_ID))
       metrics.incCounter(config.defaultDatasetID, config.eventFailedMetricsCount)
-      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), ErrorConstants.MISSING_DATASET_ID, FunctionalError.MissingDatasetId))
+      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(config.defaultDatasetID), batchEvent, ErrorConstants.MISSING_DATASET_ID, FunctionalError.MissingDatasetId))
       return
     }
     val datasetId = datasetIdOpt.get.asInstanceOf[String]
@@ -61,13 +61,13 @@ class ExtractionFunction(config: ExtractorConfig)
     if (datasetOpt.isEmpty) {
       context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.MISSING_DATASET_CONFIGURATION))
       metrics.incCounter(datasetId, config.failedExtractionCount)
-      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(datasetId), ErrorConstants.MISSING_DATASET_CONFIGURATION, FunctionalError.MissingDatasetId))
+      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(datasetId), batchEvent, ErrorConstants.MISSING_DATASET_CONFIGURATION, FunctionalError.MissingDatasetId))
       return
     }
     val dataset = datasetOpt.get
     if (!containsEvent(batchEvent) && dataset.extractionConfig.isDefined && dataset.extractionConfig.get.isBatchEvent.get) {
       if (dataset.extractionConfig.get.dedupConfig.isDefined && dataset.extractionConfig.get.dedupConfig.get.dropDuplicates.get) {
-        val isDup = isDuplicate(dataset, dataset.extractionConfig.get.dedupConfig.get.dedupKey, eventAsText, context)
+        val isDup = isDuplicate(dataset, dataset.extractionConfig.get.dedupConfig.get.dedupKey, eventAsText, batchEvent, context)
         if (isDup) {
           metrics.incCounter(dataset.id, config.duplicateExtractionCount)
           context.output(config.duplicateEventOutputTag, markBatchFailed(batchEvent, ErrorConstants.DUPLICATE_BATCH_EVENT_FOUND))
@@ -87,7 +87,7 @@ class ExtractionFunction(config: ExtractorConfig)
     }
   }
 
-  private def isDuplicate(dataset: Dataset, dedupKey: Option[String], event: String,
+  private def isDuplicate(dataset: Dataset, dedupKey: Option[String], event: String, batchEvent: mutable.Map[String, AnyRef],
                           context: ProcessFunction[mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Boolean = {
     try {
       super.isDuplicate(dataset.id, dedupKey, event)(dedupEngine)
@@ -95,7 +95,7 @@ class ExtractionFunction(config: ExtractorConfig)
       case ex: ObsrvException =>
         val sysEvent = JSONUtil.serialize(SystemEvent(
           EventID.METRIC,
-          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType), eid = None, source = getSourceFromEvent(batchEvent)),
           data = EData(error = Some(ErrorLog(pdata_id = Producer.dedup, pdata_status = StatusCode.skipped, error_type = FunctionalError.DedupFailed, error_code = ex.error.errorCode, error_message = ex.error.errorMsg, error_level = ErrorLevel.warn)))
         ))
         logger.warn("BaseDeduplication:isDuplicate() | Exception", ex)
@@ -110,7 +110,7 @@ class ExtractionFunction(config: ExtractorConfig)
     if (!super.containsEvent(batchEvent)) {
       metrics.incCounter(dataset.id, config.eventFailedMetricsCount)
       context.output(config.failedEventsOutputTag(), markBatchFailed(batchEvent, ErrorConstants.EVENT_MISSING))
-      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), ErrorConstants.EVENT_MISSING, FunctionalError.MissingEventData, dataset_type = Some(dataset.datasetType)))
+      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), batchEvent, ErrorConstants.EVENT_MISSING, FunctionalError.MissingEventData, dataset_type = Some(dataset.datasetType)))
       return
     }
     val eventData = Util.getMutableMap(batchEvent(config.CONST_EVENT).asInstanceOf[Map[String, AnyRef]])
@@ -119,7 +119,7 @@ class ExtractionFunction(config: ExtractorConfig)
     if (eventSize > config.eventMaxSize) {
       metrics.incCounter(dataset.id, config.eventFailedMetricsCount)
       context.output(config.failedEventsOutputTag(), markEventFailed(dataset.id, eventData, ErrorConstants.EVENT_SIZE_EXCEEDED, obsrvMeta))
-      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), ErrorConstants.EVENT_SIZE_EXCEEDED, FunctionalError.EventSizeExceeded, dataset_type = Some(dataset.datasetType)))
+      context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), batchEvent, ErrorConstants.EVENT_SIZE_EXCEEDED, FunctionalError.EventSizeExceeded, dataset_type = Some(dataset.datasetType)))
       logger.error(s"Extractor | Event size exceeded max configured value | dataset=${dataset.id} | Event size is $eventSize, Max configured size is ${config.eventMaxSize}")
     } else {
       metrics.incCounter(dataset.id, config.skippedExtractionCount)
@@ -139,21 +139,21 @@ class ExtractionFunction(config: ExtractorConfig)
         if (eventSize > config.eventMaxSize) {
           metrics.incCounter(dataset.id, config.eventFailedMetricsCount)
           context.output(config.failedEventsOutputTag(), markEventFailed(dataset.id, eventData, ErrorConstants.EVENT_SIZE_EXCEEDED, obsrvMeta))
-          context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), ErrorConstants.EVENT_SIZE_EXCEEDED, FunctionalError.EventSizeExceeded, dataset_type = Some(dataset.datasetType)))
+          context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), batchEvent, ErrorConstants.EVENT_SIZE_EXCEEDED, FunctionalError.EventSizeExceeded, dataset_type = Some(dataset.datasetType)))
           logger.error(s"Extractor | Event size exceeded max configured value | dataset=${dataset.id} | Event size is $eventSize, Max configured size is ${config.eventMaxSize}")
         } else {
           metrics.incCounter(dataset.id, config.successEventCount)
           context.output(config.rawEventsOutputTag, markEventSuccess(dataset.id, eventData, obsrvMeta))
         }
       })
-      context.output(config.systemEventsOutputTag, JSONUtil.serialize(successSystemEvent(dataset, eventsList.size)))
+      context.output(config.systemEventsOutputTag, JSONUtil.serialize(successSystemEvent(dataset, batchEvent, eventsList.size)))
       metrics.incCounter(dataset.id, config.systemEventCount)
       metrics.incCounter(dataset.id, config.successExtractionCount)
     } catch {
       case ex: ObsrvException =>
         metrics.incCounter(dataset.id, config.failedExtractionCount)
         context.output(config.failedBatchEventOutputTag, markBatchFailed(batchEvent, ex.error))
-        context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), ex.error, FunctionalError.ExtractionDataFormatInvalid, dataset_type = Some(dataset.datasetType)))
+        context.output(config.systemEventsOutputTag, failedSystemEvent(Some(dataset.id), batchEvent, ex.error, FunctionalError.ExtractionDataFormatInvalid, dataset_type = Some(dataset.datasetType)))
         logger.error(s"Extractor | Exception extracting data | dataset=${dataset.id}", ex)
     }
 
@@ -177,18 +177,26 @@ class ExtractionFunction(config: ExtractorConfig)
   /**
    * Method to Generate a System Event to capture the extraction information and metrics
    */
-  private def successSystemEvent(dataset: Dataset, totalEvents: Int): SystemEvent = {
+  private def successSystemEvent(dataset: Dataset, event: mutable.Map[String, AnyRef], totalEvents: Int): SystemEvent = {
     SystemEvent(
       EventID.METRIC,
-      ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
+      ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType), eid = None, source = getSourceFromEvent(event)),
       data = EData(error = None, pipeline_stats = Some(PipelineStats(Some(totalEvents), Some(StatusCode.success))))
     )
   }
 
-  private def failedSystemEvent(dataset: Option[String], error: Error, functionalError: FunctionalError, dataset_type: Option[String] = None): String = {
+  private def getSourceFromEvent(event: mutable.Map[String, AnyRef]): Option[Source] = {
+    val obsrvMeta = event("obsrv_meta").asInstanceOf[Map[String, AnyRef]]
+    if (obsrvMeta.contains("source")) {
+      val source = obsrvMeta("source").asInstanceOf[Map[String, String]]
+      Some(Source(source.getOrElse("connector", "api"), source.getOrElse("connectorInstance", "api")))
+    } else None
+  }
+
+  private def failedSystemEvent(dataset: Option[String], event: mutable.Map[String, AnyRef], error: Error, functionalError: FunctionalError, dataset_type: Option[String] = None): String = {
 
     JSONUtil.serialize(SystemEvent(
-      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = dataset, dataset_type = dataset_type),
+      EventID.METRIC, ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.extractor)), dataset = dataset, dataset_type = dataset_type, eid = None, source = getSourceFromEvent(event)),
       data = EData(error = Some(ErrorLog(Producer.extractor, StatusCode.failed, functionalError, error.errorCode, error.errorMsg, ErrorLevel.critical)), pipeline_stats = None)
     ))
   }

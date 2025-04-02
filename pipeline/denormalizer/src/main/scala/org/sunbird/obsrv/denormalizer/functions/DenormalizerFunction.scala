@@ -44,7 +44,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
 
     metrics.incCounter(dataset.id, config.denormTotal)
     denormCache.open(dataset)
-    if (dataset.denormConfig.isDefined) {
+    if (dataset.denormConfig.isDefined && dataset.denormConfig.exists(_.denormFields != null) && dataset.denormConfig.exists(_.denormFields.nonEmpty)){
       val event = DenormEvent(msg)
       val denormEvent = denormCache.denormEvent(dataset.id, event, dataset.denormConfig.get.denormFields)
       val status = getDenormStatus(denormEvent)
@@ -77,7 +77,7 @@ class DenormalizerFunction(config: DenormalizerConfig) extends BaseDatasetProces
         }
         context.output(config.systemEventsOutputTag, JSONUtil.serialize(SystemEvent(
           EventID.METRIC,
-          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType)),
+          ctx = ContextData(module = ModuleID.processing, pdata = PData(config.jobName, PDataType.flink, Some(Producer.denorm)), dataset = Some(dataset.id), dataset_type = Some(dataset.datasetType), eid = None, source = getSourceFromEvent(denormEvent.msg)),
           data = EData(error = Some(ErrorLog(pdata_id = Producer.denorm, pdata_status = StatusCode.failed, error_type = functionalError, error_code = f._1.errorCode, error_message = f._1.errorMsg, error_level = ErrorLevel.critical, error_count = Some(f._2))))
         )))
       })

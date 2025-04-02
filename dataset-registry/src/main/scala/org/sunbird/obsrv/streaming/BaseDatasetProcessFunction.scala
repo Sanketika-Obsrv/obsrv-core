@@ -11,6 +11,7 @@ import org.sunbird.obsrv.core.model.Producer.Producer
 import org.sunbird.obsrv.core.model.Stats.Stats
 import org.sunbird.obsrv.core.model.StatusCode.StatusCode
 import org.sunbird.obsrv.core.model._
+import org.sunbird.obsrv.core.otel.OTelMetricsGenerator
 import org.sunbird.obsrv.core.streaming._
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.Dataset
@@ -21,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import org.sunbird.obsrv.core.otel.{OTelMetricsGenerator, OTelService}
 
 trait SystemEventHandler {
   private def getStatus(flags: Map[String, AnyRef], producer: Producer): Option[StatusCode] = {
@@ -37,9 +37,17 @@ trait SystemEventHandler {
   }
 
   private def getSource(obsrvMeta: Map[String, AnyRef]): Option[Source] = {
-    if(obsrvMeta.get("source").isDefined) {
+    if(obsrvMeta.contains("source")) {
       val source = obsrvMeta("source").asInstanceOf[Map[String, String]]
-      Some(Source(source.get("connector").getOrElse("api"), source.get("connectorInstance").getOrElse("api")))
+      Some(Source(source.getOrElse("connector", "api"), source.getOrElse("connectorInstance", "api")))
+    } else None
+  }
+
+  def getSourceFromEvent(event: mutable.Map[String, AnyRef]): Option[Source] = {
+    val obsrvMeta = event("obsrv_meta").asInstanceOf[Map[String, AnyRef]]
+    if (obsrvMeta.contains("source")) {
+      val source = obsrvMeta("source").asInstanceOf[Map[String, String]]
+      Some(Source(source.getOrElse("connector", "api"), source.getOrElse("connectorInstance", "api")))
     } else None
   }
 

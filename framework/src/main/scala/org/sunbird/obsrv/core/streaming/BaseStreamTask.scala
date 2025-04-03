@@ -2,7 +2,7 @@ package org.sunbird.obsrv.core.streaming
 
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy
-import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSink, SingleOutputStreamOperator}
+import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSink, KeyedStream, SideOutputDataStream, SingleOutputStreamOperator}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 
 import java.util.Properties
@@ -55,6 +55,18 @@ abstract class BaseStreamTask[T] extends BaseStreamTaskSink[T] {
                           kafkaConsumerProperties: Properties, consumerSourceName: String, kafkaConnector: FlinkKafkaConnector): DataStream[String] = {
     env.fromSource(kafkaConnector.kafkaStringSource(kafkaTopics, kafkaConsumerProperties), WatermarkStrategy.noWatermarks[String](), consumerSourceName)
       .uid(consumerSourceName).setParallelism(config.kafkaConsumerParallelism)
+      .rebalance()
+  }
+
+}
+
+abstract class BaseKeyedStreamTask[T, K] extends BaseStreamTaskSink[T] {
+
+  def processStream(keyedStream: KeyedStream[T, K]): SideOutputDataStream[mutable.Map[String, AnyRef]]
+
+  def getMapDataStream(env: StreamExecutionEnvironment, config: BaseJobConfig[T], kafkaConnector: FlinkKafkaConnector): DataStream[mutable.Map[String, AnyRef]] = {
+    env.fromSource(kafkaConnector.kafkaMapSource(config.inputTopic()), WatermarkStrategy.noWatermarks[mutable.Map[String, AnyRef]](), config.inputConsumer())
+      .uid(config.inputConsumer()).setParallelism(config.kafkaConsumerParallelism)
       .rebalance()
   }
 

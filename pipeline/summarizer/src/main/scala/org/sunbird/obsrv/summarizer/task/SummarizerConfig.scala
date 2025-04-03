@@ -1,34 +1,51 @@
 package org.sunbird.obsrv.summarizer.task
 
-import com.typesafe.config.Config
-import org.apache.flink.api.common.typeinfo.TypeInformation
-import org.apache.flink.api.java.typeutils.TypeSummarizer
-import org.apache.flink.streaming.api.scala.OutputTag
-import org.sunbird.obsrv.core.model.SystemConfig
 import org.sunbird.obsrv.core.streaming.BaseJobConfig
 
 import scala.collection.mutable
+import com.typesafe.config.Config
+import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.api.java.functions.KeySelector
+import org.apache.flink.api.java.typeutils.TypeExtractor
+import org.apache.flink.streaming.api.scala.OutputTag
+
+case class SummaryKey(did: String, channel: String, pdata_id: String)
+
+class SummaryKeySelector extends KeySelector[mutable.Map[String, AnyRef], SummaryKey] {
+  override def getKey(event: mutable.Map[String, AnyRef]): SummaryKey = {
+    val did = event.getOrElse("did", "").toString
+    val channel = event.getOrElse("channel", "").toString
+    val pdataId = event.getOrElse("pdata_id", "").toString
+
+    SummaryKey(did, channel, pdataId)
+  }
+}
 
 class SummarizerConfig(override val config: Config) extends BaseJobConfig[mutable.Map[String, AnyRef]](config, "SummarizerJob") {
 
   private val serialVersionUID = 2905979434303791379L
 
-  implicit val mapTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeSummarizer.getForClass(classOf[mutable.Map[String, AnyRef]])
-  implicit val stringTypeInfo: TypeInformation[String] = TypeSummarizer.getForClass(classOf[String])
+  implicit val mapTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeExtractor.getForClass(classOf[mutable.Map[String, AnyRef]])
+  implicit val stringTypeInfo: TypeInformation[String] = TypeExtractor.getForClass(classOf[String])
 
+  val waterMarkTimeBound: Long = config.getLong("waterMarkTimeBound")
   // Metric List
   val totalEventCount = "summarizer-total-count"
   val successEventCount = "summarizer-event-count"
-  val failedSummarizationCount = "summarizer-failed-count"
-  val successSummarizationCount = "summarizer-success-count"
+  val failedSummarizerCount = "summarizer-failed-count"
+  val successSummarizerCount = "summarizer-success-count"
+  val skippedSummarizerCount = "summarizer-skipped-count"
+
+  val idleTime: Long = config.getLong("idleTime")
+  val sessionBreakTime: Long = config.getLong("sessionBreakTime")
+  
   
   // Kafka Topics Configuration
   val kafkaInputTopic: String = config.getString("kafka.input.topic")
   val kafkaSuccessTopic: String = config.getString("kafka.output.summary.topic")
-  val kafkaFailedTopic: String = config.getString("kafka.output.summary.failed.topic")
 
   // Functions
-  val summarizationFunction = "SummarizationFunction"
+  val summarizerFunction = "SummarizerFunction"
 
   // Producers
   val summarizerFailedEventsProducer = "summarizer-failed-producer"

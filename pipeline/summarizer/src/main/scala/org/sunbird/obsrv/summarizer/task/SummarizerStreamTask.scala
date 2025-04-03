@@ -1,20 +1,22 @@
 package org.sunbird.obsrv.summarizer.task
 
-import com.typesafe.config.ConfigFactory
-import org.apache.flink.api.java.utils.ParameterTool
-import org.apache.flink.streaming.api.datastream.DataStream
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
-import org.sunbird.obsrv.core.streaming.{BaseStreamTask, FlinkKafkaConnector}
 import org.sunbird.obsrv.core.util.FlinkUtil
+import org.sunbird.obsrv.core.streaming.{BaseKeyedStreamTask, FlinkKafkaConnector}
+
 import org.sunbird.obsrv.summarizer.functions.SummarizerFunction
 
 import java.io.File
 import scala.collection.mutable
+import com.typesafe.config.ConfigFactory
+import org.apache.flink.api.java.utils.ParameterTool
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
+import org.apache.flink.streaming.api.datastream.{KeyedStream, SideOutputDataStream}
+import org.apache.flink.api.common.eventtime.{SerializableTimestampAssigner, WatermarkStrategy}
 
 /**
- * Summarization stream task to summarizet batch events if any dependent on dataset configuration
+ * Summarization stream task to summarizer batch events if any dependent on dataset configuration
  */
-class SummarizerStreamTask(config: SummarizerConfig, kafkaConnector: FlinkKafkaConnector) extends BaseStreamTask[mutable.Map[String, AnyRef]] {
+class SummarizerStreamTask(config: SummarizerConfig, kafkaConnector: FlinkKafkaConnector) extends BaseKeyedStreamTask[mutable.Map[String, AnyRef], SummaryKey] {
 
   private val serialVersionUID = -7729362727131516112L
 
@@ -28,35 +30,40 @@ class SummarizerStreamTask(config: SummarizerConfig, kafkaConnector: FlinkKafkaC
   // $COVERAGE-ON$
 
   def process(env: StreamExecutionEnvironment): Unit = {
-
-    val watermarkStrategy: WatermarkStrategy[mutable.Map[String, AnyRef]] = WatermarkStrategy
-      .forBoundedOutOfOrderness[mutable.Map[String, AnyRef]](Duration.ofSeconds(5))
-      .withTimestampAssigner(new TimestampAssigner[mutable.Map[String, AnyRef]] {
-        override def extractTimestamp(event: mutable.Map[String, AnyRef], recordTimestamp: Long): Long = {
-          event.ets
-        }
-      })
-      .withIdleness(Duration.ofMinutes(1))
-
+    // extract ets for watermark timestamping
+    val timestampAssigner = new SerializableTimestampAssigner[mutable.Map[String, AnyRef]] {
+      override def extractTimestamp(event: mutable.Map[String, AnyRef], recordTimestamp: Long): Long = {
+        event("ets").asInstanceOf[Long]
+      }
+    }
+    // create watermark with event.ets timestamp
+    val watermarkStrategy: WatermarkStrategy[mutable.Map[String, AnyRef]] =
+      WatermarkStrategy
+        .forBoundedOutOfOrderness(java.time.Duration.ofSeconds(config.waterMarkTimeBound))
+        .withTimestampAssigner(timestampAssigner)
+    // assign watermark to stream
     val dataStream = getMapDataStream(env, config, kafkaConnector)
-      .keyBy(event => event.did)
       .assignTimestampsAndWatermarks(watermarkStrategy)
 
-    processStream(dataStream)
+    // Create a KeyedStream with explicit KeySelector
+    val keyedStream: KeyedStream[mutable.Map[String, AnyRef], SummaryKey] =
+      dataStream.keyBy(new SummaryKeySelector())
+    // send it to processing
+    processStream(keyedStream)
   }
 
-  override def processStream(dataStream: DataStream[mutable.Map[String, AnyRef]]): DataStream[mutable.Map[String, AnyRef]] = {
-
+  override def processStream(dataStream: KeyedStream[mutable.Map[String, AnyRef], SummaryKey]): SideOutputDataStream[mutable.Map[String, AnyRef]] = {
+    // create stream with Summarizer function as process
     val summarizerStream = dataStream.process(new SummarizerFunction(config))
       .name(config.summarizerFunction).uid(config.summarizerFunction)
       .setParallelism(config.downstreamOperatorsParallelism)
-
+    // Get failed events in side output
     summarizerStream.getSideOutput(config.summarizerFailedEventOutputTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaFailedTopic))
       .name(config.summarizerFailedEventsProducer).uid(config.summarizerFailedEventsProducer).setParallelism(config.downstreamOperatorsParallelism)
-
+    // get success events in side output
     summarizerStream.getSideOutput(config.successTag()).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaSuccessTopic))
       .name(config.summarizerSuccessEventsProducer).uid(config.summarizerSuccessEventsProducer).setParallelism(config.downstreamOperatorsParallelism)
-
+    // add default success stream
     addDefaultSinks(summarizerStream, config, kafkaConnector)
     summarizerStream.getSideOutput(config.successTag())
   }

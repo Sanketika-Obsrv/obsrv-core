@@ -212,4 +212,3 @@ abstract class WindowBaseProcessFunction[I, O, K](config: BaseJobConfig[O]) exte
   }
 
 }
-

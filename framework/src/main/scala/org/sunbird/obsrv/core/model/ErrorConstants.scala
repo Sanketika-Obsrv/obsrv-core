@@ -43,5 +43,4 @@ object ErrorConstants extends Enumeration {
   val UNSUPPORTED_PROVIDER = ErrorInternalValue("ERR_UNSUPPORTED_PROVIDER_1030", "Unsupported provider.")
   val ERR_SUBMIT_INGESTION_FAILED = ErrorInternalValue("ERR_MDP_1031", "Unable to submit ingestion task to druid.")
   val ERR_DELETE_DATASOURCE_FAILED = ErrorInternalValue("ERR_MDP_1032", "Failed to delete datasource.")
-  val ERR_SUMMARIZATION_FAILED = ErrorInternalValue("ERR_SUMMARY_1033", "Failed to generate Summary event.")
 }

@@ -69,7 +69,7 @@ object ModuleID extends Enumeration {
 class StatusCodeType extends TypeReference[StatusCode.type]
 object StatusCode extends Enumeration {
   type StatusCode = Value
-  val success, failed, skipped, partial = Value
+  val success, failed, skipped, partial, consumed = Value
 }
 
 class PDataTypeType extends TypeReference[PDataType.type]
@@ -82,48 +82,3 @@ object Stats extends Enumeration {
   type Stats = Value
   val total_processing_time, latency_time, processing_time = Value
 }
-
-case class EnvSummary(
-  env: String,
-  timespent: Double,
-  visits: Long
-)
-
-case class EventSummary(
-  id: String,
-  count: Long
-)
-
-case class PageSummary(
-  id: String,
-  `type`: String,
-  env: String,
-  timespent: Double,
-  visits: Long
-)
-
-case class Extra(
-  id: String,
-  value: String
-)
-
-case class Summary(
-  `type`: String,
-  mode: String,
-  starttime: Long,
-  endtime: Long,
-  timespent: Double,
-  pageviews: Long,
-  interaction: Long,
-  envsummary: Option[List[EnvSummary]] = None,
-  eventsummary: Option[List[EventSummary]] = None,
-  pagesummary: Option[List[PageSummary]] = None,
-  extra: Option[List[Extra]] = None
-)
-
-case class SummaryState(
-  totaltime: Double,
-  idletime: Double,
-  eventcount: Long,
-  sessionstatus: String
-)

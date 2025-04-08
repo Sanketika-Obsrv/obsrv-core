@@ -1,12 +1,11 @@
 package org.sunbird.obsrv.summarizer.functions
 
-import org.sunbird.obsrv.job.util.Metrics
 import org.sunbird.obsrv.job.function.BaseKeyedProcessFunction
 
 import org.sunbird.obsrv.summarizer.task.{SummarizerConfig, SummaryKey}
 
-import org.sunbird.obsrv.core.streaming.{BaseFunction, JobMetrics}
-import org.sunbird.obsrv.core.model.{EventID, Producer, StatusCode}
+import org.sunbird.obsrv.job.util.Metrics
+import org.sunbird.obsrv.job.model.{EventID, Producer, StatusCode}
 
 import scala.collection.mutable
 import org.slf4j.LoggerFactory
@@ -15,7 +14,6 @@ import org.apache.flink.api.common.state.{MapState, MapStateDescriptor, ValueSta
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 
-
 case class SummaryStatus(status: StatusCode.Value, summary: mutable.Map[String, AnyRef])
 
 class SummarizerFunction(config: SummarizerConfig)
@@ -23,7 +21,7 @@ class SummarizerFunction(config: SummarizerConfig)
     SummaryKey,
     mutable.Map[String, AnyRef],
     mutable.Map[String, AnyRef]
-  ] with JobMetrics with BaseFunction {
+  ] {
 
   private[this] val logger = LoggerFactory.getLogger(classOf[SummarizerFunction])
   // MapState to store String values Summary object state for the particular key
@@ -34,7 +32,7 @@ class SummarizerFunction(config: SummarizerConfig)
   @transient private var timerState:  ValueState[java.lang.Long] = _
 
   override def getMetrics(): List[String] = {
-    List(config.totalEventCount, config.successEventCount, config.failedSummarizerCount, config.successSummarizerCount)
+    List(config.totalEventCount, config.successEventCount, config.failedSummarizerCount, config.successSummarizerCount, config.skippedSummarizerCount)
   }
 
   // create the state objects
@@ -51,6 +49,7 @@ class SummarizerFunction(config: SummarizerConfig)
 
   override def processElement(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit =
   {
+    initMetrics("FlinkKafkaConnector", config.jobName)
     val result = process_event(event, context)
     metrics.incCounter(config.defaultDatasetID, config.totalEventCount)
     result.status match {
@@ -78,7 +77,10 @@ class SummarizerFunction(config: SummarizerConfig)
     // create mutable result event
     if (pre_processed_event) {
       val eid = event.getOrElse("eid", "").toString
-      val edata = event.getOrElse("edata", mutable.Map[String, AnyRef]()).asInstanceOf[mutable.Map[String, AnyRef]]
+      val edata = event.get("edata") match {
+        case Some(map: Map[_, _]) => mutable.Map() ++ map.asInstanceOf[Map[String, AnyRef]]
+        case _ => mutable.Map[String, AnyRef]()
+      }
       val eventType = edata.getOrElse("type", "").toString
       eid match {
         case "START" =>
@@ -118,10 +120,22 @@ class SummarizerFunction(config: SummarizerConfig)
       return
     }
     val ets = event.getOrElse("ets", System.currentTimeMillis()).asInstanceOf[Long]
-    val actor = event.getOrElse("actor", mutable.Map[String, AnyRef]()).asInstanceOf[mutable.Map[String, AnyRef]]
-    val cdata = event.getOrElse("context", mutable.Map[String, AnyRef]()).asInstanceOf[mutable.Map[String, AnyRef]]
-    val edata = event.getOrElse("edata", mutable.Map[String, AnyRef]()).asInstanceOf[mutable.Map[String, AnyRef]]
-    val pdata = cdata.getOrElse("pdata", mutable.Map[String, AnyRef]()).asInstanceOf[mutable.Map[String, AnyRef]]
+    val actor = event.get("actor") match {
+      case Some(map: Map[_, _]) => mutable.Map() ++ map.asInstanceOf[Map[String, AnyRef]]
+      case _ => mutable.Map[String, AnyRef]()
+    }
+    val cdata = event.get("context") match {
+      case Some(map: Map[_, _]) => mutable.Map() ++ map.asInstanceOf[Map[String, AnyRef]]
+      case _ => mutable.Map[String, AnyRef]()
+    }
+    val edata = event.get("edata") match {
+      case Some(map: Map[_, _]) => mutable.Map() ++ map.asInstanceOf[Map[String, AnyRef]]
+      case _ => mutable.Map[String, AnyRef]()
+    }
+    val pdata = cdata.get("pdata") match {
+      case Some(map: Map[_, _]) => mutable.Map() ++ map.asInstanceOf[Map[String, AnyRef]]
+      case _ => mutable.Map[String, AnyRef]()
+    }
     summaryStateLong.put("startTime", ets)
     summaryStateLong.put("prevEts", ets)
     summaryStateLong.put("totalTimeSpent", 0)
@@ -133,7 +147,7 @@ class SummarizerFunction(config: SummarizerConfig)
     summaryStateString.put("pdataVer", pdata.getOrElse("ver", "").asInstanceOf[String])
     summaryStateString.put("type", edata.getOrElse("type", "").asInstanceOf[String])
     summaryStateString.put("mode", edata.getOrElse("mode", "").asInstanceOf[String])
-    summaryStateString.put("syncts", event.getOrElse("@timestamp", System.currentTimeMillis()).asInstanceOf[String])
+    summaryStateString.put("syncts", event.getOrElse("@timestamp", System.currentTimeMillis().toString).asInstanceOf[String])
     summaryStateString.put("uid", actor.getOrElse("id", "").asInstanceOf[String])
     // create timer to break session in case no end received
     val timer: Long = context.timerService().currentProcessingTime() + config.sessionBreakTime*60*1000
@@ -218,7 +232,10 @@ class SummarizerFunction(config: SummarizerConfig)
           "time_spent" -> summaryStateLong.get("totalTimeSpent")
         )
       ),
-      "tags" -> List(summaryStateString.get("channel")),
+      "tags" -> {
+        val channel = summaryStateString.get("channel")
+        if (channel != null) List(channel) else List.empty[String]
+      },
       "object" -> Map(
         "ver" -> "1.0.0"
       )

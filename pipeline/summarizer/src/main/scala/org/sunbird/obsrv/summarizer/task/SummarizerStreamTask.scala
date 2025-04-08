@@ -1,7 +1,6 @@
 package org.sunbird.obsrv.summarizer.task
 
-import org.sunbird.obsrv.core.util.FlinkUtil
-import org.sunbird.obsrv.core.streaming.{BaseKeyedStreamTask, FlinkKafkaConnector}
+import org.sunbird.obsrv.job.util.{FlinkUtil, BaseKeyedStreamTask, FlinkKafkaConnector}
 
 import org.sunbird.obsrv.summarizer.functions.SummarizerFunction
 

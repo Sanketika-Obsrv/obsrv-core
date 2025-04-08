@@ -1,6 +1,6 @@
 package org.sunbird.obsrv.summarizer.task
 
-import org.sunbird.obsrv.core.streaming.BaseJobConfig
+import org.sunbird.obsrv.job.util.BaseJobConfig
 
 import scala.collection.mutable
 import com.typesafe.config.Config

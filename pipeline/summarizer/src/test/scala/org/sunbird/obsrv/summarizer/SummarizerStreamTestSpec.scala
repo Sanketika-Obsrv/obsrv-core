@@ -9,8 +9,7 @@ import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.{BeforeAndAfterAll, FlatSpec}
 import org.scalatest.Matchers._
-import org.sunbird.obsrv.core.streaming.FlinkKafkaConnector
-import org.sunbird.obsrv.core.util.FlinkUtil
+import org.sunbird.obsrv.job.util.{FlinkKafkaConnector, FlinkUtil, JSONUtil}
 import org.sunbird.obsrv.summarizer.fixture.EventFixtures
 import org.sunbird.obsrv.summarizer.task.{SummarizerConfig, SummarizerStreamTask}
 
@@ -40,6 +39,7 @@ class SummarizerStreamTestSpec extends FlatSpec with BeforeAndAfterAll{
   override def beforeAll(): Unit = {
     EmbeddedKafka.start()(embeddedKafkaConfig)
     createTestTopics()
+    publishEvents()
     flinkCluster.before()
   }
 
@@ -54,98 +54,65 @@ class SummarizerStreamTestSpec extends FlatSpec with BeforeAndAfterAll{
     ).foreach(EmbeddedKafka.createCustomTopic(_))
   }
 
-  "SummarizerStreamTestSpec" should "validate" in {
+  def publishEvents(): Unit = {
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_1_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_1_INTERACT)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_1_AUDIT)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_1_END)
 
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_2_INTERACT)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_2_END)
+
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_4_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_4_IMPRESSION)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_4_END)
+
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_5_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_5_INTERACT)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_5_SECOND_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_5_END)
+
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_6_END)
+
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_7_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_7_INTERACT)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_7_PAGE_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_7_END)
+
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_8_INTERACT)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_8_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_8_END)
+
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_9_IMPRESSION)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_9_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_9_END)
+
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_3_START)
+    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.CASE_3_INTERACT)
+
+  }
+
+  def getTotalTimeSpent(event: Map[String, AnyRef], timeSpent: Int): Unit = {
+    val edata = event.getOrElse("edata", Map[String, AnyRef]()).asInstanceOf[Map[String, AnyRef]]
+    val eks = edata.getOrElse("eks", Map[String, AnyRef]()).asInstanceOf[Map[String, AnyRef]]
+    val totalTimeSpent = eks.getOrElse("time_spent", 0).asInstanceOf[Int]
+    println(totalTimeSpent)
+    totalTimeSpent should be(timeSpent)
+  }
+
+  "SummarizerStreamTestSpec" should "validate all flows" in {
     implicit val env: StreamExecutionEnvironment = FlinkUtil.getExecutionContext(pConfig)
     val task = new SummarizerStreamTask(pConfig, kafkaConnector)
     task.process(env)
     env.executeAsync(pConfig.jobName)
-    validateCorrectFlow()
-    validateNoEnd()
-    validateIdleTime()
-    validateNoStart()
-    validateMultipleStart()
-    validateValidOutOfOrder()
-    validateInvalidOutOfOrder()
+    val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSuccessTopic, 10, timeout = 35.seconds)
+    outputEvents.size should be(10)
+    outputEvents.zipWithIndex.foreach {
+      case (elem, idx) =>
+        val msg = JSONUtil.deserialize[Map[String, AnyRef]](elem)
+        val time = EventFixtures.timeIndex(idx)
+        println(idx, time)
+        getTotalTimeSpent(msg, time)
+    }
   }
-
-  def getTotalTimeSpent(event: mutable.Map[String, AnyRef], timeSpent: Long): Unit = {
-    val edata = event.getOrElse("edata", mutable.Map[String, AnyRef]()).asInstanceOf[mutable.Map[String, AnyRef]]
-    val eks = edata.getOrElse("eks", mutable.Map[String, AnyRef]()).asInstanceOf[mutable.Map[String, AnyRef]]
-    val totalTimeSpent = eks.getOrElse("totalTimeSpent", 0)
-    totalTimeSpent should be(timeSpent)
-  }
-
-  // START, INTERACT, LOG, END
-  def validateCorrectFlow(): Unit = {
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.START)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.INTERACT)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.AUDIT)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.END)
-    val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSuccessTopic, 1, timeout = 130.seconds)
-    outputEvents.size should be(1)
-    getTotalTimeSpent(outputEvents.head.asInstanceOf[mutable.Map[String, AnyRef]], 64000)
-  }
-
-  // START, INTERACT. Should time out after sessionBreakTime
-  def validateNoEnd(): Unit = {
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.START)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.INTERACT)
-    val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSuccessTopic, 1, timeout = 130.seconds)
-    outputEvents.size should be(1)
-    getTotalTimeSpent(outputEvents.head.asInstanceOf[mutable.Map[String, AnyRef]], 5000)
-  }
-
-  // START, IMPRESSION, END. should skip idleTime from total time
-  def validateIdleTime(): Unit = {
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.START)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.IMPRESSION)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.END)
-    val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSuccessTopic, 1, timeout = 130.seconds)
-    outputEvents.size should be(1)
-    getTotalTimeSpent(outputEvents.head.asInstanceOf[mutable.Map[String, AnyRef]], 3000)
-  }
-
-  // INTERACT, END. Should assume start at INTERACT ets
-  def validateNoStart(): Unit = {
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.INTERACT)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.END)
-    val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSuccessTopic, 1, timeout = 130.seconds)
-    outputEvents.size should be(1)
-    getTotalTimeSpent(outputEvents.head.asInstanceOf[mutable.Map[String, AnyRef]], 59000)
-  }
-
-  // START, INTERACT, SECOND_START, END. Should close first session and start new session
-  def validateMultipleStart(): Unit = {
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.START)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.INTERACT)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.SECOND_START)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.END)
-    val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSuccessTopic, 2, timeout = 130.seconds)
-    outputEvents.size should be(2)
-    getTotalTimeSpent(outputEvents.head.asInstanceOf[mutable.Map[String, AnyRef]], 62000)
-    getTotalTimeSpent(outputEvents(1).asInstanceOf[mutable.Map[String, AnyRef]], 2000)
-  }
-
-  // INTERACT, START, END. watermark strategy should wait for START
-  def validateValidOutOfOrder(): Unit = {
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.INTERACT)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.START)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.END)
-    val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSuccessTopic, 1, timeout = 130.seconds)
-    outputEvents.size should be(1)
-    getTotalTimeSpent(outputEvents.head.asInstanceOf[mutable.Map[String, AnyRef]], 64000)
-  }
-
-  // IMPRESSION, START, END. watermark strategy should send IMPRESSION as START reaches after time bound
-  def validateInvalidOutOfOrder(): Unit = {
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.IMPRESSION)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.START)
-    EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.END)
-    val outputEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSuccessTopic, 2, timeout = 130.seconds)
-    outputEvents.size should be(2)
-    getTotalTimeSpent(outputEvents.head.asInstanceOf[mutable.Map[String, AnyRef]], 0)
-    getTotalTimeSpent(outputEvents.head.asInstanceOf[mutable.Map[String, AnyRef]], 0)
-  }
-
 }

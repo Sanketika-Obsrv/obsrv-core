@@ -47,31 +47,34 @@ class SummarizerFunction(config: SummarizerConfig)
     timerState = getRuntimeContext().getState(timerDescriptor)
   }
 
-  override def processElement(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit =
-  {
+  override def processElement(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit = {
     initMetrics("FlinkKafkaConnector", config.jobName)
-    val result = process_event(event, context)
-    metrics.incCounter(config.defaultDatasetID, config.totalEventCount)
-    result.status match {
-      case StatusCode.skipped =>
-        metrics.incCounter(config.defaultDatasetID, config.skippedSummarizerCount)
-        context.output(config.summarizerEventsOutputTag, markSkipped(result.summary, Producer.summarizer))
-      case StatusCode.success =>
-        metrics.incCounter(config.defaultDatasetID, config.successSummarizerCount)
-        context.output(config.summarizerEventsOutputTag, markSuccess(result.summary, Producer.summarizer))
-    }
+    println("timestamp: ", context.timestamp())
+    process_event(event, context, metrics)
   }
 
   // triggered in case no summary state not closed by END event in time
   override def onTimer(timestamp: Long, context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#OnTimerContext, metrics: Metrics): Unit = {
-    val event: mutable.Map[String, AnyRef] = mutable.Map("ets" -> Long.box(timestamp))
-    endSession(event, context)
-    timerState.clear()
+    implicit val event: mutable.Map[String, AnyRef] = mutable.Map(
+      "ets" -> Long.box(summaryStateLong.get("prevEts")),
+      "eid" -> "END",
+      "edata" -> Map("type" -> "app")
+    )
+    endSession(event, context, metrics)
+  }
+
+  // if eid is of type AUDIT, SEARCH, LOG , skip those events
+  private def preProcessSummarization(event: mutable.Map[String, AnyRef]): Boolean = {
+    val valid_event_type = List(EventID.AUDIT.toString, EventID.SEARCH.toString, EventID.LOG.toString)
+    val eid = event.getOrElse("eid", "").toString
+    if (!valid_event_type.contains(eid)) {
+      return true
+    }
+    false
   }
 
   // process the telemetry event
-  private def process_event(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): SummaryStatus = {
-
+  private def process_event(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit = {
     // check if eid in list
     val pre_processed_event = preProcessSummarization(event)
     // create mutable result event
@@ -85,39 +88,23 @@ class SummarizerFunction(config: SummarizerConfig)
       eid match {
         case "START" =>
           if (eventType == "app") {
-            startSession(event, context)
+            startSession(event, context, metrics)
           }
         case "END" =>
           if (eventType == "app") {
-            endSession(event, context)
-            val result_event = createSummaryEvent(event)
-            return SummaryStatus(StatusCode.success, result_event)
+            endSession(event, context, metrics)
           }
         case _ =>
-          updateSession(event, context)
+          updateSession(event, context, metrics)
       }
-      // create success result
     }
-    // create skipped result
-    SummaryStatus(StatusCode.skipped, event)
-  }
-
-  // if eid is of type AUDIT, SEARCH, LOG , skip those events
-  private def preProcessSummarization(event: mutable.Map[String, AnyRef]): Boolean = {
-    val valid_event_type = List(EventID.AUDIT.toString, EventID.SEARCH.toString, EventID.LOG.toString)
-    val eid = event.getOrElse("eid", "").toString
-    if (!valid_event_type.contains(eid)) {
-      return true
-    }
-    false
   }
 
   // instantiate a new Summary object on START event
-  private def startSession(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
+  private def startSession(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit = {
     // if another app START received when existing is not closed, close current one and start new
     if (summaryStateLong.contains("startTime")) {
-      endSession(event, context)
-      return
+      endSession(event, context, metrics: Metrics)
     }
     val ets = event.getOrElse("ets", System.currentTimeMillis()).asInstanceOf[Long]
     val actor = event.get("actor") match {
@@ -149,24 +136,25 @@ class SummarizerFunction(config: SummarizerConfig)
     summaryStateString.put("mode", edata.getOrElse("mode", "").asInstanceOf[String])
     summaryStateString.put("syncts", event.getOrElse("@timestamp", System.currentTimeMillis().toString).asInstanceOf[String])
     summaryStateString.put("uid", actor.getOrElse("id", "").asInstanceOf[String])
-    // create timer to break session in case no end received
-    val timer: Long = context.timerService().currentProcessingTime() + config.sessionBreakTime*60*1000
+    // create timer to break session in case no end
+    val timer: Long = context.timerService().currentProcessingTime() + (config.sessionBreakTime * 1000)
+    summaryStateLong.put("timer", timer)
     context.timerService().registerProcessingTimeTimer(timer)
   }
 
   // update the Summary object with captured metrics, like IMPRESSION count, resume an INACTIVE session
-  private def updateSession(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
+  private def updateSession(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit = {
     // if no start present, create
     if (!summaryStateLong.contains("startTime")) {
-      startSession(event, context)
+      startSession(event, context, metrics)
     }
     // if start present, add time spent to it
     else {
       val ets = event.getOrElse("ets", System.currentTimeMillis()).asInstanceOf[Long]
-      val timeDiff = ets - summaryStateLong.get("prevEts")
+      val timeDiff = ets - summaryStateLong.get("prevEts").toLong
       // check for idle time
-      if (timeDiff <= config.idleTime * 60 * 1000) {
-        val timeSpent = summaryStateLong.get("totalTimeSpent")
+      if (timeDiff <= config.idleTime * 1000) {
+        val timeSpent = summaryStateLong.get("totalTimeSpent").toLong
         summaryStateLong.put("totalTimeSpent", timeSpent + timeDiff)
       }
       summaryStateLong.put("prevEts", ets)
@@ -174,25 +162,24 @@ class SummarizerFunction(config: SummarizerConfig)
   }
 
   // finalize the Summary object on END event, or timer, and return from processing element stream
-  private def endSession(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
+  private def endSession(event: mutable.Map[String, AnyRef], context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit = {
     val ets = event.getOrElse("ets", System.currentTimeMillis()).asInstanceOf[Long]
     // if start present for key
     if (summaryStateLong.contains("startTime")) {
       // check for idle time
       val timeDiff = ets - summaryStateLong.get("prevEts")
-      if (timeDiff <= config.idleTime * 60 * 1000) {
-        val timeSpent = summaryStateLong.get("totalTimeSpent")
+      if (timeDiff <= config.idleTime * 1000) {
+        val timeSpent = summaryStateLong.get("totalTimeSpent").toLong
         summaryStateLong.put("totalTimeSpent", timeSpent + timeDiff)
       }
       summaryStateLong.put("prevEts", ets)
       summaryStateLong.put("endTime", ets)
+      publishSummary(context, metrics)
     }
-    // if no start present, skip
-    cleanUpState(context)
   }
 
   // generate the summary event
-  private def createSummaryEvent(event: mutable.Map[String, AnyRef]): mutable.Map[String, AnyRef] = {
+  private def createSummaryEvent(): mutable.Map[String, AnyRef] = {
     mutable.Map(
       "eid" -> "ME_WORKFLOW_SUMMARY",
       "ets" -> Long.box(System.currentTimeMillis()),
@@ -238,13 +225,31 @@ class SummarizerFunction(config: SummarizerConfig)
       },
       "object" -> Map(
         "ver" -> "1.0.0"
+      ),
+      "obsrv_meta" -> Map(
+        "syncts" -> summaryStateString.get("syncts"),
+        "processingStartTime" -> System.currentTimeMillis(),
+        "flags" -> Map(),
+        "timespans" -> Map(),
+        "error" -> Map(),
+        "source" -> Map(
+          "connector" -> "api",
+          "connectorInstance" -> "api",
+        )
       )
     )
   }
 
+  private def publishSummary(context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context, metrics: Metrics): Unit = {
+    val summaryEvent = createSummaryEvent()
+    metrics.incCounter(config.defaultDatasetID, config.successSummarizerCount)
+    context.output(config.summarizerEventsOutputTag, markSuccess(summaryEvent, Producer.summarizer))
+    cleanUpState(context)
+  }
+
   // reset the timer and summary object state
   private def cleanUpState(context: KeyedProcessFunction[SummaryKey, mutable.Map[String, AnyRef], mutable.Map[String, AnyRef]]#Context): Unit = {
-    val timer: Long = timerState.value()
+    val timer = summaryStateLong.get("timer").toLong
     context.timerService().deleteProcessingTimeTimer(timer)
     timerState.clear()
     summaryStateString.clear()

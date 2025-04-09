@@ -13,10 +13,17 @@ case class SummaryKey(did: String, channel: String, pdata_id: String)
 
 class SummaryKeySelector extends KeySelector[mutable.Map[String, AnyRef], SummaryKey] {
   override def getKey(event: mutable.Map[String, AnyRef]): SummaryKey = {
-    val did = event.getOrElse("did", "").toString
-    val channel = event.getOrElse("channel", "").toString
-    val pdataId = event.getOrElse("pdata_id", "").toString
-
+    val cdata = event.get("context") match {
+      case Some(map: Map[_, _]) => mutable.Map() ++ map.asInstanceOf[Map[String, AnyRef]]
+      case _ => mutable.Map[String, AnyRef]()
+    }
+    val pdata = cdata.get("pdata") match {
+      case Some(map: Map[_, _]) => mutable.Map() ++ map.asInstanceOf[Map[String, AnyRef]]
+      case _ => mutable.Map[String, AnyRef]()
+    }
+    val did = cdata.getOrElse("did", "").toString
+    val channel = cdata.getOrElse("channel", "").toString
+    val pdataId = pdata.getOrElse("id", "").toString
     SummaryKey(did, channel, pdataId)
   }
 }
@@ -28,7 +35,6 @@ class SummarizerConfig(override val config: Config) extends BaseJobConfig[mutabl
   implicit val mapTypeInfo: TypeInformation[mutable.Map[String, AnyRef]] = TypeExtractor.getForClass(classOf[mutable.Map[String, AnyRef]])
   implicit val stringTypeInfo: TypeInformation[String] = TypeExtractor.getForClass(classOf[String])
 
-  val waterMarkTimeBound: Long = config.getLong("waterMarkTimeBound")
   // Metric List
   val totalEventCount = "summarizer-total-count"
   val successEventCount = "summarizer-event-count"
@@ -38,7 +44,7 @@ class SummarizerConfig(override val config: Config) extends BaseJobConfig[mutabl
 
   val idleTime: Long = config.getLong("idleTime")
   val sessionBreakTime: Long = config.getLong("sessionBreakTime")
-  
+  val waterMarkTimeBound: Long = config.getLong("waterMarkTimeBound")
   
   // Kafka Topics Configuration
   val kafkaInputTopic: String = config.getString("kafka.input.topic")

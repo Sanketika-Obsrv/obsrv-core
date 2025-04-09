@@ -29,20 +29,7 @@ class SummarizerStreamTask(config: SummarizerConfig, kafkaConnector: FlinkKafkaC
   // $COVERAGE-ON$
 
   def process(env: StreamExecutionEnvironment): Unit = {
-    // extract ets for watermark timestamping
-    val timestampAssigner = new SerializableTimestampAssigner[mutable.Map[String, AnyRef]] {
-      override def extractTimestamp(event: mutable.Map[String, AnyRef], recordTimestamp: Long): Long = {
-        event("ets").asInstanceOf[Long]
-      }
-    }
-    // create watermark with event.ets timestamp
-    val watermarkStrategy: WatermarkStrategy[mutable.Map[String, AnyRef]] =
-      WatermarkStrategy
-        .forBoundedOutOfOrderness(java.time.Duration.ofSeconds(config.waterMarkTimeBound))
-        .withTimestampAssigner(timestampAssigner)
-    // assign watermark to stream
     val dataStream = getMapDataStream(env, config, kafkaConnector)
-      .assignTimestampsAndWatermarks(watermarkStrategy)
 
     // Create a KeyedStream with explicit KeySelector
     val keyedStream: KeyedStream[mutable.Map[String, AnyRef], SummaryKey] =
@@ -60,11 +47,11 @@ class SummarizerStreamTask(config: SummarizerConfig, kafkaConnector: FlinkKafkaC
     summarizerStream.getSideOutput(config.summarizerFailedEventOutputTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaFailedTopic))
       .name(config.summarizerFailedEventsProducer).uid(config.summarizerFailedEventsProducer).setParallelism(config.downstreamOperatorsParallelism)
     // get success events in side output
-    summarizerStream.getSideOutput(config.successTag()).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaSuccessTopic))
+    summarizerStream.getSideOutput(config.successTag).sinkTo(kafkaConnector.kafkaSink[mutable.Map[String, AnyRef]](config.kafkaSuccessTopic))
       .name(config.summarizerSuccessEventsProducer).uid(config.summarizerSuccessEventsProducer).setParallelism(config.downstreamOperatorsParallelism)
     // add default success stream
     addDefaultSinks(summarizerStream, config, kafkaConnector)
-    summarizerStream.getSideOutput(config.successTag())
+    summarizerStream.getSideOutput(config.successTag)
   }
 }
 

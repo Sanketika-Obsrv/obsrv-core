@@ -44,7 +44,7 @@ class SummarizerConfig(override val config: Config) extends BaseJobConfig[mutabl
 
   val idleTime: Long = config.getLong("idleTime")
   val sessionBreakTime: Long = config.getLong("sessionBreakTime")
-  val waterMarkTimeBound: Long = config.getLong("waterMarkTimeBound")
+  override val waterMarkTimeBound: Int = config.getInt("waterMarkTimeBound")
   
   // Kafka Topics Configuration
   val kafkaInputTopic: String = config.getString("kafka.input.topic")

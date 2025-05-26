@@ -9,6 +9,7 @@
         <groupId>org.sunbird.obsrv</groupId>
         <artifactId>pipeline</artifactId>
         <version>1.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <groupId>org.sunbird.obsrv.pipeline</groupId>

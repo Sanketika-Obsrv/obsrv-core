@@ -3,34 +3,29 @@ package org.sunbird.obsrv.spec
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig, duration2JavaDuration}
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
-import kong.unirest.{HttpResponse, JsonNode}
-import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
-import org.joda.time.{DateTime, DateTimeZone}
-import org.mockito.MockitoSugar.{mock, when}
-import org.sunbird.obsrv.registry.DatasetRegistry
-import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
-import org.sunbird.fixture.EventFixture
-import org.sunbird.obsrv.core.cache.RedisConnect
-import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
-import org.sunbird.obsrv.dataproducts.helper.BaseMetricHelper
-import org.sunbird.obsrv.dataproducts.model.{Edata, MetricLabel}
-import redis.embedded.RedisServer
-
-import scala.collection.JavaConverters._
-import scala.concurrent.duration.FiniteDuration
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
-import org.mockito.Mockito
+import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
+import org.joda.time.{DateTime, DateTimeZone}
+import org.mockito.MockitoSugar.mock
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
+import org.sunbird.fixture.EventFixture
+import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.exception.ObsrvException
-import org.sunbird.obsrv.core.model
 import org.sunbird.obsrv.core.model.ErrorConstants
-import org.sunbird.obsrv.dataproducts
+import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
+import org.sunbird.obsrv.dataproducts.helper.BaseMetricHelper
+import org.sunbird.obsrv.dataproducts.model.{Edata, MetricLabel}
 import org.sunbird.obsrv.dataproducts.util.StorageUtil.BlobProvider
-import org.sunbird.obsrv.dataproducts.util.{CommonUtil, HttpUtil, StorageUtil}
+import org.sunbird.obsrv.dataproducts.util.{CommonUtil, StorageUtil}
+import org.sunbird.obsrv.registry.DatasetRegistry
+import redis.embedded.RedisServer
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration.FiniteDuration
 
 class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
@@ -48,7 +43,7 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   )
 
   var embeddedPostgres: EmbeddedPostgres = _
-  var redisServer: RedisServer = _
+  val redisServer: RedisServer = new RedisServer(6340)
   var redisConnection: RedisConnect = _
   private val dayPeriodFormat: DateTimeFormatter = DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC()
   val dt = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay()
@@ -64,15 +59,17 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   implicit val deserializer: StringDeserializer = new StringDeserializer()
   var spark: SparkSession = _
 
-
   override def beforeAll(): Unit = {
+    try {
+      redisServer.start()
+    } catch {
+      case ex: Exception =>
+        ex.printStackTrace()
+        Console.err.println("### Unable to start redis server. Falling back to use locally run redis if any ###")
+    }
     super.beforeAll()
-    val conf = new SparkConf()
-      .setAppName("MasterDataProcessorIndexer")
-      .setMaster("local[*]")
+    val conf = new SparkConf().setAppName("MasterDataProcessorIndexer").setMaster("local[*]")
     spark = SparkSession.builder().config(conf).getOrCreate()
-    redisServer = new RedisServer(6340)
-    redisServer.start()
     embeddedPostgres = EmbeddedPostgres.builder.setPort(5432).start()
     val postgresConnect = new PostgresConnect(postgresConfig)
     createSchema(postgresConnect)
@@ -101,7 +98,7 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   }
 
   private def createSchema(postgresConnect: PostgresConnect) {
-    postgresConnect.execute("CREATE TABLE IF NOT EXISTS datasets ( id text PRIMARY KEY, type text NOT NULL, validation_config json, extraction_config json, dedup_config json, data_schema json, denorm_config json, router_config json NOT NULL, dataset_config json NOT NULL, status text NOT NULL, tags text[], data_version INT, created_by text NOT NULL, updated_by text NOT NULL, created_date timestamp NOT NULL, updated_date timestamp NOT NULL );")
+    postgresConnect.execute("CREATE TABLE IF NOT EXISTS datasets ( id text PRIMARY KEY, type text NOT NULL, validation_config json, extraction_config json, dedup_config json, data_schema json, denorm_config json, router_config json NOT NULL, dataset_config json NOT NULL, status text NOT NULL, tags text[], data_version INT, api_version VARCHAR(255) NOT NULL, entry_topic TEXT NOT NULL, created_by text NOT NULL, updated_by text NOT NULL, created_date timestamp NOT NULL, updated_date timestamp NOT NULL );")
     postgresConnect.execute("CREATE TABLE IF NOT EXISTS datasources ( id text PRIMARY KEY, dataset_id text REFERENCES datasets (id), ingestion_spec json NOT NULL, datasource text NOT NULL, datasource_ref text NOT NULL);")
     postgresConnect.execute("CREATE TABLE IF NOT EXISTS dataset_transformations ( id text PRIMARY KEY, dataset_id text REFERENCES datasets (id), field_key text NOT NULL, transformation_function json NOT NULL, status text NOT NULL, mode text, created_by text NOT NULL, updated_by text NOT NULL, created_date Date NOT NULL, updated_date Date NOT NULL, UNIQUE(field_key, dataset_id) );")
     postgresConnect.execute("CREATE TABLE IF NOT EXISTS dataset_source_config ( id text PRIMARY KEY, dataset_id text NOT NULL REFERENCES datasets (id), connector_type text NOT NULL, connector_config json NOT NULL, status text NOT NULL, connector_stats json, created_by text NOT NULL, updated_by text NOT NULL, created_date Date NOT NULL, updated_date Date NOT NULL, UNIQUE(connector_type, dataset_id) );")
@@ -146,42 +143,42 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   it should "index datasets for single datasource and generate metrics for local storage" in {
     val config = jobConfig.withValue("cloud.storage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
     println("Path -> " + config.getString("cloud.storage.container"))
-    assertThrows[Exception](
+    noException should be thrownBy (
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for aws" in {
     val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("aws"))
-    assertThrows[Exception](
+    noException should be thrownBy (
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for azure" in {
     val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("azure"))
-    assertThrows[Exception](
+    noException should be thrownBy (
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for gcloud" in {
     val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("gcloud"))
-    assertThrows[Exception](
+    noException should be thrownBy (
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for cephs3" in {
     val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("cephs3"))
-    assertThrows[Exception](
+    noException should be thrownBy (
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }
 
   it should "index datasets for oci" in {
     val config = jobConfig.withValue("cloud.storage.provider", ConfigValueFactory.fromAnyRef("oci"))
-    assertThrows[Exception](
+    noException should be thrownBy (
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
   }

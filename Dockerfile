@@ -1,6 +1,8 @@
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-core
 COPY . /app
-RUN mvn clean install -DskipTests
+RUN mvn clean install -DskipTests -f /app/pom.xml
+# RUN mvn clean install -DskipTests -f /app/dataset-registry/pom.xml
+# RUN mvn clean install -DskipTests -f /app/transformation-sdk/pom.xml
 
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
 COPY --from=build-core /root/.m2 /root/.m2

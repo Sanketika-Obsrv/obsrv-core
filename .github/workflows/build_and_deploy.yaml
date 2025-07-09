@@ -29,8 +29,6 @@ jobs:
             target: "dataset-router-image"
           - image: "unified-pipeline"
             target: "unified-image"
-          - image: "lakehouse-connector"
-            target: "lakehouse-connector-image"
           - image: "cache-indexer"
             target: "cache-indexer-image"
     steps:

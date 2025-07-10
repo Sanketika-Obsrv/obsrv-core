@@ -9,33 +9,33 @@ COPY --from=build-core /root/.m2 /root/.m2
 COPY . /app
 RUN mvn clean package -DskipTests -f /app/pipeline/pom.xml
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS extractor-image
+FROM sanketikahub/flink:1.20-scala_2.12-java11 AS extractor-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/extractor/target/extractor-1.0.0.jar $FLINK_HOME/usrlib/
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS preprocessor-image
+FROM sanketikahub/flink:1.20-scala_2.12-java11 AS preprocessor-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/preprocessor/target/preprocessor-1.0.0.jar $FLINK_HOME/usrlib/
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS denormalizer-image
+FROM sanketikahub/flink:1.20-scala_2.12-java11 AS denormalizer-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/denormalizer/target/denormalizer-1.0.0.jar $FLINK_HOME/usrlib/
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS transformer-image
+FROM sanketikahub/flink:1.20-scala_2.12-java11 AS transformer-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/transformer/target/transformer-1.0.0.jar $FLINK_HOME/usrlib/
 
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS dataset-router-image
+FROM sanketikahub/flink:1.20-scala_2.12-java11 AS dataset-router-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/dataset-router/target/dataset-router-1.0.0.jar $FLINK_HOME/usrlib/
 
 # unified image build
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS unified-image
+FROM sanketikahub/flink:1.20-scala_2.12-java11 AS unified-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar $FLINK_HOME/usrlib/
@@ -53,7 +53,7 @@ COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipelin
 # COPY --from=build-pipeline /app/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
 
 # cache indexer image build
-FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS cache-indexer-image
+FROM sanketikahub/flink:1.20-scala_2.12-java11 AS cache-indexer-image
 USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/cache-indexer/target/cache-indexer-1.0.0.jar $FLINK_HOME/usrlib/

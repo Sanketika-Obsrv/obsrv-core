@@ -17,7 +17,6 @@ object FlinkUtil {
     configuration.set(RestartStrategyOptions.RESTART_STRATEGY_FIXED_DELAY_DELAY, Duration.ofMillis(config.delayBetweenAttempts))
     configuration.set(CheckpointingOptions.CHECKPOINTING_INTERVAL, Duration.ofMillis(config.checkpointingInterval))
     configuration.set[java.lang.Boolean](ExecutionOptions.SNAPSHOT_COMPRESSION, config.enableCompressedCheckpointing)
-
     // $COVERAGE-OFF$ Disabling scoverage as the below code can only be invoked with a cloud blob store config
     /* Use Blob storage as distributed state backend if enabled */
     config.enableDistributedCheckpointing match {
@@ -32,9 +31,12 @@ object FlinkUtil {
       case _ => // Do nothing
     }
     // $COVERAGE-ON$
+
     val env = StreamExecutionEnvironment.getExecutionEnvironment(configuration)
     print("Flink Config:", env.getConfiguration)
     env.enableCheckpointing(config.checkpointingInterval)
+    env.configure(configuration)
+    print("Flink checkpointing config:", env.getCheckpointConfig)
     env
 
   }

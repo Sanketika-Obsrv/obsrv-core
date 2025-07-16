@@ -16,7 +16,8 @@ object OTelMetricsGenerator {
       case Some(openTelemetry) =>
         generate(systemEvent, openTelemetry)
       case None =>
-        println("OpenTelemetry is disabled. No metrics generated.")
+      // Do nothing.
+      //println("OpenTelemetry is disabled. No metrics generated.")
     }
   }
 

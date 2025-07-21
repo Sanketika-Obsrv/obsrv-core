@@ -51,7 +51,16 @@ RUN mv flink-shaded-hadoop-2-uber-2.8.3-10.0.jar $FLINK_HOME/lib
 RUN mv flink-s3-fs-hadoop-1.17.2.jar $FLINK_HOME/lib
 RUN mv hudi-flink1.17.x-1.0.2.jar $FLINK_HOME/lib
 RUN mkdir $FLINK_HOME/custom-lib
-COPY --from=build-pipeline /app/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
+
+# Clone and build dataset-registry and framework from a specific tag (before copying the hudi-connector jar)
+USER root
+RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git /app \
+    && cd /app \
+    && git checkout tags/1.7.1 \
+    && mvn clean install -DskipTests -f /app/framework/pom.xml \
+    && mvn clean install -DskipTests -f /app/dataset-registry/pom.xml
+USER flink
+COPY /app/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
 
 # cache indexer image build
 FROM sanketikahub/flink:1.20-scala_2.12-java11 AS cache-indexer-image

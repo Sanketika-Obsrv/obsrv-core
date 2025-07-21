@@ -57,9 +57,9 @@ WORKDIR /home/flink
 RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
     && cd obsrv-core \
     && git checkout tags/1.7.1 \
-    && mvn clean install -DskipTests -f /app/framework/pom.xml \
-    && mvn clean install -DskipTests -f /app/dataset-registry/pom.xml \
-    && mvn clean package -DskipTests -f pipeline/hudi-connector/pom.xml
+    && mvn clean install -DskipTests -f /home/flink/obsrv-core/framework/pom.xml \
+    && mvn clean install -DskipTests -f /home/flink/obsrv-core/dataset-registry/pom.xml \
+    && mvn clean package -DskipTests -f /home/flink/obsrv-core/pipeline/hudi-connector/pom.xml
 COPY /home/flink/obsrv-core/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
 
 # cache indexer image build

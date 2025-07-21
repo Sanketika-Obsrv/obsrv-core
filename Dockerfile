@@ -47,10 +47,7 @@ RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
     && cd obsrv-core \
     && git checkout tags/1.7.1 \
     && mvn clean install -DskipTests -f framework/pom.xml \
-    && mvn clean install -DskipTests -f dataset-registry/pom.xml \
-    && mvn clean install -DskipTests -f transformation-sdk/pom.xml \
-    && mvn clean package -DskipTests -pl pipeline/hudi-connector -am
-
+    && mvn clean install -DskipTests -f dataset-registry/pom.xml
 # Lakehouse connector image build
 FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS lakehouse-connector-image
 USER flink

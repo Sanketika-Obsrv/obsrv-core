@@ -61,7 +61,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       val rowType = schemaParser.rowTypeMap(datasetId)
 
       val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)
-      val pipeline = Pipelines.hoodieStreamWrite(conf, hoodieRecordDataStream)
+      val pipeline = Pipelines.hoodieStreamWrite(conf, rowType, hoodieRecordDataStream)
       if (OptionsResolver.needsAsyncCompaction(conf)) {
         Pipelines.compact(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
       } else {

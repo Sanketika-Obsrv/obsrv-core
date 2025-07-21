@@ -40,6 +40,17 @@ USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar $FLINK_HOME/usrlib/
 
+# Separate stage to clone tag 1.7.1 and build hudi-connector
+FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
+WORKDIR /home/flink
+RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
+    && cd obsrv-core \
+    && git checkout tags/1.7.1 \
+    && mvn clean install -DskipTests -f framework/pom.xml \
+    && mvn clean install -DskipTests -f dataset-registry/pom.xml \
+    && mvn clean install -DskipTests -f transformation-sdk/pom.xml \
+    && mvn clean package -DskipTests -pl pipeline/hudi-connector -am
+
 # Lakehouse connector image build
 FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS lakehouse-connector-image
 USER flink
@@ -50,17 +61,9 @@ RUN wget https://repo1.maven.org/maven2/org/apache/hudi/hudi-flink1.17.x/1.0.2/h
 RUN mv flink-shaded-hadoop-2-uber-2.8.3-10.0.jar $FLINK_HOME/lib
 RUN mv flink-s3-fs-hadoop-1.17.2.jar $FLINK_HOME/lib
 RUN mv hudi-flink1.17.x-1.0.2.jar $FLINK_HOME/lib
-RUN mkdir $FLINK_HOME/custom-lib
+# RUN mkdir $FLINK_HOME/custom-lib
 
-# Clone and build hudi-connector from tag 1.7.1 as flink user
-WORKDIR /home/flink
-RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
-    && cd obsrv-core \
-    && git checkout tags/1.7.1 \
-    && mvn clean install -DskipTests -f /home/flink/obsrv-core/framework/pom.xml \
-    && mvn clean install -DskipTests -f /home/flink/obsrv-core/dataset-registry/pom.xml \
-    && mvn clean package -DskipTests -pl pipeline/hudi-connector -am
-COPY /home/flink/obsrv-core/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
+COPY --from=build-hudi-connector /home/flink/obsrv-core/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
 
 # cache indexer image build
 FROM sanketikahub/flink:1.20-scala_2.12-java11 AS cache-indexer-image

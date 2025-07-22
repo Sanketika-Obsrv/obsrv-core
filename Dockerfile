@@ -48,9 +48,10 @@ RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
     && git checkout tags/1.7.1 \
     && mvn clean install -DskipTests -f framework/pom.xml \
     && mvn clean install -DskipTests -f dataset-registry/pom.xml
-RUN mkdir -p /home/flink/hudi-connector
-COPY --from=build-pipeline /app/pipeline/hudi-connector /home/flink/hudi-connector/
-RUN mvn clean install -DskipTests -f /home/flink/hudi-connector/pom.xml
+#RUN mkdir -p /home/flink/hudi-connector
+RUN mkdir -p /home/flink/pipeline
+COPY --from=build-pipeline /app/pipeline /home/flink/pipeline/
+RUN mvn clean install -DskipTests -f /home/flink/pipeline/hudi-connector/pom.xml
 
 
 # Lakehouse connector image build

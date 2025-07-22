@@ -56,7 +56,7 @@ FROM maven:3.9.4-eclipse-temurin-11-focal AS build-core-legacy
 RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git /app
 WORKDIR /app
 RUN git checkout tags/1.7.1
-RUN mvn clean install -DskipTests -pl app/framework,app/dataset-registry -am
+RUN mvn clean install -DskipTests -pl framework,dataset-registry -am
 
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
 COPY . /app

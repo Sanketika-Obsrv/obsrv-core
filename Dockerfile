@@ -65,7 +65,7 @@ RUN mv flink-shaded-hadoop-2-uber-2.8.3-10.0.jar $FLINK_HOME/lib
 RUN mv flink-s3-fs-hadoop-1.17.2.jar $FLINK_HOME/lib
 RUN mv hudi-flink1.17.x-1.0.2.jar $FLINK_HOME/lib
 
-COPY --from=build-hudi-connector /home/flink/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
+COPY --from=build-hudi-connector /home/flink/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
 
 
 

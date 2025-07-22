@@ -57,7 +57,7 @@ RUN mvn clean package -DskipTests -f /app/pipeline/pom.xml
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-base-1.7.1
 WORKDIR /app
 # Use git to checkout specific tag cleanly
-RUN git clone https://github.com/your-org/your-repo.git . && \
+RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git . && \
     git checkout tags/1.7.1
 # Install only framework and dataset-registry
 RUN mvn clean install -DskipTests -pl framework,dataset-registry -am
@@ -70,8 +70,10 @@ WORKDIR /home/flink
 # Checkout to tag 2.0.0 if needed (already in the correct codebase otherwise skip)
 # RUN git checkout tags/2.0.0
 # Use pre-built 1.7.1 framework and dataset-registry jars
-COPY --from=build-core-legacy /root/.m2 /root/.m2
+COPY --from=build-base-1.7.1 /root/.m2 /root/.m2
 # Build hudi-connector with its parents present
+# RUN mvn clean install -DskipTests -pl pipeline/hudi-connector -am
+
 RUN mvn clean install -DskipTests -pl pipeline/hudi-connector -am -f pom.xml
 
 

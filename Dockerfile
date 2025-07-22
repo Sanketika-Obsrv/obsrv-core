@@ -59,8 +59,9 @@ RUN git checkout tags/1.7.1
 RUN mvn clean install -DskipTests -pl framework,dataset-registry -am
 
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
-COPY . /app
+# COPY . /app
 COPY --from=build-core-legacy /root/.m2 /root/.m2
+COPY --from=build-pipeline /app/pipeline/hudi-connector /app/pipeline/hudi-connector
 WORKDIR /app
 RUN mvn clean install -DskipTests -pl pipeline/hudi-connector -am
 

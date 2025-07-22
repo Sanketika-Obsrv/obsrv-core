@@ -74,7 +74,7 @@ COPY --from=build-base-1.7.1 /root/.m2 /root/.m2
 # Build hudi-connector with its parents present
 # RUN mvn clean install -DskipTests -pl pipeline/hudi-connector -am
 
-RUN mvn clean install -DskipTests -pl pipeline/hudi-connector -am
+RUN mvn clean install -DskipTests -pl pipeline/hudi-connector -f pom.xml
 
 
 # Lakehouse connector image build

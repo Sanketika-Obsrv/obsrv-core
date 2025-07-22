@@ -55,7 +55,7 @@ COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipelin
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-core-legacy
 RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git /app
 WORKDIR /app
-RUN git checkout tags/v1.7.1
+RUN git checkout tags/1.7.1
 RUN mvn clean install -DskipTests -pl pipeline/framework,pipeline/dataset-registry -am
 
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector

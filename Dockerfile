@@ -40,31 +40,31 @@ USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar $FLINK_HOME/usrlib/
 
-# Separate stage to clone tag 1.7.1 and build hudi-connector
-FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
-WORKDIR /home/flink
-RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
-    && cd obsrv-core \
-    && git checkout tags/1.7.1 \
-    && mvn clean install -DskipTests -f framework/pom.xml \
-    && mvn clean install -DskipTests -f dataset-registry/pom.xml
-#RUN mkdir -p /home/flink/hudi-connector
-RUN mkdir -p /home/flink/pipeline
-COPY --from=build-pipeline /app/pipeline /home/flink/pipeline/
-RUN mvn clean install -DskipTests -pl /home/flink/pipeline/hudi-connector -am
-
-# FROM maven:3.9.4-eclipse-temurin-11-focal AS build-core-legacy
-# RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git /app
-# WORKDIR /app
-# RUN git checkout tags/1.7.1
-# RUN mvn clean install -DskipTests -pl framework,dataset-registry -am
-
+# Separate stage to clone tag 1.7.1 and build-hudi-connector
 # FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
-# # COPY . /app
-# COPY --from=build-core-legacy /root/.m2 /root/.m2
-# COPY --from=build-pipeline /app/pipeline/hudi-connector /app/pipeline/hudi-connector
-# WORKDIR /app
-# RUN mvn clean install -DskipTests -pl pipeline/hudi-connector -am
+# WORKDIR /home/flink
+# RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
+#     && cd obsrv-core \
+#     && git checkout tags/1.7.1 \
+#     && mvn clean install -DskipTests -f framework/pom.xml \
+#     && mvn clean install -DskipTests -f dataset-registry/pom.xml
+# #RUN mkdir -p /home/flink/hudi-connector
+# RUN mkdir -p /home/flink/pipeline
+# COPY --from=build-pipeline /app/pipeline /home/flink/pipeline/
+# RUN mvn clean install -DskipTests -pl /home/flink/pipeline/hudi-connector -am
+
+FROM maven:3.9.4-eclipse-temurin-11-focal AS build-core-legacy
+RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git /app
+WORKDIR /app
+RUN git checkout tags/1.7.1
+RUN mvn clean install -DskipTests -pl framework,dataset-registry -am
+
+FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
+# COPY . /app
+COPY --from=build-core-legacy /root/.m2 /root/.m2
+COPY --from=build-pipeline /app/pipeline/hudi-connector /app/pipeline/hudi-connector
+WORKDIR /app
+RUN mvn clean install -DskipTests -pl pipeline/hudi-connector/pom.xml -am
 
 
 # Lakehouse connector image build

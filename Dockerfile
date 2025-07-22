@@ -40,18 +40,29 @@ USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar $FLINK_HOME/usrlib/
 
-# Separate stage to clone tag 1.7.1 and build hudi-connector
+# # Separate stage to clone tag 1.7.1 and build hudi-connector
+# FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
+# WORKDIR /home/flink
+# RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
+#     && cd obsrv-core \
+#     && git checkout tags/1.7.1 \
+#     && mvn clean install -DskipTests -f framework/pom.xml \
+#     && mvn clean install -DskipTests -f dataset-registry/pom.xml
+# #RUN mkdir -p /home/flink/hudi-connector
+# RUN mkdir -p /home/flink/pipeline
+# COPY --from=build-pipeline /app/pipeline /home/flink/pipeline/
+# RUN mvn clean install -DskipTests -f /home/flink/pipeline/hudi-connector/pom.xml
+FROM maven:3.9.4-eclipse-temurin-11-focal AS build-core-legacy
+RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git /app
+WORKDIR /app
+RUN git checkout tags/v1.7.1
+RUN mvn clean install -DskipTests -pl pipeline/framework,pipeline/dataset-registry -am
+
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
-WORKDIR /home/flink
-RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
-    && cd obsrv-core \
-    && git checkout tags/1.7.1 \
-    && mvn clean install -DskipTests -f framework/pom.xml \
-    && mvn clean install -DskipTests -f dataset-registry/pom.xml
-#RUN mkdir -p /home/flink/hudi-connector
-RUN mkdir -p /home/flink/pipeline
-COPY --from=build-pipeline /app/pipeline /home/flink/pipeline/
-RUN mvn clean install -DskipTests -f /home/flink/pipeline/hudi-connector/pom.xml
+COPY . /app
+COPY --from=build-core-legacy /root/.m2 /root/.m2
+WORKDIR /app
+RUN mvn clean install -DskipTests -pl pipeline/hudi-connector -am
 
 
 # Lakehouse connector image build
@@ -65,7 +76,7 @@ RUN mv flink-shaded-hadoop-2-uber-2.8.3-10.0.jar $FLINK_HOME/lib
 RUN mv flink-s3-fs-hadoop-1.17.2.jar $FLINK_HOME/lib
 RUN mv hudi-flink1.17.x-1.0.2.jar $FLINK_HOME/lib
 
-COPY --from=build-hudi-connector /home/flink/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib
+COPY --from=build-hudi-connector /app/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib/
 
 
 

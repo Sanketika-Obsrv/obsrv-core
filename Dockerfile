@@ -40,7 +40,8 @@ USER flink
 RUN mkdir -p $FLINK_HOME/usrlib
 COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar $FLINK_HOME/usrlib/
 
-# Separate stage to clone tag 1.7.1 and build-hudi-connector
+# hudi connector image build
+
 FROM maven:3.9.4-eclipse-temurin-11-focal AS build-hudi-connector
 WORKDIR /home/flink
 RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
@@ -51,7 +52,7 @@ RUN git clone https://github.com/Sanketika-Obsrv/obsrv-core.git \
 #RUN mkdir -p /home/flink/hudi-connector
 RUN mkdir -p /home/flink/pipeline
 COPY --from=build-pipeline /app/pipeline /home/flink/pipeline/
-RUN mvn clean install -DskipTests -pl /home/flink/pipeline/
+RUN mvn clean install -DskipTests -pl /home/flink/pipeline/hudi-connector -am -f /home/flink/pipeline/hudi-connector/pom.xml
 
 # Lakehouse connector image build
 FROM sanketikahub/flink:1.17.2-scala_2.12-java11 AS lakehouse-connector-image

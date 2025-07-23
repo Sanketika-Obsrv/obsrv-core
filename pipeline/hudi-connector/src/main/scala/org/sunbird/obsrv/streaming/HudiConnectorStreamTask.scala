@@ -84,6 +84,9 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     val rowType = schemaParser.rowTypeMap(dataset)
     val avroSchema = AvroSchemaConverter.convertToSchema(rowType, dataset.replace("-", "_"))
     conf.setString(FlinkOptions.PATH.key, s"${config.hudiBasePath}/${datasetSchema.schema.table}")
+    conf.setString("hoodie.datasource.meta.sync.base.path", s"${config.hudiBasePath}/${datasetSchema.schema.table}")
+    conf.setBoolean("hoodie.datasource.meta.sync.enable", true)
+
     conf.setString(FlinkOptions.TABLE_NAME, datasetSchema.schema.table)
     conf.setString(FlinkOptions.RECORD_KEY_FIELD.key, datasetSchema.schema.primaryKey)
     conf.setString(FlinkOptions.PRECOMBINE_FIELD.key, datasetSchema.schema.timestampColumn)

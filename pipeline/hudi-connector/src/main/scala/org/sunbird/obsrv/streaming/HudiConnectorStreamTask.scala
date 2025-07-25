@@ -61,7 +61,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       val rowType = schemaParser.rowTypeMap(datasetId)
 
       val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)
-      val pipeline = Pipelines.hoodieStreamWrite(conf, hoodieRecordDataStream)
+      val pipeline = Pipelines.hoodieStreamWrite(conf, rowType, hoodieRecordDataStream)
       if (OptionsResolver.needsAsyncCompaction(conf)) {
         Pipelines.compact(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
       } else {
@@ -84,6 +84,7 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
     val rowType = schemaParser.rowTypeMap(dataset)
     val avroSchema = AvroSchemaConverter.convertToSchema(rowType, dataset.replace("-", "_"))
     conf.setString(FlinkOptions.PATH.key, s"${config.hudiBasePath}/${datasetSchema.schema.table}")
+    conf.setString("hoodie.base.path", s"${config.hudiBasePath}/${datasetSchema.schema.table}")
     conf.setString(FlinkOptions.TABLE_NAME, datasetSchema.schema.table)
     conf.setString(FlinkOptions.RECORD_KEY_FIELD.key, datasetSchema.schema.primaryKey)
     conf.setString(FlinkOptions.PRECOMBINE_FIELD.key, datasetSchema.schema.timestampColumn)

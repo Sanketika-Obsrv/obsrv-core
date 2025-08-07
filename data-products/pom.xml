@@ -3,15 +3,18 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
+    <parent>
+        <groupId>org.sunbird.obsrv</groupId>
+        <artifactId>core</artifactId>
+        <version>1.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
     <groupId>org.sunbird.obsrv</groupId>
     <artifactId>data-products</artifactId>
     <version>1.0.0</version>
 
     <properties>
         <spark.version>3.1.0</spark.version>
-        <scala.version>2.12.11</scala.version>
-        <scala.maj.version>2.12</scala.maj.version>
         <scoverage.plugin.version>1.4.0</scoverage.plugin.version>
         <java.target.runtime>11</java.target.runtime>
         <log4j.version>2.14.1</log4j.version>
@@ -258,9 +261,15 @@
             <version>${log4j.version}</version>
         </dependency>
         <dependency>
-            <groupId>it.ozimov</groupId>
+            <groupId>com.github.codemonstur</groupId>
             <artifactId>embedded-redis</artifactId>
-            <version>0.7.1</version>
+            <version>1.0.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka_${scala.maj.version}</artifactId>
+            <version>${kafka.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

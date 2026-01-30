@@ -142,7 +142,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.4</version>
+            <version>42.7.7</version>
         </dependency>
 
         <dependency>
@@ -166,7 +166,7 @@
         <dependency>
             <groupId>io.github.embeddedkafka</groupId>
             <artifactId>embedded-kafka_2.12</artifactId>
-            <version>3.4.0</version>
+            <version>3.9.1</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>

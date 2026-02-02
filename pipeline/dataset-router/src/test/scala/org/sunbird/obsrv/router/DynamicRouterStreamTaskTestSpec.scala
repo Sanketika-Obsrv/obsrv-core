@@ -27,7 +27,7 @@ class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
   val routerConfig = new DynamicRouterConfig(config)
   val kafkaConnector = new FlinkKafkaConnector(routerConfig)
-  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> "test-event-schema-group")
+  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> s"test-event-schema-group-${java.util.UUID.randomUUID()}")
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(
       kafkaPort = 9093,

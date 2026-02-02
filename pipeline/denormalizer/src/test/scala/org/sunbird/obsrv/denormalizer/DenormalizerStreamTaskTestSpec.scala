@@ -32,7 +32,7 @@ class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
   val denormConfig = new DenormalizerConfig(config)
   val redisPort: Int = denormConfig.redisPort
   val kafkaConnector = new FlinkKafkaConnector(denormConfig)
-  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> "test-event-schema-group")
+  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> s"test-event-schema-group-${java.util.UUID.randomUUID()}")
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(
       kafkaPort = 9093,
@@ -103,6 +103,8 @@ class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.kafkaSystemTopic, 3, timeout = 30.seconds)
     validateSystemEvents(systemEvents)
 
+    // Allow flink to report metrics before validation
+    Thread.sleep(2000)
     validateMetrics(metricsReporter)
   }
 

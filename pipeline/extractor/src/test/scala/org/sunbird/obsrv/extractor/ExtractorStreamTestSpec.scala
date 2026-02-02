@@ -29,7 +29,7 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
   val pConfig = new ExtractorConfig(config)
   val kafkaConnector = new FlinkKafkaConnector(pConfig)
-  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> "test-event-schema-group")
+  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> s"test-event-schema-group-${java.util.UUID.randomUUID()}")
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(
       kafkaPort = 9093,

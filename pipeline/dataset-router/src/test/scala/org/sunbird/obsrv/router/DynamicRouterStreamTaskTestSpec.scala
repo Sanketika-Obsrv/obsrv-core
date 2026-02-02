@@ -43,8 +43,8 @@ class DynamicRouterStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     insertTestData(postgresConnect)
     postgresConnect.closeConnection()
     createTestTopics()
-    publishMessagesToKafka()
     flinkCluster.before()
+    publishMessagesToKafka()
   }
 
   private def publishMessagesToKafka(): Unit = {

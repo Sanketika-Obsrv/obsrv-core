@@ -45,12 +45,13 @@ class CacheIndexerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val postgresConnect = new PostgresConnect(postgresConfig)
     insertTestData(postgresConnect)
     createTestTopics()
+    flinkCluster.before()
     EmbeddedKafka.publishStringMessageToKafka("dataset3", EventFixture.VALID_BATCH_EVENT_D3_INSERT)
     EmbeddedKafka.publishStringMessageToKafka("dataset3", EventFixture.VALID_BATCH_EVENT_D3_INSERT_2)
     EmbeddedKafka.publishStringMessageToKafka("dataset4", EventFixture.VALID_BATCH_EVENT_D4)
     EmbeddedKafka.publishStringMessageToKafka("dataset3", EventFixture.VALID_BATCH_EVENT_D3_UPDATE)
     EmbeddedKafka.publishStringMessageToKafka("dataset4", EventFixture.INVALID_BATCH_EVENT_D4)
-    flinkCluster.before()
+    
   }
 
   private def insertTestData(postgresConnect: PostgresConnect): Unit = {

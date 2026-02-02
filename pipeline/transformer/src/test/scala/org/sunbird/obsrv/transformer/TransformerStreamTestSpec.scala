@@ -42,8 +42,8 @@ class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.start()(embeddedKafkaConfig)
     insertTestData()
     createTestTopics()
-    publishMessagesToKafka()
     flinkCluster.before()
+    publishMessagesToKafka()
   }
 
   private def publishMessagesToKafka(): Unit = {

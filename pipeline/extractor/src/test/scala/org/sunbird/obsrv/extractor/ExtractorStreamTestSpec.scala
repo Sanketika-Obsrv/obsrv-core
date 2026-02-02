@@ -42,6 +42,7 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     super.beforeAll()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     createTestTopics()
+    flinkCluster.before()
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.INVALID_JSON)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.MISSING_DEDUP_KEY)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.LARGE_JSON_EVENT)
@@ -49,7 +50,6 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.VALID_EVENT)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.VALID_BATCH)
 
-    flinkCluster.before()
   }
 
   override def afterAll(): Unit = {

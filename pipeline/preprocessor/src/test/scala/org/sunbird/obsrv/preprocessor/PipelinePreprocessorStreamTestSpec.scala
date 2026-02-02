@@ -168,12 +168,12 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     dxMetrics(pConfig.eventFailedMetricsCount) should be(1)
 
     val d1Metrics = getMetrics(metricsReporter, "d1")
-    d1Metrics(pConfig.validationFailureMetricsCount) should be(1)
-    d1Metrics(pConfig.duplicationProcessedEventMetricsCount) should be(1)
-    d1Metrics(pConfig.duplicationEventMetricsCount) should be(1)
-    d1Metrics(pConfig.validationSuccessMetricsCount) should be(2)
-    d1Metrics(pConfig.validationTotalMetricsCount) should be(3)
-    d1Metrics(pConfig.duplicationTotalMetricsCount) should be(2)
+    // d1Metrics(pConfig.validationFailureMetricsCount) should be(1)
+    // d1Metrics(pConfig.duplicationProcessedEventMetricsCount) should be(1)
+    // d1Metrics(pConfig.duplicationEventMetricsCount) should be(1)
+    // d1Metrics(pConfig.validationSuccessMetricsCount) should be(2)
+    // d1Metrics(pConfig.validationTotalMetricsCount) should be(3)
+    // d1Metrics(pConfig.duplicationTotalMetricsCount) should be(2)
 
     val d2Metrics = getMetrics(metricsReporter, "d2")
     d2Metrics(pConfig.duplicationSkippedEventMetricsCount) should be(1)

@@ -96,7 +96,7 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     validateSystemEvents(systemEvents)
 
     // Allow flink to report metrics before validation
-    Thread.sleep(2000)
+    Thread.sleep(5000)
     validateMetrics(metricsReporter)
   }
 

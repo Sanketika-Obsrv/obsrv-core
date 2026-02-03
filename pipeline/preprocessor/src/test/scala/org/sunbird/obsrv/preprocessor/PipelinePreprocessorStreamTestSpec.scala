@@ -100,7 +100,7 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSystemTopic, 8, timeout = 30.seconds)
 
     // Allow flink to report metrics before validation
-    Thread.sleep(2000)
+    Thread.sleep(5000)
     validateOutputEvents(outputEvents)
     validateInvalidEvents(invalidEvents)
     validateSystemEvents(systemEvents)

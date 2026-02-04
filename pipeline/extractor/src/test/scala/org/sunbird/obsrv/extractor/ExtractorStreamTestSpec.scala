@@ -29,7 +29,7 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
   val pConfig = new ExtractorConfig(config)
   val kafkaConnector = new FlinkKafkaConnector(pConfig)
-  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> s"test-event-schema-group-${java.util.UUID.randomUUID()}")
+  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> "test-event-schema-group")
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(
       kafkaPort = 9093,
@@ -42,7 +42,6 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     super.beforeAll()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     createTestTopics()
-    flinkCluster.before()
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.INVALID_JSON)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.MISSING_DEDUP_KEY)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.LARGE_JSON_EVENT)
@@ -50,6 +49,7 @@ class ExtractorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.VALID_EVENT)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixture.VALID_BATCH)
 
+    flinkCluster.before()
   }
 
   override def afterAll(): Unit = {

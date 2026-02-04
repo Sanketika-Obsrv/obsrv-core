@@ -27,7 +27,7 @@ class UnifiedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
 
   val unifiedPipelineConfig = new UnifiedPipelineConfig(config)
   val kafkaConnector = new FlinkKafkaConnector(unifiedPipelineConfig)
-  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> s"test-event-schema-group-${java.util.UUID.randomUUID()}")
+  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> "test-event-schema-group")
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(
       kafkaPort = 9093,
@@ -40,7 +40,6 @@ class UnifiedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     super.beforeAll()
     EmbeddedKafka.start()(embeddedKafkaConfig)
     createTestTopics()
-    flinkCluster.before()
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.VALID_BATCH_EVENT_D1)
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.MISSING_DATASET_BATCH_EVENT)
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.UNREGISTERED_DATASET_BATCH_EVENT)
@@ -49,6 +48,7 @@ class UnifiedPipelineStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.INVALID_BATCH_EVENT_EXTRACTION_KEY_NOT_ARRAY)
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.VALID_BATCH_EVENT_D2)
     EmbeddedKafka.publishStringMessageToKafka(config.getString("kafka.input.topic"), EventFixture.INVALID_BATCH_EVENT_D2)
+    flinkCluster.before()
   }
 
   override def afterAll(): Unit = {

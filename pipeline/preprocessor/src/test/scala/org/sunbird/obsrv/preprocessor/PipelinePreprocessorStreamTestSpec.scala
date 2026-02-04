@@ -29,7 +29,7 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
 
   val pConfig = new PipelinePreprocessorConfig(config)
   val kafkaConnector = new FlinkKafkaConnector(pConfig)
-  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> s"test-event-schema-group-${java.util.UUID.randomUUID()}")
+  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> "test-event-schema-group")
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(
       kafkaPort = 9093,
@@ -43,9 +43,6 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.start()(embeddedKafkaConfig)
     prepareTestData()
     createTestTopics()
-
-    flinkCluster.before()
-
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.VALID_EVENT)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.INVALID_EVENT)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.DUPLICATE_EVENT)
@@ -61,6 +58,8 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.EVENT_WITH_UNKNOWN_VALIDATION_ERR)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.EVENT_WITH_EMPTY_SCHEMA)
     EmbeddedKafka.publishStringMessageToKafka(pConfig.kafkaInputTopic, EventFixtures.DEDUP_KEY_MISSING)
+
+    flinkCluster.before()
   }
 
   private def prepareTestData(): Unit = {
@@ -99,8 +98,6 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     val invalidEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaInvalidTopic, 7, timeout = 30.seconds)
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](pConfig.kafkaSystemTopic, 8, timeout = 30.seconds)
 
-    // Allow flink to report metrics before validation
-    Thread.sleep(5000)
     validateOutputEvents(outputEvents)
     validateInvalidEvents(invalidEvents)
     validateSystemEvents(systemEvents)

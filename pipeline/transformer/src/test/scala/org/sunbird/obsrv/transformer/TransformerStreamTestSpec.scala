@@ -28,7 +28,7 @@ class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
   val transformerConfig = new TransformerConfig(config)
   val redisPort: Int = transformerConfig.redisPort
   val kafkaConnector = new FlinkKafkaConnector(transformerConfig)
-  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> s"test-event-schema-group-${java.util.UUID.randomUUID()}")
+  val customKafkaConsumerProperties: Map[String, String] = Map[String, String]("auto.offset.reset" -> "earliest", "group.id" -> "test-event-schema-group")
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(
       kafkaPort = 9093,
@@ -42,8 +42,8 @@ class TransformerStreamTestSpec extends BaseSpecWithDatasetRegistry {
     EmbeddedKafka.start()(embeddedKafkaConfig)
     insertTestData()
     createTestTopics()
-    flinkCluster.before()
     publishMessagesToKafka()
+    flinkCluster.before()
   }
 
   private def publishMessagesToKafka(): Unit = {

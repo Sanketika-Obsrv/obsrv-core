@@ -45,6 +45,37 @@ jobs:
           path: ./dataset-registry/target/dataset-registry-1.0.0.jar
           if-no-files-found: error
 
+  artifacts-upload-data-products:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Tag Name
+        id: get-tag
+        run: echo "tag_name=${GITHUB_REF#refs/tags/}" >>$GITHUB_OUTPUT
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JAVA
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build Data Products Artifacts
+        run: |
+          cd ./data-products
+          mvn clean package -DskipTests
+      - name: Get Data Products POM Version
+        id: get-version
+        run: echo "pom_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f ./data-products/pom.xml)" >>$GITHUB_OUTPUT
+      - name: Upload Data Products Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-products-${{ steps.get-tag.outputs.tag_name }}.jar
+          path: ./data-products/target/data-products-${{ steps.get-version.outputs.pom_version }}.jar
+          if-no-files-found: error
+
   artifacts-upload-pipeline:
     needs: artifacts-upload-core
     runs-on: ubuntu-latest

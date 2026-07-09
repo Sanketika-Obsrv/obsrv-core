@@ -60,6 +60,14 @@ object DatasetRegistry {
     DatasetRegistryService.updateDatasourceRef(datasource, datasourceRef)
   }
 
+  def insertDatasource(datasetId: String, datasource: String, datasourceRef: String, ingestionSpec: String, isPrimary: Boolean = false): Int = {
+    DatasetRegistryService.insertDatasource(datasetId, datasource, datasourceRef, ingestionSpec, isPrimary = isPrimary)
+  }
+
+  def retireDatasource(id: String, datasource: String): Int = {
+    DatasetRegistryService.retireDatasource(id, datasource)
+  }
+
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
     DatasetRegistryService.updateConnectorStats(id, lastFetchTimestamp, records)
   }

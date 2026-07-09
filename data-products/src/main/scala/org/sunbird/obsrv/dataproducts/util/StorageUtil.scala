@@ -7,7 +7,7 @@ import org.joda.time.{DateTime, DateTimeZone}
 import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
-import org.sunbird.obsrv.model.DatasetModels.DataSource
+import org.sunbird.obsrv.model.DatasetModels.Dataset
 
 object StorageUtil {
   val logger: Logger = LogManager.getLogger(MasterDataProcessorIndexer.getClass)
@@ -30,22 +30,25 @@ object StorageUtil {
     }
   }
 
-  def getPaths(datasource: DataSource, config: Config): Paths = {
+  def getPaths(dataset: Dataset, config: Config): Paths = {
     val dt = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay()
     val timestamp = dt.getMillis
     val date = dayPeriodFormat.print(dt)
     val provider = providerFormat(config.getString("cloud.storage.provider"))
     val cloudPrefix = provider.sparkURIFormat + config.getString("cloud.storage.container")
-    val pathSuffix = s"""masterdata-indexer/${datasource.datasetId}/$date/"""
+    val pathSuffix = s"""masterdata-indexer/${dataset.id}/$date/"""
     val ingestionPath = cloudPrefix.replace(provider.sparkURIFormat, provider.druidURIFormat) + pathSuffix
-    val datasourceRef =  this.getDataSourceRefFormat(datasource, date)
+    val datasourceRef = this.getDataSourceRefFormat(dataset, date)
     val outputFilePath = cloudPrefix + pathSuffix
     Paths(datasourceRef, ingestionPath, outputFilePath, timestamp)
   }
 
   // This method provides appropriate input source spec depending on the cloud storage provider
   def getInputSourceSpec(filePath: String, config: Config): String = {
-    config.getString("source.spec").replace("FILE_PATH", filePath)
+    val provider = providerFormat(config.getString("cloud.storage.provider"))
+    config.getString("source.spec")
+      .replace("FILE_PATH", filePath)
+      .replace("INPUT_SOURCE_TYPE", provider.ingestionSourceType)
   }
 
   def getDate(retensionPeriod: Int): String  = {
@@ -53,8 +56,8 @@ object StorageUtil {
     dayPeriodFormat.print(dt)
   }
 
-  def getDataSourceRefFormat(datasource: DataSource, date: String): String = {
-    datasource.datasource + '-' + date
+  def getDataSourceRefFormat(dataset: Dataset, date: String): String = {
+    dataset.id + "_druid-" + date
   }
 
 }

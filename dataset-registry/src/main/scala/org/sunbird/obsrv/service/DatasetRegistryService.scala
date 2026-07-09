@@ -158,7 +158,43 @@ object DatasetRegistryService {
       postgresConnect.closeConnection()
     }
   }
-  
+
+  def insertDatasource(datasetId: String, datasource: String, datasourceRef: String, ingestionSpec: String, datasourceType: String = "druid", status: String = "Live", isPrimary: Boolean = false): Int = {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    var preparedStatement: PreparedStatement = null
+    val query = "INSERT INTO datasources (id, datasource, dataset_id, type, status, ingestion_spec, datasource_ref, is_primary, backup_config, created_by, updated_by, created_date, updated_date) VALUES (?, ?, ?, ?, ?, ?::json, ?, ?, '{}'::json, 'SYSTEM', 'SYSTEM', now(), now())"
+    try {
+      preparedStatement = postgresConnect.prepareStatement(query)
+      preparedStatement.setString(1, datasourceRef)
+      preparedStatement.setString(2, datasource)
+      preparedStatement.setString(3, datasetId)
+      preparedStatement.setString(4, datasourceType)
+      preparedStatement.setString(5, status)
+      preparedStatement.setString(6, ingestionSpec)
+      preparedStatement.setString(7, datasourceRef)
+      preparedStatement.setBoolean(8, isPrimary)
+      postgresConnect.executeUpdate(preparedStatement)
+    } finally {
+      if (preparedStatement != null) preparedStatement.close()
+      postgresConnect.closeConnection()
+    }
+  }
+
+  def retireDatasource(id: String, datasource: String): Int = {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    var preparedStatement: PreparedStatement = null
+    val query = "UPDATE datasources SET status = 'Retired', datasource = ?, updated_date = now() WHERE id = ?"
+    try {
+      preparedStatement = postgresConnect.prepareStatement(query)
+      preparedStatement.setString(1, datasource)
+      preparedStatement.setString(2, id)
+      postgresConnect.executeUpdate(preparedStatement)
+    } finally {
+      if (preparedStatement != null) preparedStatement.close()
+      postgresConnect.closeConnection()
+    }
+  }
+
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     var preparedStatement: PreparedStatement = null

@@ -11,7 +11,7 @@ object HttpUtil extends Serializable {
     Unirest.post(url).headers(headers.asJava).body(requestBody).asJson()
   }
 
-  def delete(url: String): HttpResponse[JsonNode] = {
-    Unirest.delete(url).header("Content-Type", "application/json").asJson()
+  def delete(url: String, headers: Map[String, String] = Map[String, String]("Content-Type" -> "application/json")): HttpResponse[JsonNode] = {
+    Unirest.delete(url).headers(headers.asJava).asJson()
   }
 }

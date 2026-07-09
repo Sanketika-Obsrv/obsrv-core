@@ -5,6 +5,9 @@ on:
     tags:
       - '*'
 
+permissions:
+  contents: write
+
 jobs:
   artifacts-upload-core:
     runs-on: ubuntu-latest
@@ -23,27 +26,23 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build Framework Artifacts
+      - name: Build Core Artifacts
         run: |
-          cd ./framework
-          mvn clean install -DskipTests
-      - name: Upload Framework Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: framework-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: ./framework/target/framework-1.0.0.jar
-          if-no-files-found: error
+          mvn install -N -DskipTests
+          mvn clean install -DskipTests -pl framework,dataset-registry
 
-      - name: Build Dataset Registry Artifacts
+      - name: Stage Core Release Assets
         run: |
-          cd ./dataset-registry
-          mvn clean install -DskipTests
-      - name: Upload Dataset Registry Artifacts
-        uses: actions/upload-artifact@v4
+          mkdir -p release-assets
+          cp ./framework/target/framework-1.0.0.jar release-assets/framework-${{ steps.get-tag.outputs.tag_name }}.jar
+          cp ./dataset-registry/target/dataset-registry-1.0.0.jar release-assets/dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
+
+      - name: Publish Core Assets to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: ./dataset-registry/target/dataset-registry-1.0.0.jar
-          if-no-files-found: error
+          tag_name: ${{ steps.get-tag.outputs.tag_name }}
+          files: release-assets/*
+          fail_on_unmatched_files: true
 
   artifacts-upload-data-products:
     runs-on: ubuntu-latest
@@ -64,31 +63,28 @@ jobs:
 
       - name: Build Data Products Artifacts
         run: |
-          cd ./data-products
-          mvn clean package -DskipTests
+          mvn install -N -DskipTests
+          mvn install -DskipTests -pl framework,dataset-registry
+          mvn clean package -DskipTests -f ./data-products/pom.xml
+
       - name: Get Data Products POM Version
         id: get-version
         run: echo "pom_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f ./data-products/pom.xml)" >>$GITHUB_OUTPUT
-      - name: Upload Data Products Artifacts
-        uses: actions/upload-artifact@v4
+
+      - name: Stage Data Products Release Asset
+        run: |
+          mkdir -p release-assets
+          cp ./data-products/target/data-products-${{ steps.get-version.outputs.pom_version }}.jar release-assets/data-products-${{ steps.get-tag.outputs.tag_name }}.jar
+
+      - name: Publish Data Products Asset to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: data-products-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: ./data-products/target/data-products-${{ steps.get-version.outputs.pom_version }}.jar
-          if-no-files-found: error
+          tag_name: ${{ steps.get-tag.outputs.tag_name }}
+          files: release-assets/*
+          fail_on_unmatched_files: true
 
   artifacts-upload-pipeline:
-    needs: artifacts-upload-core
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - image: "extractor"
-          - image: "preprocessor"
-          - image: "denormalizer"
-          - image: "transformer"
-          - image: "druid-router"
-          - image: "unified-pipeline"
-          - image: "master-data-processor"
     steps:
       - name: Get Tag Name
         id: get-tag
@@ -105,12 +101,18 @@ jobs:
           cache: 'maven'
 
       - name: Build Data Pipeline Artifacts
+        run: mvn clean install -DskipTests
+
+      - name: Stage Pipeline Release Assets
         run: |
-          cd ./pipeline
-          mvn clean install -DskipTests
-      - name: Upload Data Pipeline Artifacts
-        uses: actions/upload-artifact@v4
+          mkdir -p release-assets
+          for img in extractor preprocessor denormalizer transformer dataset-router unified-pipeline cache-indexer; do
+            cp ./pipeline/${img}/target/${img}-1.0.0.jar release-assets/${img}-${{ steps.get-tag.outputs.tag_name }}.jar
+          done
+
+      - name: Publish Pipeline Assets to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: ${{matrix.image}}-${{ steps.get-tag.outputs.tag_name }}.jar
-          path: ./pipeline/${{matrix.image}}/target/${{matrix.image}}-1.0.0.jar
-          if-no-files-found: error
+          tag_name: ${{ steps.get-tag.outputs.tag_name }}
+          files: release-assets/*
+          fail_on_unmatched_files: true

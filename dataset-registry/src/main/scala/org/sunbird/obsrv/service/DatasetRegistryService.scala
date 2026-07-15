@@ -195,6 +195,45 @@ object DatasetRegistryService {
     }
   }
 
+  // Atomically retire the existing Live datasource and insert the new Live row in a
+  // single transaction. Either both changes commit or neither does, so the dataset is
+  // never left without a Live datasource on partial failure.
+  def retireAndInsertDatasource(retireId: String, retireDatasource: String, datasetId: String, datasource: String,
+                                datasourceRef: String, ingestionSpec: String, datasourceType: String = "druid",
+                                status: String = "Live", isPrimary: Boolean = false): Unit = {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    val retireQuery = "UPDATE datasources SET status = 'Retired', datasource = ?, updated_date = now() WHERE id = ?"
+    val insertQuery = "INSERT INTO datasources (id, datasource, dataset_id, type, status, ingestion_spec, datasource_ref, is_primary, backup_config, created_by, updated_by, created_date, updated_date) VALUES (?, ?, ?, ?, ?, ?::json, ?, ?, '{}'::json, 'SYSTEM', 'SYSTEM', now(), now())"
+    var retireStatement: PreparedStatement = null
+    var insertStatement: PreparedStatement = null
+    try {
+      postgresConnect.setAutoCommit(false)
+      retireStatement = postgresConnect.prepareStatement(retireQuery)
+      retireStatement.setString(1, retireDatasource)
+      retireStatement.setString(2, retireId)
+      retireStatement.executeUpdate()
+      insertStatement = postgresConnect.prepareStatement(insertQuery)
+      insertStatement.setString(1, datasourceRef)
+      insertStatement.setString(2, datasource)
+      insertStatement.setString(3, datasetId)
+      insertStatement.setString(4, datasourceType)
+      insertStatement.setString(5, status)
+      insertStatement.setString(6, ingestionSpec)
+      insertStatement.setString(7, datasourceRef)
+      insertStatement.setBoolean(8, isPrimary)
+      insertStatement.executeUpdate()
+      postgresConnect.commit()
+    } catch {
+      case ex: Exception =>
+        postgresConnect.rollback()
+        throw ex
+    } finally {
+      if (retireStatement != null) retireStatement.close()
+      if (insertStatement != null) insertStatement.close()
+      postgresConnect.closeConnection()
+    }
+  }
+
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     var preparedStatement: PreparedStatement = null

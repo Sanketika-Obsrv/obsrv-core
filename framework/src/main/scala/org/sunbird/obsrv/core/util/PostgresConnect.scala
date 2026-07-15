@@ -43,6 +43,21 @@ class PostgresConnect(config: PostgresConnectionConfig) {
   }
 
   @throws[Exception]
+  def setAutoCommit(autoCommit: Boolean): Unit = {
+    connection.setAutoCommit(autoCommit)
+  }
+
+  @throws[Exception]
+  def commit(): Unit = {
+    connection.commit()
+  }
+
+  @throws[Exception]
+  def rollback(): Unit = {
+    connection.rollback()
+  }
+
+  @throws[Exception]
   def execute(query: String): Boolean = {
     try {
       statement.execute(query)

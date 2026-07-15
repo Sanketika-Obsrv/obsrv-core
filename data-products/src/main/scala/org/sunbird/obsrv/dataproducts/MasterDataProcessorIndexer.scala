@@ -68,8 +68,7 @@ object MasterDataProcessorIndexer {
       case Some(ds) if ds.datasourceRef == datasourceRef =>
         logger.info(s"createOrUpdateDatasource() | datasetId=${dataset.id} | datasourceRef=$datasourceRef already Live, skipping")
       case Some(ds) =>
-        DatasetRegistry.retireDatasource(ds.id, ds.datasourceRef)
-        DatasetRegistry.insertDatasource(dataset.id, datasourceName, datasourceRef, ingestionSpec, isPrimary = true)
+        DatasetRegistry.retireAndInsertDatasource(ds.id, ds.datasourceRef, dataset.id, datasourceName, datasourceRef, ingestionSpec, isPrimary = true)
         logger.info(s"createOrUpdateDatasource() | datasetId=${dataset.id} | retired=${ds.id} | new datasourceRef=$datasourceRef")
       case None =>
         DatasetRegistry.insertDatasource(dataset.id, datasourceName, datasourceRef, ingestionSpec, isPrimary = true)

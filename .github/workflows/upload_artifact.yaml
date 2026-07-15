@@ -6,11 +6,13 @@ on:
       - '*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   artifacts-upload-core:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Get Tag Name
         id: get-tag
@@ -18,6 +20,8 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup JAVA
         uses: actions/setup-java@v4
@@ -34,8 +38,10 @@ jobs:
       - name: Stage Core Release Assets
         run: |
           mkdir -p release-assets
-          cp ./framework/target/framework-1.0.0.jar release-assets/framework-${{ steps.get-tag.outputs.tag_name }}.jar
-          cp ./dataset-registry/target/dataset-registry-1.0.0.jar release-assets/dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
+          framework_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -pl framework)
+          registry_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -pl dataset-registry)
+          cp ./framework/target/framework-${framework_version}.jar release-assets/framework-${{ steps.get-tag.outputs.tag_name }}.jar
+          cp ./dataset-registry/target/dataset-registry-${registry_version}.jar release-assets/dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
 
       - name: Publish Core Assets to Release
         uses: softprops/action-gh-release@v2
@@ -46,6 +52,8 @@ jobs:
 
   artifacts-upload-data-products:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Get Tag Name
         id: get-tag
@@ -53,6 +61,8 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup JAVA
         uses: actions/setup-java@v4
@@ -85,6 +95,8 @@ jobs:
 
   artifacts-upload-pipeline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Get Tag Name
         id: get-tag
@@ -92,6 +104,8 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup JAVA
         uses: actions/setup-java@v4
@@ -107,7 +121,8 @@ jobs:
         run: |
           mkdir -p release-assets
           for img in extractor preprocessor denormalizer transformer dataset-router unified-pipeline cache-indexer; do
-            cp ./pipeline/${img}/target/${img}-1.0.0.jar release-assets/${img}-${{ steps.get-tag.outputs.tag_name }}.jar
+            module_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -pl pipeline/${img})
+            cp ./pipeline/${img}/target/${img}-${module_version}.jar release-assets/${img}-${{ steps.get-tag.outputs.tag_name }}.jar
           done
 
       - name: Publish Pipeline Assets to Release

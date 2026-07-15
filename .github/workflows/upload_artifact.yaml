@@ -36,12 +36,14 @@ jobs:
           mvn clean install -DskipTests -pl framework,dataset-registry
 
       - name: Stage Core Release Assets
+        env:
+          TAG_NAME: ${{ steps.get-tag.outputs.tag_name }}
         run: |
           mkdir -p release-assets
           framework_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -pl framework)
           registry_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -pl dataset-registry)
-          cp ./framework/target/framework-${framework_version}.jar release-assets/framework-${{ steps.get-tag.outputs.tag_name }}.jar
-          cp ./dataset-registry/target/dataset-registry-${registry_version}.jar release-assets/dataset-registry-${{ steps.get-tag.outputs.tag_name }}.jar
+          cp ./framework/target/framework-${framework_version}.jar "release-assets/framework-${TAG_NAME}.jar"
+          cp ./dataset-registry/target/dataset-registry-${registry_version}.jar "release-assets/dataset-registry-${TAG_NAME}.jar"
 
       - name: Publish Core Assets to Release
         uses: softprops/action-gh-release@v2
@@ -82,9 +84,12 @@ jobs:
         run: echo "pom_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f ./data-products/pom.xml)" >>$GITHUB_OUTPUT
 
       - name: Stage Data Products Release Asset
+        env:
+          TAG_NAME: ${{ steps.get-tag.outputs.tag_name }}
+          POM_VERSION: ${{ steps.get-version.outputs.pom_version }}
         run: |
           mkdir -p release-assets
-          cp ./data-products/target/data-products-${{ steps.get-version.outputs.pom_version }}.jar release-assets/data-products-${{ steps.get-tag.outputs.tag_name }}.jar
+          cp ./data-products/target/data-products-${POM_VERSION}.jar "release-assets/data-products-${TAG_NAME}.jar"
 
       - name: Publish Data Products Asset to Release
         uses: softprops/action-gh-release@v2
@@ -118,11 +123,13 @@ jobs:
         run: mvn clean install -DskipTests
 
       - name: Stage Pipeline Release Assets
+        env:
+          TAG_NAME: ${{ steps.get-tag.outputs.tag_name }}
         run: |
           mkdir -p release-assets
           for img in extractor preprocessor denormalizer transformer dataset-router unified-pipeline cache-indexer; do
             module_version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -pl pipeline/${img})
-            cp ./pipeline/${img}/target/${img}-${module_version}.jar release-assets/${img}-${{ steps.get-tag.outputs.tag_name }}.jar
+            cp ./pipeline/${img}/target/${img}-${module_version}.jar "release-assets/${img}-${TAG_NAME}.jar"
           done
 
       - name: Publish Pipeline Assets to Release

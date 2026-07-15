@@ -9,6 +9,33 @@ import java.io.File
 import java.sql.{PreparedStatement, ResultSet, Timestamp}
 
 object DatasetRegistryService {
+
+  // Shared SQL for datasource retire/insert, reused by insertDatasource and the
+  // transactional retireAndInsertDatasource so the query and param binding live in one place.
+  private val insertDatasourceQuery = "INSERT INTO datasources (id, datasource, dataset_id, type, status, ingestion_spec, datasource_ref, is_primary, backup_config, created_by, updated_by, created_date, updated_date) VALUES (?, ?, ?, ?, ?, ?::json, ?, ?, '{}'::json, 'SYSTEM', 'SYSTEM', now(), now())"
+  private val retireDatasourceQuery = "UPDATE datasources SET status = 'Retired', datasource = ?, updated_date = now() WHERE id = ?"
+
+  private def prepareInsertDatasource(postgresConnect: PostgresConnect, datasetId: String, datasource: String, datasourceRef: String,
+                                      ingestionSpec: String, datasourceType: String, status: String, isPrimary: Boolean): PreparedStatement = {
+    val preparedStatement = postgresConnect.prepareStatement(insertDatasourceQuery)
+    preparedStatement.setString(1, datasourceRef)
+    preparedStatement.setString(2, datasource)
+    preparedStatement.setString(3, datasetId)
+    preparedStatement.setString(4, datasourceType)
+    preparedStatement.setString(5, status)
+    preparedStatement.setString(6, ingestionSpec)
+    preparedStatement.setString(7, datasourceRef)
+    preparedStatement.setBoolean(8, isPrimary)
+    preparedStatement
+  }
+
+  private def prepareRetireDatasource(postgresConnect: PostgresConnect, id: String, datasource: String): PreparedStatement = {
+    val preparedStatement = postgresConnect.prepareStatement(retireDatasourceQuery)
+    preparedStatement.setString(1, datasource)
+    preparedStatement.setString(2, id)
+    preparedStatement
+  }
+
   private val configFile = new File("/data/flink/conf/baseconfig.conf")
   // $COVERAGE-OFF$ This code only executes within a flink cluster
   val config: Config = if (configFile.exists()) {
@@ -162,32 +189,8 @@ object DatasetRegistryService {
   def insertDatasource(datasetId: String, datasource: String, datasourceRef: String, ingestionSpec: String, datasourceType: String = "druid", status: String = "Live", isPrimary: Boolean = false): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     var preparedStatement: PreparedStatement = null
-    val query = "INSERT INTO datasources (id, datasource, dataset_id, type, status, ingestion_spec, datasource_ref, is_primary, backup_config, created_by, updated_by, created_date, updated_date) VALUES (?, ?, ?, ?, ?, ?::json, ?, ?, '{}'::json, 'SYSTEM', 'SYSTEM', now(), now())"
     try {
-      preparedStatement = postgresConnect.prepareStatement(query)
-      preparedStatement.setString(1, datasourceRef)
-      preparedStatement.setString(2, datasource)
-      preparedStatement.setString(3, datasetId)
-      preparedStatement.setString(4, datasourceType)
-      preparedStatement.setString(5, status)
-      preparedStatement.setString(6, ingestionSpec)
-      preparedStatement.setString(7, datasourceRef)
-      preparedStatement.setBoolean(8, isPrimary)
-      postgresConnect.executeUpdate(preparedStatement)
-    } finally {
-      if (preparedStatement != null) preparedStatement.close()
-      postgresConnect.closeConnection()
-    }
-  }
-
-  def retireDatasource(id: String, datasource: String): Int = {
-    val postgresConnect = new PostgresConnect(postgresConfig)
-    var preparedStatement: PreparedStatement = null
-    val query = "UPDATE datasources SET status = 'Retired', datasource = ?, updated_date = now() WHERE id = ?"
-    try {
-      preparedStatement = postgresConnect.prepareStatement(query)
-      preparedStatement.setString(1, datasource)
-      preparedStatement.setString(2, id)
+      preparedStatement = prepareInsertDatasource(postgresConnect, datasetId, datasource, datasourceRef, ingestionSpec, datasourceType, status, isPrimary)
       postgresConnect.executeUpdate(preparedStatement)
     } finally {
       if (preparedStatement != null) preparedStatement.close()
@@ -202,25 +205,13 @@ object DatasetRegistryService {
                                 datasourceRef: String, ingestionSpec: String, datasourceType: String = "druid",
                                 status: String = "Live", isPrimary: Boolean = false): Unit = {
     val postgresConnect = new PostgresConnect(postgresConfig)
-    val retireQuery = "UPDATE datasources SET status = 'Retired', datasource = ?, updated_date = now() WHERE id = ?"
-    val insertQuery = "INSERT INTO datasources (id, datasource, dataset_id, type, status, ingestion_spec, datasource_ref, is_primary, backup_config, created_by, updated_by, created_date, updated_date) VALUES (?, ?, ?, ?, ?, ?::json, ?, ?, '{}'::json, 'SYSTEM', 'SYSTEM', now(), now())"
     var retireStatement: PreparedStatement = null
     var insertStatement: PreparedStatement = null
     try {
       postgresConnect.setAutoCommit(false)
-      retireStatement = postgresConnect.prepareStatement(retireQuery)
-      retireStatement.setString(1, retireDatasource)
-      retireStatement.setString(2, retireId)
+      retireStatement = prepareRetireDatasource(postgresConnect, retireId, retireDatasource)
       retireStatement.executeUpdate()
-      insertStatement = postgresConnect.prepareStatement(insertQuery)
-      insertStatement.setString(1, datasourceRef)
-      insertStatement.setString(2, datasource)
-      insertStatement.setString(3, datasetId)
-      insertStatement.setString(4, datasourceType)
-      insertStatement.setString(5, status)
-      insertStatement.setString(6, ingestionSpec)
-      insertStatement.setString(7, datasourceRef)
-      insertStatement.setBoolean(8, isPrimary)
+      insertStatement = prepareInsertDatasource(postgresConnect, datasetId, datasource, datasourceRef, ingestionSpec, datasourceType, status, isPrimary)
       insertStatement.executeUpdate()
       postgresConnect.commit()
     } catch {

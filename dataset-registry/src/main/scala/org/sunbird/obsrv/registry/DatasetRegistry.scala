@@ -64,10 +64,6 @@ object DatasetRegistry {
     DatasetRegistryService.insertDatasource(datasetId, datasource, datasourceRef, ingestionSpec, isPrimary = isPrimary)
   }
 
-  def retireDatasource(id: String, datasource: String): Int = {
-    DatasetRegistryService.retireDatasource(id, datasource)
-  }
-
   def retireAndInsertDatasource(retireId: String, retireDatasource: String, datasetId: String, datasource: String,
                                 datasourceRef: String, ingestionSpec: String, isPrimary: Boolean = false): Unit = {
     DatasetRegistryService.retireAndInsertDatasource(retireId, retireDatasource, datasetId, datasource, datasourceRef, ingestionSpec, isPrimary = isPrimary)

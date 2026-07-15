@@ -210,8 +210,8 @@ object DatasetRegistryService {
     try {
       postgresConnect.setAutoCommit(false)
       retireStatement = prepareRetireDatasource(postgresConnect, retireId, retireDatasource)
-      retireStatement.executeUpdate()
       insertStatement = prepareInsertDatasource(postgresConnect, datasetId, datasource, datasourceRef, ingestionSpec, datasourceType, status, isPrimary)
+      retireStatement.executeUpdate()
       insertStatement.executeUpdate()
       postgresConnect.commit()
     } catch {

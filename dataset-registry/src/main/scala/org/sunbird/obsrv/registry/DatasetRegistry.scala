@@ -60,13 +60,8 @@ object DatasetRegistry {
     DatasetRegistryService.updateDatasourceRef(datasource, datasourceRef)
   }
 
-  def insertDatasource(datasetId: String, datasource: String, datasourceRef: String, ingestionSpec: String, isPrimary: Boolean = false): Int = {
-    DatasetRegistryService.insertDatasource(datasetId, datasource, datasourceRef, ingestionSpec, isPrimary = isPrimary)
-  }
-
-  def retireAndInsertDatasource(retireId: String, retireDatasource: String, datasetId: String, datasource: String,
-                                datasourceRef: String, ingestionSpec: String, isPrimary: Boolean = false): Unit = {
-    DatasetRegistryService.retireAndInsertDatasource(retireId, retireDatasource, datasetId, datasource, datasourceRef, ingestionSpec, isPrimary = isPrimary)
+  def insertDatasource(id: String, datasetId: String, datasource: String, datasourceRef: String, ingestionSpec: String, isPrimary: Boolean = false, metadata: String = "{}"): Int = {
+    DatasetRegistryService.insertDatasource(id, datasetId, datasource, datasourceRef, ingestionSpec, isPrimary = isPrimary, metadata = metadata)
   }
 
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {

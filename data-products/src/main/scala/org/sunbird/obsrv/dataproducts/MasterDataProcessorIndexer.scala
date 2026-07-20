@@ -66,15 +66,11 @@ object MasterDataProcessorIndexer {
     val datasourceName = s"${dataset.id}_druid"
     val datasourceId = s"${dataset.id}_events_druid"
     val metadata = """{"aggregated":false,"granularity":"day"}"""
-    val existing = DatasetRegistry.getDatasources(dataset.id).getOrElse(List())
-    val liveDatasource = existing.find(ds => ds.datasource == datasourceName && ds.status == "Live")
-    liveDatasource match {
-      case Some(_) =>
-        logger.info(s"createOrUpdateDatasource() | datasetId=${dataset.id} | datasource=$datasourceName already Live, skipping")
-      case None =>
-        DatasetRegistry.insertDatasource(datasourceId, dataset.id, datasourceName, datasourceRef, ingestionSpec, metadata = metadata, isPrimary = true)
-        logger.info(s"createOrUpdateDatasource() | datasetId=${dataset.id} | created datasource=$datasourceName | datasourceRef=$datasourceRef")
-    }
+    // Upsert on the primary key (id): inserts on the first run, and on later runs updates the row in
+    // place — reactivating a non-Live row and refreshing datasource_ref/spec/metadata. Atomic (no
+    // find-then-insert race, no duplicate-key crash) and guarantees exactly one Live row per dataset.
+    DatasetRegistry.upsertDatasource(datasourceId, dataset.id, datasourceName, datasourceRef, ingestionSpec, metadata = metadata, isPrimary = true)
+    logger.info(s"createOrUpdateDatasource() | datasetId=${dataset.id} | upserted datasource=$datasourceName | datasourceRef=$datasourceRef")
   }
 
   // This method is used to submit the ingestion task to Druid for indexing data
@@ -108,10 +104,13 @@ object MasterDataProcessorIndexer {
     val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
       f => CommonUtil.processEvent(f._2, ts)
     )
+    // Persist so count() + read.json() reuse a single Redis scan instead of scanning twice.
+    rdd.persist()
     val noOfRecords: Long = rdd.count()
     if (noOfRecords > 0) {
       spark.read.json(rdd).write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
     }
+    rdd.unpersist()
     logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
     noOfRecords
   }

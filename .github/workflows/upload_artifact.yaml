@@ -54,6 +54,7 @@ jobs:
 
   artifacts-upload-data-products:
     runs-on: ubuntu-latest
+    needs: artifacts-upload-core
     permissions:
       contents: write
     steps:
@@ -100,6 +101,7 @@ jobs:
 
   artifacts-upload-pipeline:
     runs-on: ubuntu-latest
+    needs: artifacts-upload-data-products
     permissions:
       contents: write
     steps:

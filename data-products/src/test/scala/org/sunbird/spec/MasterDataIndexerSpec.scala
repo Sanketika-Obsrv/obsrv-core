@@ -19,6 +19,7 @@ import org.sunbird.obsrv.dataproducts.model.{Edata, MetricLabel}
 import org.sunbird.obsrv.dataproducts.util.StorageUtil.BlobProvider
 import org.sunbird.obsrv.dataproducts.util.{CommonUtil, StorageUtil}
 import org.sunbird.obsrv.registry.DatasetRegistry
+import org.sunbird.obsrv.service.DatasetRegistryService
 import redis.embedded.RedisServer
 
 import scala.collection.JavaConverters._
@@ -232,9 +233,24 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
     live1.datasourceRef shouldEqual ref
     DatasetRegistry.getDatasources("md5").getOrElse(List()).count(_.status == "Live") shouldEqual 1
 
-    // Same datasource already Live -> no-op, still a single Live row (stable ref, in-place re-index)
+    // Second run upserts the same id -> updated in place, still a single Live row (stable ref)
     MasterDataProcessorIndexer.createOrUpdateDatasource(dataset, ref, "{}")
     DatasetRegistry.getDatasources("md5").getOrElse(List()).count(_.status == "Live") shouldEqual 1
+  }
+
+  it should "reactivate an existing non-Live row (no duplicate-key crash) via upsert" in {
+    val dataset = DatasetRegistry.getDataset("md4").get
+    val ref = s"${dataset.id}_events"
+
+    // Pre-existing non-Live row sharing the primary key id (id = md4_events_druid)
+    DatasetRegistryService.insertDatasource("md4_events_druid", "md4", "md4_druid", ref, "{}", status = "Retired", isPrimary = true)
+
+    // Upsert on id -> must NOT violate the PK; updates the existing row in place to Live
+    noException should be thrownBy MasterDataProcessorIndexer.createOrUpdateDatasource(dataset, ref, "{}")
+
+    val rows = DatasetRegistry.getDatasources("md4").getOrElse(List()).filter(_.id == "md4_events_druid")
+    rows.size shouldEqual 1               // no duplicate row
+    rows.head.status shouldEqual "Live"   // reactivated in place
   }
 
   it should "return proper provider format for each cloud provider" in {

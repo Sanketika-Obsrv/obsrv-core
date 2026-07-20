@@ -7,11 +7,22 @@ import org.joda.time.{DateTime, DateTimeZone}
 import org.sunbird.obsrv.core.exception.ObsrvException
 import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
-import org.sunbird.obsrv.model.DatasetModels.DataSource
+import org.sunbird.obsrv.model.DatasetModels.Dataset
 
 object StorageUtil {
   val logger: Logger = LogManager.getLogger(MasterDataProcessorIndexer.getClass)
   val dayPeriodFormat: DateTimeFormatter = DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC()
+  val intervalDateFormat: DateTimeFormatter = DateTimeFormat.forPattern("yyyy-MM-dd").withZoneUTC()
+
+  // Ingestion interval = the current month. All records are stamped with today's start-of-day as
+  // obsrv_meta.syncts (CommonUtil.processEvent), so __time falls in this month's segment. Combined
+  // with dropExisting + MONTH segmentGranularity, each run atomically replaces the whole month
+  // segment — repeated runs in the same month stay a single current snapshot (no accumulation),
+  // and a failed task leaves the existing data untouched (no manual segment deletion needed).
+  def getIngestionInterval: String = {
+    val monthStart = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().withDayOfMonth(1)
+    s"${intervalDateFormat.print(monthStart)}/${intervalDateFormat.print(monthStart.plusMonths(1))}"
+  }
 
   case class Paths(datasourceRef: String, ingestionPath: String, outputFilePath: String, timestamp: Long)
 
@@ -30,22 +41,25 @@ object StorageUtil {
     }
   }
 
-  def getPaths(datasource: DataSource, config: Config): Paths = {
+  def getPaths(dataset: Dataset, config: Config): Paths = {
     val dt = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay()
     val timestamp = dt.getMillis
     val date = dayPeriodFormat.print(dt)
     val provider = providerFormat(config.getString("cloud.storage.provider"))
     val cloudPrefix = provider.sparkURIFormat + config.getString("cloud.storage.container")
-    val pathSuffix = s"""masterdata-indexer/${datasource.datasetId}/$date/"""
+    val pathSuffix = s"""masterdata-indexer/${dataset.id}/$date/"""
     val ingestionPath = cloudPrefix.replace(provider.sparkURIFormat, provider.druidURIFormat) + pathSuffix
-    val datasourceRef =  this.getDataSourceRefFormat(datasource, date)
+    val datasourceRef = this.getDataSourceRefFormat(dataset)
     val outputFilePath = cloudPrefix + pathSuffix
     Paths(datasourceRef, ingestionPath, outputFilePath, timestamp)
   }
 
   // This method provides appropriate input source spec depending on the cloud storage provider
   def getInputSourceSpec(filePath: String, config: Config): String = {
-    config.getString("source.spec").replace("FILE_PATH", filePath)
+    val provider = providerFormat(config.getString("cloud.storage.provider"))
+    config.getString("source.spec")
+      .replace("FILE_PATH", filePath)
+      .replace("INPUT_SOURCE_TYPE", provider.ingestionSourceType)
   }
 
   def getDate(retensionPeriod: Int): String  = {
@@ -53,8 +67,10 @@ object StorageUtil {
     dayPeriodFormat.print(dt)
   }
 
-  def getDataSourceRefFormat(datasource: DataSource, date: String): String = {
-    datasource.datasource + '-' + date
+  // Stable datasource_ref (no date suffix) so the daily re-index replaces data in place
+  // via dropExisting, matching a normal dataset's primary datasource (<id>_events).
+  def getDataSourceRefFormat(dataset: Dataset): String = {
+    dataset.id + "_events"
   }
 
 }

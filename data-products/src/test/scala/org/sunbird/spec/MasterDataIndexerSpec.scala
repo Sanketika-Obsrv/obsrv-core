@@ -12,8 +12,6 @@ import org.mockito.MockitoSugar.mock
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import org.sunbird.fixture.EventFixture
 import org.sunbird.obsrv.core.cache.RedisConnect
-import org.sunbird.obsrv.core.exception.ObsrvException
-import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
 import org.sunbird.obsrv.dataproducts.helper.BaseMetricHelper
@@ -21,6 +19,7 @@ import org.sunbird.obsrv.dataproducts.model.{Edata, MetricLabel}
 import org.sunbird.obsrv.dataproducts.util.StorageUtil.BlobProvider
 import org.sunbird.obsrv.dataproducts.util.{CommonUtil, StorageUtil}
 import org.sunbird.obsrv.registry.DatasetRegistry
+import org.sunbird.obsrv.service.DatasetRegistryService
 import redis.embedded.RedisServer
 
 import scala.collection.JavaConverters._
@@ -99,7 +98,7 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
 
   private def createSchema(postgresConnect: PostgresConnect) {
     postgresConnect.execute("CREATE TABLE IF NOT EXISTS datasets ( id text PRIMARY KEY, type text NOT NULL, validation_config json, extraction_config json, dedup_config json, data_schema json, denorm_config json, router_config json NOT NULL, dataset_config json NOT NULL, status text NOT NULL, tags text[], data_version INT, api_version VARCHAR(255) NOT NULL, entry_topic TEXT NOT NULL, created_by text NOT NULL, updated_by text NOT NULL, created_date timestamp NOT NULL, updated_date timestamp NOT NULL );")
-    postgresConnect.execute("CREATE TABLE IF NOT EXISTS datasources ( id text PRIMARY KEY, dataset_id text REFERENCES datasets (id), ingestion_spec json NOT NULL, datasource text NOT NULL, datasource_ref text NOT NULL);")
+    postgresConnect.execute("CREATE TABLE IF NOT EXISTS datasources ( id text PRIMARY KEY, dataset_id text REFERENCES datasets (id), ingestion_spec json NOT NULL, datasource text NOT NULL, datasource_ref text NOT NULL, type text NOT NULL DEFAULT 'druid', status text NOT NULL DEFAULT 'Live', is_primary boolean NOT NULL DEFAULT false, metadata json NOT NULL DEFAULT '{}', backup_config json NOT NULL DEFAULT '{}', created_by text NOT NULL DEFAULT 'SYSTEM', updated_by text NOT NULL DEFAULT 'SYSTEM', created_date timestamp NOT NULL DEFAULT now(), updated_date timestamp NOT NULL DEFAULT now());")
     postgresConnect.execute("CREATE TABLE IF NOT EXISTS dataset_transformations ( id text PRIMARY KEY, dataset_id text REFERENCES datasets (id), field_key text NOT NULL, transformation_function json NOT NULL, status text NOT NULL, mode text, created_by text NOT NULL, updated_by text NOT NULL, created_date Date NOT NULL, updated_date Date NOT NULL, UNIQUE(field_key, dataset_id) );")
     postgresConnect.execute("CREATE TABLE IF NOT EXISTS dataset_source_config ( id text PRIMARY KEY, dataset_id text NOT NULL REFERENCES datasets (id), connector_type text NOT NULL, connector_config json NOT NULL, status text NOT NULL, connector_stats json, created_by text NOT NULL, updated_by text NOT NULL, created_date Date NOT NULL, updated_date Date NOT NULL, UNIQUE(connector_type, dataset_id) );")
   }
@@ -190,12 +189,6 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
     val edata = Edata(metric = Map(mockMetrics.getMetricName("failure_dataset_count") -> 1, mockMetrics.getMetricName("total_dataset_count") -> 1), labels = List(MetricLabel("job", "MasterDataIndexer"), MetricLabel("datasetId", dataset.get.id), MetricLabel("cloud", s"${provider.getString("cloud.storage.provider")}")), err = "FAILED", errMsg = "Unsupported provider")
   }
 
-  it should "throw exception when datasource is null" in {
-    val dataset = DatasetRegistry.getDataset("md5")
-    the[ObsrvException] thrownBy {
-      MasterDataProcessorIndexer.fetchDatasource(dataset.get)
-    } should have message ErrorConstants.ERR_DATASOURCE_NOT_FOUND.errorMsg
-  }
 
   it should "create a SparkSession with default master (local[*]) if not provided in the config" in {
     val appName = "MasterDataIndexer"
@@ -226,6 +219,38 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDataset(config, dataset.get, spark)
     )
+  }
+
+  it should "create the datasources record and stay idempotent after ingestion" in {
+    val dataset = DatasetRegistry.getDataset("md5").get
+    val ref = s"${dataset.id}_events"
+
+    // No existing datasource -> insert a single Live row with normal-dataset naming
+    MasterDataProcessorIndexer.createOrUpdateDatasource(dataset, ref, "{}")
+    val live1 = DatasetRegistry.getDatasources("md5").getOrElse(List()).find(_.status == "Live").get
+    live1.id shouldEqual "md5_events_druid"
+    live1.datasource shouldEqual "md5_druid"
+    live1.datasourceRef shouldEqual ref
+    DatasetRegistry.getDatasources("md5").getOrElse(List()).count(_.status == "Live") shouldEqual 1
+
+    // Second run upserts the same id -> updated in place, still a single Live row (stable ref)
+    MasterDataProcessorIndexer.createOrUpdateDatasource(dataset, ref, "{}")
+    DatasetRegistry.getDatasources("md5").getOrElse(List()).count(_.status == "Live") shouldEqual 1
+  }
+
+  it should "reactivate an existing non-Live row (no duplicate-key crash) via upsert" in {
+    val dataset = DatasetRegistry.getDataset("md4").get
+    val ref = s"${dataset.id}_events"
+
+    // Pre-existing non-Live row sharing the primary key id (id = md4_events_druid)
+    DatasetRegistryService.insertDatasource("md4_events_druid", "md4", "md4_druid", ref, "{}", status = "Retired", isPrimary = true)
+
+    // Upsert on id -> must NOT violate the PK; updates the existing row in place to Live
+    noException should be thrownBy MasterDataProcessorIndexer.createOrUpdateDatasource(dataset, ref, "{}")
+
+    val rows = DatasetRegistry.getDatasources("md4").getOrElse(List()).filter(_.id == "md4_events_druid")
+    rows.size shouldEqual 1               // no duplicate row
+    rows.head.status shouldEqual "Live"   // reactivated in place
   }
 
   it should "return proper provider format for each cloud provider" in {

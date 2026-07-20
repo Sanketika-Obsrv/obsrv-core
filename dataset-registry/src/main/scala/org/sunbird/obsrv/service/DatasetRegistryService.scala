@@ -9,6 +9,31 @@ import java.io.File
 import java.sql.{PreparedStatement, ResultSet, Timestamp}
 
 object DatasetRegistryService {
+
+  private val insertDatasourceQuery = "INSERT INTO datasources (id, datasource, dataset_id, type, status, ingestion_spec, datasource_ref, is_primary, metadata, backup_config, created_by, updated_by, created_date, updated_date) VALUES (?, ?, ?, ?, ?, ?::json, ?, ?, ?::json, '{}'::json, 'SYSTEM', 'SYSTEM', now(), now())"
+
+  // Upsert on the primary key (id): inserts on first run, otherwise updates the existing row in place
+  // (reactivating a non-Live row and refreshing datasource/ref/spec/metadata). Same bound params as
+  // the insert; the ON CONFLICT clause references EXCLUDED so no extra placeholders are needed.
+  private val upsertDatasourceQuery = insertDatasourceQuery +
+    " ON CONFLICT (id) DO UPDATE SET datasource = EXCLUDED.datasource, dataset_id = EXCLUDED.dataset_id, type = EXCLUDED.type, status = EXCLUDED.status, ingestion_spec = EXCLUDED.ingestion_spec, datasource_ref = EXCLUDED.datasource_ref, is_primary = EXCLUDED.is_primary, metadata = EXCLUDED.metadata, updated_by = 'SYSTEM', updated_date = now()"
+
+  private def prepareInsertDatasource(postgresConnect: PostgresConnect, id: String, datasetId: String, datasource: String, datasourceRef: String,
+                                      ingestionSpec: String, datasourceType: String, status: String, isPrimary: Boolean, metadata: String,
+                                      query: String = insertDatasourceQuery): PreparedStatement = {
+    val preparedStatement = postgresConnect.prepareStatement(query)
+    preparedStatement.setString(1, id)
+    preparedStatement.setString(2, datasource)
+    preparedStatement.setString(3, datasetId)
+    preparedStatement.setString(4, datasourceType)
+    preparedStatement.setString(5, status)
+    preparedStatement.setString(6, ingestionSpec)
+    preparedStatement.setString(7, datasourceRef)
+    preparedStatement.setBoolean(8, isPrimary)
+    preparedStatement.setString(9, metadata)
+    preparedStatement
+  }
+
   private val configFile = new File("/data/flink/conf/baseconfig.conf")
   // $COVERAGE-OFF$ This code only executes within a flink cluster
   val config: Config = if (configFile.exists()) {
@@ -158,7 +183,31 @@ object DatasetRegistryService {
       postgresConnect.closeConnection()
     }
   }
-  
+
+  def insertDatasource(id: String, datasetId: String, datasource: String, datasourceRef: String, ingestionSpec: String, datasourceType: String = "druid", status: String = "Live", isPrimary: Boolean = false, metadata: String = "{}"): Int = {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    var preparedStatement: PreparedStatement = null
+    try {
+      preparedStatement = prepareInsertDatasource(postgresConnect, id, datasetId, datasource, datasourceRef, ingestionSpec, datasourceType, status, isPrimary, metadata)
+      postgresConnect.executeUpdate(preparedStatement)
+    } finally {
+      if (preparedStatement != null) preparedStatement.close()
+      postgresConnect.closeConnection()
+    }
+  }
+
+  def upsertDatasource(id: String, datasetId: String, datasource: String, datasourceRef: String, ingestionSpec: String, datasourceType: String = "druid", status: String = "Live", isPrimary: Boolean = false, metadata: String = "{}"): Int = {
+    val postgresConnect = new PostgresConnect(postgresConfig)
+    var preparedStatement: PreparedStatement = null
+    try {
+      preparedStatement = prepareInsertDatasource(postgresConnect, id, datasetId, datasource, datasourceRef, ingestionSpec, datasourceType, status, isPrimary, metadata, upsertDatasourceQuery)
+      postgresConnect.executeUpdate(preparedStatement)
+    } finally {
+      if (preparedStatement != null) preparedStatement.close()
+      postgresConnect.closeConnection()
+    }
+  }
+
   def updateConnectorStats(id: String, lastFetchTimestamp: Timestamp, records: Long): Int = {
     val postgresConnect = new PostgresConnect(postgresConfig)
     var preparedStatement: PreparedStatement = null

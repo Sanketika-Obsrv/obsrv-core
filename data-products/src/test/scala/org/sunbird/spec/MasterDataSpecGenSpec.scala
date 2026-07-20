@@ -52,4 +52,10 @@ class MasterDataSpecGenSpec extends FlatSpec with Matchers {
     (parse(spec) \ "spec" \ "dataSchema" \ "dataSource").extract[String] shouldEqual ref
     spec should not include "_druid-"
   }
+
+  it should "honor a configured segmentGranularity override" in {
+    val overridden = ConfigFactory.parseString("""druid.segment.granularity="DAY"""").withFallback(config)
+    val spec = MasterDataProcessorIndexer.updateIngestionSpec("test-dataset_events", "s3a://bucket/path/", overridden)
+    (parse(spec) \ "spec" \ "dataSchema" \ "granularitySpec" \ "segmentGranularity").extract[String] shouldEqual "DAY"
+  }
 }

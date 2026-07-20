@@ -43,11 +43,13 @@ object MasterDataProcessorIndexer {
   def updateIngestionSpec(datasourceRef: String, filePath: String, config: Config): String = {
     val deltaIngestionSpec: String = config.getString("delta.ingestion.spec").replace("DATASOURCE_REF", datasourceRef)
     val inputSourceSpec: String = StorageUtil.getInputSourceSpec(filePath, config)
-    // Master data is a full snapshot: replace-in-place each run. Inject MONTH segmentGranularity +
-    // the current-month interval (required by dropExisting) and dropExisting itself, so the spec is
-    // correct regardless of what the base conf carries. appendToExisting defaults to false in Druid
-    // (and dropExisting requires it false), so it is left implicit.
-    val replaceSpec: String = s"""{"spec":{"dataSchema":{"granularitySpec":{"type":"uniform","segmentGranularity":"MONTH","intervals":["${StorageUtil.getIngestionInterval}"]}},"ioConfig":{"type":"index_parallel","dropExisting":true}}}"""
+    // Master data is a full snapshot: replace-in-place each run. Inject the configured
+    // segmentGranularity (defaults to MONTH) + the current-month interval (required by dropExisting)
+    // and dropExisting itself, so the spec is correct regardless of what the base conf carries.
+    // appendToExisting defaults to false in Druid (and dropExisting requires it false), so it is
+    // left implicit.
+    val segmentGranularity: String = if (config.hasPath("druid.segment.granularity")) config.getString("druid.segment.granularity") else "MONTH"
+    val replaceSpec: String = s"""{"spec":{"dataSchema":{"granularitySpec":{"type":"uniform","segmentGranularity":"$segmentGranularity","intervals":["${StorageUtil.getIngestionInterval}"]}},"ioConfig":{"type":"index_parallel","dropExisting":true}}}"""
     val deltaJson = parse(deltaIngestionSpec)
     val inputSourceJson = parse(inputSourceSpec)
     val replaceJson = parse(replaceSpec)

@@ -4,12 +4,19 @@ WORKDIR /build
 COPY . .
 RUN mvn -pl pipeline/hudi-connector -am clean package -DskipTests -q
 
-# Stage 2: Flink 1.20 on DHI Eclipse Temurin JRE 11 (Debian)
-FROM dhi.io/eclipse-temurin:11-debian13 AS flink-base
+# Stage 2: Pull hardened Java from DHI eclipse-temurin image
+FROM dhi.io/eclipse-temurin:11-debian13 AS java-provider
+
+# Stage 3: Flink 1.20 on Debian 13 slim with DHI Java copied in
+FROM debian:13-slim AS flink-base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl wget gpg libsnappy1v5 gettext-base libjemalloc-dev \
+    curl wget gpg libsnappy1v5 gettext-base libjemalloc-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=java-provider /opt/java /opt/java
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH=$JAVA_HOME/bin:$PATH
 
 ENV GOSU_VERSION=1.17
 RUN set -ex; \
@@ -32,7 +39,7 @@ RUN set -ex; \
     rm flink.tgz; \
     chown -R flink:flink .
 
-# Stage 3: Lakehouse connector — layer hudi jars on top of Flink 1.20
+# Stage 4: Lakehouse connector — layer hudi jars on top of Flink 1.20
 FROM flink-base AS lakehouse-connector-image
 
 USER flink

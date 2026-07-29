@@ -33,7 +33,7 @@ RUN set -ex; \
     chown -R flink:flink .
 
 # Stage 3: Lakehouse connector — layer hudi jars on top of Flink 1.20
-FROM flink-base AS lakehouse-connector
+FROM flink-base AS lakehouse-connector-image
 
 USER flink
 

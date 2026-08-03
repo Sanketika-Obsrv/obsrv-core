@@ -1,58 +1,54 @@
-# Stage 1: Build hudi-connector JAR
-FROM maven:3.9-eclipse-temurin-17 AS builder
-WORKDIR /build
-COPY . .
-RUN mvn -pl pipeline/hudi-connector -am clean package -DskipTests -q
+# =============================================================================
+# Hardened Flink runtime for obsrv-core (lakehouse-connector)
+# -----------------------------------------------------------------------------
+# * Build stages stay on the original maven image (discarded, not shipped).
+# * Flink dist is taken from the official flink image (version-matched, has
+#   the s3 plugin) — avoids downloading from archive.apache.org.
+# * Runtime uses dhi.io/eclipse-temurin:11-jdk-debian13-dev which has bash,
+#   coreutils and glibc so Flink scripts and snappy-java work correctly.
+# =============================================================================
+ARG FLINK_UID=9999
 
-# Stage 2: Pull hardened Java from DHI eclipse-temurin image
-FROM dhi.io/eclipse-temurin:11-debian13 AS java-provider
+# ---- build: compile hudi-connector and its dependencies only ----------------
+FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
+COPY . /app
+RUN mvn -pl pipeline/hudi-connector -am clean package -DskipTests -q -f /app/pom.xml
 
-# Stage 3: Flink 1.20 on Debian 13 slim with DHI Java copied in
-FROM debian:13-slim AS flink-base
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl wget gpg libsnappy1v5 gettext-base libjemalloc-dev ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=java-provider /opt/java /opt/java
-ENV JAVA_HOME=/opt/java/openjdk
-ENV PATH=$JAVA_HOME/bin:$PATH
-
-ENV GOSU_VERSION=1.17
-RUN set -ex; \
-    dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
-    wget -nv -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch"; \
-    chmod +x /usr/local/bin/gosu; \
-    gosu nobody true
-
-ENV FLINK_VERSION=1.20.1
+# ---- flink-dist: Flink 1.20 dist + extra jars for lakehouse -----------------
+FROM public.ecr.aws/docker/library/flink:1.20-scala_2.12-java11 AS flink-dist
+ARG FLINK_UID
 ENV FLINK_HOME=/opt/flink
-ENV PATH=$FLINK_HOME/bin:$PATH
+USER root
+RUN set -eux; \
+    mkdir -p "${FLINK_HOME}/usrlib" "${FLINK_HOME}/plugins/flink-s3-fs-hadoop"; \
+    mv "${FLINK_HOME}"/opt/flink-s3-fs-hadoop-*.jar "${FLINK_HOME}/plugins/flink-s3-fs-hadoop/"; \
+    if [ -f "${FLINK_HOME}/conf/config.yaml" ]; then CONF="${FLINK_HOME}/conf/config.yaml"; \
+    else CONF="${FLINK_HOME}/conf/flink-conf.yaml"; fi; \
+    echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> "${CONF}"; \
+    wget -nv -P "${FLINK_HOME}/lib/" \
+        https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
+        https://repo.maven.apache.org/maven2/org/apache/hudi/hudi-flink1.20-bundle/1.0.2/hudi-flink1.20-bundle-1.0.2.jar \
+        https://repo1.maven.org/maven2/org/apache/flink/flink-gs-fs-hadoop/1.20.1/flink-gs-fs-hadoop-1.20.1.jar \
+        https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.11/gcs-connector-hadoop3-2.2.11-shaded.jar \
+        https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.13.4/jackson-databind-2.13.4.jar \
+        https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.13.4/jackson-core-2.13.4.jar \
+        https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.13.4/jackson-annotations-2.13.4.jar; \
+    chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}"
 
-RUN groupadd --system --gid=9999 flink && \
-    useradd --system --home-dir $FLINK_HOME --uid=9999 --gid=flink flink
-WORKDIR $FLINK_HOME
-
-RUN set -ex; \
-    wget -nv -O flink.tgz "https://archive.apache.org/dist/flink/flink-${FLINK_VERSION}/flink-${FLINK_VERSION}-bin-scala_2.12.tgz"; \
-    tar -xf flink.tgz --strip-components=1; \
-    rm flink.tgz; \
-    chown -R flink:flink .
-
-# Stage 4: Lakehouse connector — layer hudi jars on top of Flink 1.20
-FROM flink-base AS lakehouse-connector-image
-
-USER flink
-
-RUN wget -nv https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar && \
-    wget -nv https://repo1.maven.org/maven2/org/apache/flink/flink-s3-fs-hadoop/${FLINK_VERSION}/flink-s3-fs-hadoop-${FLINK_VERSION}.jar && \
-    wget -nv https://repo.maven.apache.org/maven2/org/apache/hudi/hudi-flink1.20-bundle/1.0.2/hudi-flink1.20-bundle-1.0.2.jar && \
-    wget -nv https://repo1.maven.org/maven2/org/apache/flink/flink-gs-fs-hadoop/${FLINK_VERSION}/flink-gs-fs-hadoop-${FLINK_VERSION}.jar && \
-    wget -nv https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.11/gcs-connector-hadoop3-2.2.11-shaded.jar && \
-    mv flink-shaded-hadoop-2-uber-2.8.3-10.0.jar $FLINK_HOME/lib/ && \
-    mv flink-s3-fs-hadoop-${FLINK_VERSION}.jar $FLINK_HOME/lib/ && \
-    mv hudi-flink1.20-bundle-1.0.2.jar $FLINK_HOME/lib/ && \
-    mv flink-gs-fs-hadoop-${FLINK_VERSION}.jar $FLINK_HOME/lib/ && \
-    mv gcs-connector-hadoop3-2.2.11-shaded.jar $FLINK_HOME/lib/
-
-COPY --from=builder /build/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar $FLINK_HOME/lib/
+# =============================================================================
+# lakehouse-connector runtime (DHI debian/glibc JDK 11 — has bash + coreutils)
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS lakehouse-connector-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist /docker-entrypoint.sh /docker-entrypoint.sh
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar ${FLINK_HOME}/lib/
+RUN chmod +x /docker-entrypoint.sh \
+    && printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
+ENTRYPOINT ["/docker-entrypoint.sh"]

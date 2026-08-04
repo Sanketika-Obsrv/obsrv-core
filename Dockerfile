@@ -1,3 +1,24 @@
+# =============================================================================
+# Hardened Flink runtime for obsrv-core (unified-pipeline + cache-indexer)
+# -----------------------------------------------------------------------------
+# WHY the choices here (learned the hard way):
+#   * DHI has NO Flink runtime base and NO maven-jdk11. BUILD stages stay on the
+#     original maven image (multi-stage: discarded, not shipped).
+#   * The shipped RUNTIME uses the DHI eclipse-temurin 11 JDK **debian** (glibc)
+#     image, NOT the alpine `11-jre`. Reasons the alpine base failed:
+#       - Flink launch scripts need bash (alpine has only busybox ash).
+#       - Hadoop S3 login needs the running uid in /etc/passwd (getpwuid).
+#       - snappy-java's bundled native lib is glibc-linked (needs
+#         ld-linux-x86-64.so.2); on musl/alpine it fails and every checkpoint
+#         (snapshot-compression=true) dies.
+#     The debian (glibc) DHI image ships bash + coreutils + glibc, so it just
+#     works — we only add a flink:9999 passwd entry and own the dist.
+#   * Flink stays 1.20; dist is taken from the official flink image (version
+#     matched, has the s3 plugin), then carried onto the hardened runtime.
+# =============================================================================
+ARG FLINK_UID=9999
+
+# ---- build stages: compile obsrv-core (original maven, discarded) ------------
 FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-core
 COPY . /app
 RUN mvn clean install -DskipTests -f /app/pom.xml
@@ -7,31 +28,46 @@ COPY --from=build-core /root/.m2 /root/.m2
 COPY . /app
 RUN mvn clean package -DskipTests -f /app/pipeline/pom.xml
 
-FROM public.ecr.aws/docker/library/flink:1.20-scala_2.12-java11 AS unified-image
-USER flink
-# Move the bundled flink-s3-fs-hadoop plugin from opt/ to the required plugins subfolder.
-# This avoids a network download and guarantees the plugin version matches the runtime.
-RUN mkdir -p $FLINK_HOME/usrlib && \
-    mkdir -p $FLINK_HOME/plugins/flink-s3-fs-hadoop && \
-    mv $FLINK_HOME/opt/flink-s3-fs-hadoop-*.jar $FLINK_HOME/plugins/flink-s3-fs-hadoop/
-# Use IRSA/OIDC (Web Identity Token) for S3 auth instead of static access keys.
-# EKS injects AWS_ROLE_ARN and AWS_WEB_IDENTITY_TOKEN_FILE into pods whose service
-# account has an IAM role annotation; WebIdentityTokenCredentialsProvider reads them.
-RUN if [ -f "$FLINK_HOME/conf/config.yaml" ]; then \
-        echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> $FLINK_HOME/conf/config.yaml; \
-    else \
-        echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> $FLINK_HOME/conf/flink-conf.yaml; \
-    fi
-COPY --from=build-pipeline /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar $FLINK_HOME/usrlib/
+# ---- flink-dist stage: exact Flink 1.20 dist from the official image ---------
+FROM public.ecr.aws/docker/library/flink:1.20-scala_2.12-java11 AS flink-dist
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+USER root
+RUN set -eux; \
+    mkdir -p "${FLINK_HOME}/usrlib" "${FLINK_HOME}/plugins/flink-s3-fs-hadoop"; \
+    mv "${FLINK_HOME}"/opt/flink-s3-fs-hadoop-*.jar "${FLINK_HOME}/plugins/flink-s3-fs-hadoop/"; \
+    if [ -f "${FLINK_HOME}/conf/config.yaml" ]; then CONF="${FLINK_HOME}/conf/config.yaml"; \
+    else CONF="${FLINK_HOME}/conf/flink-conf.yaml"; fi; \
+    echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> "${CONF}"; \
+    chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}"
 
-FROM public.ecr.aws/docker/library/flink:1.20-scala_2.12-java11 AS cache-indexer-image
-USER flink
-RUN mkdir -p $FLINK_HOME/usrlib && \
-    mkdir -p $FLINK_HOME/plugins/flink-s3-fs-hadoop && \
-    mv $FLINK_HOME/opt/flink-s3-fs-hadoop-*.jar $FLINK_HOME/plugins/flink-s3-fs-hadoop/
-RUN if [ -f "$FLINK_HOME/conf/config.yaml" ]; then \
-        echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> $FLINK_HOME/conf/config.yaml; \
-    else \
-        echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> $FLINK_HOME/conf/flink-conf.yaml; \
-    fi
-COPY --from=build-pipeline /app/pipeline/cache-indexer/target/cache-indexer-1.0.0.jar $FLINK_HOME/usrlib/
+# =============================================================================
+# unified-pipeline runtime  (DHI debian/glibc JDK 11 — has bash, coreutils, glibc)
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS unified-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar ${FLINK_HOME}/usrlib/
+# flink user so Hadoop getpwuid(9999) resolves for S3 login
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
+
+# =============================================================================
+# cache-indexer runtime
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS cache-indexer-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/cache-indexer/target/cache-indexer-1.0.0.jar ${FLINK_HOME}/usrlib/
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}

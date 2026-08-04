@@ -14,23 +14,34 @@ on:
 jobs:
   build-image:
     runs-on: ubuntu-latest
+    # optional legs (the individual pipeline modules) must not fail the workflow or block deploy;
+    # only unified-pipeline + cache-indexer are mandatory (merged-pipeline is the shipped topology).
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - image: "extractor"
             target: "extractor-image"
+            optional: true
           - image: "preprocessor"
             target: "preprocessor-image"
+            optional: true
           - image: "denormalizer"
             target: "denormalizer-image"
+            optional: true
           - image: "transformer"
             target: "transformer-image"
+            optional: true
           - image: "dataset-router"
             target: "dataset-router-image"
+            optional: true
           - image: "unified-pipeline"
             target: "unified-image"
+            optional: false
           - image: "cache-indexer"
             target: "cache-indexer-image"
+            optional: false
     steps:
       - uses: actions/checkout@v4
         with:

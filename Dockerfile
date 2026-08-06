@@ -16,13 +16,13 @@ RUN sed -i 's|<blocked>true</blocked>||g' /usr/share/maven/conf/settings.xml
 COPY . /app
 RUN --mount=type=cache,target=/root/.m2 mvn -pl pipeline/hudi-connector -am clean package -DskipTests -q -f /app/pom.xml
 RUN mkdir -p /jars && \
-    curl -sL -o /jars/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
+    curl -fsSL -o /jars/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar && \
-    curl -sL -o /jars/flink-gs-fs-hadoop-1.20.1.jar \
+    curl -fsSL -o /jars/flink-gs-fs-hadoop-1.20.1.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-gs-fs-hadoop/1.20.1/flink-gs-fs-hadoop-1.20.1.jar && \
-    curl -sL -o /jars/gcs-connector-hadoop3-2.2.11-shaded.jar \
+    curl -fsSL -o /jars/gcs-connector-hadoop3-2.2.11-shaded.jar \
         https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.11/gcs-connector-hadoop3-2.2.11-shaded.jar && \
-    curl -sL -o /jars/flink-shaded-guava-30.1.1-jre-16.1.jar \
+    curl -fsSL -o /jars/flink-shaded-guava-30.1.1-jre-16.1.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-guava/30.1.1-jre-16.1/flink-shaded-guava-30.1.1-jre-16.1.jar && \
     echo "Jackson jars intentionally omitted — hudi-flink bundle ships its own databind"
 

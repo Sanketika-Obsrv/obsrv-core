@@ -15,24 +15,16 @@ jobs:
   build-image:
     runs-on: ubuntu-latest
     strategy:
+      # This branch (dhi-2.2.0-hudi / hudi-gs-support) only carries the lakehouse-connector
+      # image forward — the Dockerfile here defines just build-pipeline, flink-dist and
+      # lakehouse-connector-image. The other 7 legs targeted stages that don't exist on
+      # this branch's Dockerfile; they'd fail immediately and (with default fail-fast)
+      # cancel the still-running lakehouse-connector-image build, so tagging this branch
+      # shipped no image at all. Pruned to the one target this branch actually builds.
       matrix:
         include:
-          - image: "extractor"
-            target: "extractor-image"
-          - image: "preprocessor"
-            target: "preprocessor-image"
-          - image: "denormalizer"
-            target: "denormalizer-image"
-          - image: "transformer"
-            target: "transformer-image"
-          - image: "dataset-router"
-            target: "dataset-router-image"
-          - image: "unified-pipeline"
-            target: "unified-image"
           - image: "lakehouse-connector"
             target: "lakehouse-connector-image"
-          - image: "cache-indexer"
-            target: "cache-indexer-image"
     steps:
       - uses: actions/checkout@v4
         with:

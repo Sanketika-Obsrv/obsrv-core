@@ -71,6 +71,20 @@
         </exclusion>
       </exclusions>
     </dependency>
+    <!-- framework still pins flink.version=1.17.2, so flink-connector-kafka rides in
+         transitively at 1.17.2 via framework's FlinkKafkaConnector (which
+         HudiConnectorStreamTask uses for its Kafka source). Pinned here explicitly at
+         ${flink.version}, same pattern already used below for flink-streaming-scala /
+         flink-table-api-scala-bridge / flink-statebackend-rocksdb — Maven's nearest-wins
+         resolution then picks this 1.20.5 declaration over framework's 1.17.2 one, so the
+         jar shaded into Flink 1.20's lib/ carries the matching connector version instead
+         of a stale one. (Excluding the artifact instead of pinning would drop Kafka source
+         support entirely, since Flink's own dist doesn't bundle connectors.) -->
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-connector-kafka</artifactId>
+      <version>${flink.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.sunbird.obsrv</groupId>
       <artifactId>dataset-registry</artifactId>

@@ -46,6 +46,7 @@ RUN set -eux; \
     if [ -f "${FLINK_HOME}/conf/config.yaml" ]; then CONF="${FLINK_HOME}/conf/config.yaml"; \
     else CONF="${FLINK_HOME}/conf/flink-conf.yaml"; fi; \
     echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> "${CONF}"; \
+    echo 'security.delegation.token.provider.HiveServer2.enabled: false' >> "${CONF}"; \
     chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}"
 
 # =============================================================================

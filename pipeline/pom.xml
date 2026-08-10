@@ -30,7 +30,10 @@
 		<!-- maven specific properties -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<scala.maj.version>2.12</scala.maj.version>
-		<scala.version>2.12.11</scala.version>
+		<!-- 2.12.18: matches main's own scala.version (bd579898), needed for hudi-connector's
+		     build on this branch. Closer to hudi-connector in the parent chain than root
+		     pom.xml, so it was overriding that bump too. -->
+		<scala.version>2.12.18</scala.version>
 		<flink.version>1.17.2</flink.version>
 		<kafka.version>3.7.1</kafka.version>
 		<java.target.runtime>11</java.target.runtime>

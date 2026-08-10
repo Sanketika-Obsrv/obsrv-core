@@ -27,7 +27,12 @@
 		<!-- maven specific properties -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<scala.maj.version>2.12</scala.maj.version>
-		<scala.version>2.12.11</scala.version>
+		<!-- 2.12.18, not 2.12.11: matches main's own scala.version (bd579898). This is a
+		     patch/bugfix bump within Scala 2.12, binary-compatible for every module - not
+		     related to the flink.version bump below, which stays untouched here since it's
+		     still out of scope for modules other than framework/hudi-connector on this
+		     branch (see framework/pom.xml and pipeline/hudi-connector/pom.xml for those). -->
+		<scala.version>2.12.18</scala.version>
 		<flink.version>1.17.2</flink.version>
 		<kafka.version>3.7.1</kafka.version>
 		<java.target.runtime>11</java.target.runtime>

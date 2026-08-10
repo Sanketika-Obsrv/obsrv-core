@@ -12,7 +12,11 @@
         <encoding>UTF-8</encoding>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<scala.maj.version>2.12</scala.maj.version>
-		<scala.version>2.12.11</scala.version>
+		<!-- 2.12.18, not 2.12.11: matches main's own flink.version=1.20.0 migration
+		     (bd579898), and old 2.12.11's classfile reader appears unable to parse newer
+		     Flink 1.20.x jars correctly ("bad constant pool index" fatal errors resolving
+		     basic package/type references, not normal type errors). -->
+		<scala.version>2.12.18</scala.version>
 		<!-- Bumped for this branch's DHI/lakehouse-connector build: hudi-connector needs
 		     flink-connector-kafka 3.x, whose KafkaSource/KafkaSink API this module's own
 		     FlinkKafkaConnector/FlinkUtil classes must compile against too (nearest-wins can't

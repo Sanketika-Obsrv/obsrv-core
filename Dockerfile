@@ -69,6 +69,12 @@ FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS lakehouse-connector-image
 ARG FLINK_UID
 ENV FLINK_HOME=/opt/flink
 ENV PATH="${FLINK_HOME}/bin:${PATH}"
+# Plugin classloaders (plugins/s3-fs-hadoop/, plugins/gs-fs-hadoop/) don't inherit the main
+# classpath's /opt/hadoop/etc/hadoop entry, so isolating s3-fs-hadoop there (for the earlier
+# Jackson fix) also cut it off from core-site.xml, where fs.s3a.access.key/secret.key live for
+# MinIO. HADOOP_CONF_DIR is Hadoop's own env-var-based config lookup, checked independent of
+# whichever classloader is running, so this restores core-site.xml visibility for every plugin.
+ENV HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
 USER 0
 RUN apt-get update -qq && apt-get install -y --no-install-recommends gettext-base && rm -rf /var/lib/apt/lists/*
 COPY --from=flink-dist /docker-entrypoint.sh /docker-entrypoint.sh

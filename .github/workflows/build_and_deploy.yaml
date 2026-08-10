@@ -10,6 +10,11 @@ on:
         type: boolean
         required: true
         default: false
+      only_lakehouse:
+        description: "Manual test runs only: skip the 7 legs that don't apply to this branch, build just lakehouse-connector-image. Has no effect on a tag push (real releases still build all 8)."
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   build-image:
@@ -21,6 +26,9 @@ jobs:
     # would regress main whenever this branch merges forward. Same fail-fast/continue-on-error
     # pattern #130 already applies to this same file for this same problem.
     continue-on-error: ${{ matrix.optional || false }}
+    # only_lakehouse is workflow_dispatch-only (github.event.inputs is empty on a tag push, so
+    # this condition is always true there and every leg still runs, unaffected).
+    if: matrix.optional == false || github.event.inputs.only_lakehouse != 'true'
     strategy:
       fail-fast: false
       matrix:

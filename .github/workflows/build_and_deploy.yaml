@@ -80,6 +80,10 @@ jobs:
         if: matrix.optional == false || github.event.inputs.only_lakehouse != 'true'
         uses: docker/build-push-action@v5
         with:
+          # Confirmed on a sibling branch: without this, build-push-action can resolve a
+          # different context than the local checkout, missing files written by earlier
+          # steps in this same job. Explicit context avoids that ambiguity.
+          context: .
           platforms: linux/amd64
           target: ${{matrix.target}}
           push: true

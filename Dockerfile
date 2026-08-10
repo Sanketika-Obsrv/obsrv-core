@@ -24,9 +24,18 @@ RUN --mount=type=cache,target=/root/.m2 mvn -pl pipeline/hudi-connector -am clea
 # classloader keeps its bundled Jackson out of lib/'s shared classpath entirely. gs-fs-hadoop
 # gets the same isolated treatment, which also keeps its Hadoop 3 classes away from
 # s3-fs-hadoop's Hadoop 2 ones instead of mixing both in lib/.
+#
+# flink-shaded-hadoop-2-uber ALSO goes into /jars (-> lib/) as a second copy: hudi-connector's
+# flink-connector-hive dependency bundles HiveServer2DelegationTokenProvider, auto-registered
+# via ServiceLoader, whose constructor needs org.apache.hadoop.conf.Configuration resolvable
+# from lib/'s classloader - moving the uber jar fully into plugins/ (isolated from lib/) broke
+# that. This jar's own Jackson is relocated under org.apache.htrace.* (verified - not the real
+# com.fasterxml.jackson package), so a second copy in lib/ doesn't reintroduce the Jackson
+# conflict the plugins/ move was fixing in the first place.
 RUN mkdir -p /plugins/s3-fs-hadoop /plugins/gs-fs-hadoop /jars && \
     curl -fsSL -o /plugins/s3-fs-hadoop/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar && \
+    cp /plugins/s3-fs-hadoop/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar /jars/ && \
     curl -fsSL -o /plugins/gs-fs-hadoop/flink-gs-fs-hadoop-1.20.1.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-gs-fs-hadoop/1.20.1/flink-gs-fs-hadoop-1.20.1.jar && \
     curl -fsSL -o /plugins/gs-fs-hadoop/gcs-connector-hadoop3-2.2.11-shaded.jar \
@@ -46,7 +55,6 @@ RUN set -eux; \
     if [ -f "${FLINK_HOME}/conf/config.yaml" ]; then CONF="${FLINK_HOME}/conf/config.yaml"; \
     else CONF="${FLINK_HOME}/conf/flink-conf.yaml"; fi; \
     echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> "${CONF}"; \
-    echo 'security.delegation.token.provider.HiveServer2.enabled: false' >> "${CONF}"; \
     chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}"
 
 # =============================================================================

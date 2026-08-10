@@ -11,8 +11,6 @@ ARG FLINK_UID=9999
 
 # ---- build: compile hudi-connector + download extra JARs (has network) ------
 FROM --platform=linux/amd64 public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
-# Maven 3.8+ blocks HTTP repos by default; scala-tools.org in pom uses http://
-RUN sed -i 's|<blocked>true</blocked>||g' /usr/share/maven/conf/settings.xml
 COPY . /app
 RUN --mount=type=cache,target=/root/.m2 mvn -pl pipeline/hudi-connector -am clean package -DskipTests -q -f /app/pom.xml
 RUN mkdir -p /jars && \

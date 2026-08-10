@@ -12,7 +12,7 @@
   <properties>
     <encoding>UTF-8</encoding>
     <scoverage.plugin.version>1.4.0</scoverage.plugin.version>
-    <jackson-bom.version>2.15.3</jackson-bom.version>
+    <jackson-bom.version>2.17.2</jackson-bom.version>
     <flink.version>1.20.5</flink.version>
   </properties>
 
@@ -73,17 +73,18 @@
     </dependency>
     <!-- framework still pins flink.version=1.17.2, so flink-connector-kafka rides in
          transitively at 1.17.2 via framework's FlinkKafkaConnector (which
-         HudiConnectorStreamTask uses for its Kafka source). Pinned here explicitly at
-         ${flink.version}, same pattern already used below for flink-streaming-scala /
-         flink-table-api-scala-bridge / flink-statebackend-rocksdb — Maven's nearest-wins
-         resolution then picks this 1.20.5 declaration over framework's 1.17.2 one, so the
-         jar shaded into Flink 1.20's lib/ carries the matching connector version instead
-         of a stale one. (Excluding the artifact instead of pinning would drop Kafka source
-         support entirely, since Flink's own dist doesn't bundle connectors.) -->
+         HudiConnectorStreamTask uses for its Kafka source). Pinned here explicitly, same
+         pattern already used below for flink-streaming-scala / flink-table-api-scala-bridge /
+         flink-statebackend-rocksdb, so Maven's nearest-wins resolution picks this declaration
+         over framework's 1.17.2 one. NOT ${flink.version}: flink-connector-kafka was
+         externalized from the Flink release train after 1.17 onto its own versioning
+         (3.x-1.20 for the Flink-1.20 line) - "1.20.5" doesn't exist as a coordinate and 404s.
+         FlinkKafkaConnector.scala only uses the modern KafkaSource/KafkaSink/OffsetsInitializer
+         API, which 3.x provides. -->
     <dependency>
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-connector-kafka</artifactId>
-      <version>${flink.version}</version>
+      <version>3.4.0-1.20</version>
     </dependency>
     <dependency>
       <groupId>org.sunbird.obsrv</groupId>

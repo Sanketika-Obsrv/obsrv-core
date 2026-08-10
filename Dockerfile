@@ -52,10 +52,15 @@ USER root
 RUN set -eux; \
     mkdir -p "${FLINK_HOME}/plugins/s3-fs-hadoop"; \
     mv "${FLINK_HOME}"/opt/flink-s3-fs-hadoop-*.jar "${FLINK_HOME}/plugins/s3-fs-hadoop/"; \
-    if [ -f "${FLINK_HOME}/conf/config.yaml" ]; then CONF="${FLINK_HOME}/conf/config.yaml"; \
-    else CONF="${FLINK_HOME}/conf/flink-conf.yaml"; fi; \
-    echo 's3.aws.credentials.provider: com.amazonaws.auth.WebIdentityTokenCredentialsProvider' >> "${CONF}"; \
     chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}"
+    # No hardcoded s3.aws.credentials.provider here (was: WebIdentityTokenCredentialsProvider
+    # only) - the original Dockerfile had no credentials-provider override at all, relying on
+    # Hadoop-S3A's own default provider chain to try key-based SimpleAWSCredentialsProvider
+    # (fs.s3a.access.key/secret.key from core-site.xml - what MinIO needs) first, falling
+    # through to WebIdentityTokenCredentialsProvider/instance-profile for real AWS/IRSA if no
+    # keys are set. Forcing one provider broke MinIO: it went straight to
+    # EnvironmentVariableCredentialsProvider on the checkpoint S3 client and failed, since keys
+    # were never even tried.
 
 # =============================================================================
 # lakehouse-connector runtime (DHI debian/glibc JDK 11 — has bash + coreutils)

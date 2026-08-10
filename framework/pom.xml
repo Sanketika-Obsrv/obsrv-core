@@ -46,6 +46,25 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-streaming-scala_${scala.maj.version}</artifactId>
             <version>${flink.version}</version>
+            <!-- flink-streaming-scala pulls scala-compiler/-reflect/-library:2.12.7 (compile
+                 scope) as an internal dependency of its own. Having a second scala-compiler on
+                 the classpath the scala-maven-plugin's own toolchain (2.12.11) is running with
+                 corrupts the compiler's bootstrap state - "bad constant pool index" fatal
+                 errors on unrelated source files, not a normal type error. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.scala-lang</groupId>
+                    <artifactId>scala-compiler</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.scala-lang</groupId>
+                    <artifactId>scala-reflect</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.scala-lang</groupId>
+                    <artifactId>scala-library</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -291,6 +310,29 @@
                     <scalaVersion>${scala.version}</scalaVersion>
                     <checkMultipleScalaVersions>false</checkMultipleScalaVersions>
                 </configuration>
+                <!-- The plugin's own compiler-bridge pulls its own scala-library/-xml versions
+                     (2.12.0 / 1.0.6, older than this project's 2.12.11), landing on the same
+                     compile classpath as the project's own scala-library:2.12.11 and corrupting
+                     the compiler's bootstrap state ("bad constant pool index" fatal errors while
+                     compiling this module's own sources). Pinning the plugin's toolchain deps to
+                     match the project's fixes it. -->
+                <dependencies>
+                    <dependency>
+                        <groupId>org.scala-lang</groupId>
+                        <artifactId>scala-library</artifactId>
+                        <version>${scala.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.scala-lang</groupId>
+                        <artifactId>scala-compiler</artifactId>
+                        <version>${scala.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.scala-lang</groupId>
+                        <artifactId>scala-reflect</artifactId>
+                        <version>${scala.version}</version>
+                    </dependency>
+                </dependencies>
                 <executions>
                     <execution>
                         <id>scala-compile-first</id>

@@ -282,6 +282,30 @@
           <scalaVersion>${scala.version}</scalaVersion>
           <checkMultipleScalaVersions>false</checkMultipleScalaVersions>
         </configuration>
+        <!-- The plugin's own compiler-bridge pulls its own scala-library/-xml versions
+             (2.12.0 / 1.0.6 - much older than this project's own 2.12.11), which end up on the
+             same compile classpath as the project's scala-library:2.12.11 and corrupt the
+             compiler's bootstrap state ("bad constant pool index" fatal errors, not normal type
+             errors). checkMultipleScalaVersions was already turned off above instead of fixing
+             this - pinning the plugin's own toolchain deps to match the project's actually
+             fixes it. -->
+        <dependencies>
+          <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>${scala.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-compiler</artifactId>
+            <version>${scala.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-reflect</artifactId>
+            <version>${scala.version}</version>
+          </dependency>
+        </dependencies>
         <executions>
           <execution>
             <id>scala-compile-first</id>

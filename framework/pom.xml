@@ -13,7 +13,15 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<scala.maj.version>2.12</scala.maj.version>
 		<scala.version>2.12.11</scala.version>
-		<flink.version>1.17.2</flink.version>
+		<!-- Bumped for this branch's DHI/lakehouse-connector build: hudi-connector needs
+		     flink-connector-kafka 3.x, whose KafkaSource/KafkaSink API this module's own
+		     FlinkKafkaConnector/FlinkUtil classes must compile against too (nearest-wins can't
+		     reconcile two incompatible API shapes at link time). Ported from main's
+		     bd579898 ("Upgrade flink from 1.17 to 1.20"), scoped to just this module since
+		     this Dockerfile only ever compiles framework+dataset-registry+hudi-connector from
+		     source in an isolated `mvn package` (not `install`) session - doesn't affect any
+		     other pipeline module's own separate Docker build. -->
+		<flink.version>1.20.5</flink.version>
 		<kafka.version>3.7.1</kafka.version>
 		<java.target.runtime>11</java.target.runtime>
 		<jackson-jaxrs.version>1.9.13</jackson-jaxrs.version>
@@ -41,12 +49,23 @@
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-connector-kafka</artifactId>
+            <artifactId>flink-connector-base</artifactId>
             <version>${flink.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-kafka</artifactId>
+            <!-- Not ${flink.version}: flink-connector-kafka was externalized from the Flink
+                 release train after 1.17 onto its own 3.x-1.<flink-minor> versioning. -->
+            <version>3.4.0-1.20</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.apache.kafka</groupId>
                     <artifactId>kafka-clients</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

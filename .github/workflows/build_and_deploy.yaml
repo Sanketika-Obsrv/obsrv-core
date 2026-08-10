@@ -14,17 +14,41 @@ on:
 jobs:
   build-image:
     runs-on: ubuntu-latest
+    # optional legs must not fail the workflow or block deploy - this branch's Dockerfile only
+    # defines build-pipeline, flink-dist and lakehouse-connector-image, so every other leg
+    # targets a stage that doesn't exist here and fails immediately. This file is shared with
+    # main (which does build all 8), so the legs stay rather than being deleted - removing them
+    # would regress main whenever this branch merges forward. Same fail-fast/continue-on-error
+    # pattern #130 already applies to this same file for this same problem.
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
-      # This branch (dhi-2.2.0-hudi / hudi-gs-support) only carries the lakehouse-connector
-      # image forward — the Dockerfile here defines just build-pipeline, flink-dist and
-      # lakehouse-connector-image. The other 7 legs targeted stages that don't exist on
-      # this branch's Dockerfile; they'd fail immediately and (with default fail-fast)
-      # cancel the still-running lakehouse-connector-image build, so tagging this branch
-      # shipped no image at all. Pruned to the one target this branch actually builds.
+      fail-fast: false
       matrix:
         include:
+          - image: "extractor"
+            target: "extractor-image"
+            optional: true
+          - image: "preprocessor"
+            target: "preprocessor-image"
+            optional: true
+          - image: "denormalizer"
+            target: "denormalizer-image"
+            optional: true
+          - image: "transformer"
+            target: "transformer-image"
+            optional: true
+          - image: "dataset-router"
+            target: "dataset-router-image"
+            optional: true
+          - image: "unified-pipeline"
+            target: "unified-image"
+            optional: true
           - image: "lakehouse-connector"
             target: "lakehouse-connector-image"
+            optional: false
+          - image: "cache-indexer"
+            target: "cache-indexer-image"
+            optional: true
     steps:
       - uses: actions/checkout@v4
         with:

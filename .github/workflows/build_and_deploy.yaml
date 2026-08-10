@@ -14,25 +14,43 @@ on:
 jobs:
   build-image:
     runs-on: ubuntu-latest
+    # This branch's Dockerfile only defines one stage (`lakehouse-connector`, no `-image`
+    # suffix), so every other leg's target doesn't exist and fails immediately. Without
+    # fail-fast: false, GitHub's default cancels every other still-running leg the moment any
+    # one fails - so lakehouse-connector never even got to try. continue-on-error lets the
+    # 7 known-inapplicable legs fail without failing the job/workflow overall. Same pattern
+    # #130 already uses on obsrv-core's other Flink Dockerfile for this exact problem.
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - image: "extractor"
             target: "extractor-image"
+            optional: true
           - image: "preprocessor"
             target: "preprocessor-image"
+            optional: true
           - image: "denormalizer"
             target: "denormalizer-image"
+            optional: true
           - image: "transformer"
             target: "transformer-image"
+            optional: true
           - image: "dataset-router"
             target: "dataset-router-image"
+            optional: true
           - image: "unified-pipeline"
             target: "unified-image"
+            optional: true
           - image: "lakehouse-connector"
-            target: "lakehouse-connector-image"
+            # Dockerfile's actual stage name has no -image suffix (unlike the other legs) -
+            # matching the workflow's target to what already exists, not renaming the stage.
+            target: "lakehouse-connector"
+            optional: false
           - image: "cache-indexer"
             target: "cache-indexer-image"
+            optional: true
     steps:
       - uses: actions/checkout@v4
         with:

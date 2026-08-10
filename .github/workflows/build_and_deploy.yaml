@@ -56,6 +56,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The single Dockerfile at repo root doesn't compile anything itself - line 17 (COPY
+      # pipeline/hudi-connector/target/hudi-connector-1.0.0.jar ...) expects that jar to
+      # already exist on disk before the Docker build starts. Nothing in this workflow ever
+      # built it, so every run failed at that COPY with "not found". Missing step, not a
+      # DHI/Flink content issue - the pom.xml/Dockerfile here are untouched.
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build hudi-connector jar
+        run: mvn -pl pipeline/hudi-connector -am clean package -DskipTests -q -f pom.xml
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 

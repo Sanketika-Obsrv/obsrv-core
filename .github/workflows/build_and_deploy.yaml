@@ -90,6 +90,10 @@ jobs:
       - name: Build ${{matrix.image}} image and push
         uses: docker/build-push-action@v5
         with:
+          # Without this, build-push-action wasn't picking up the jar the previous step just
+          # built into the checked-out working tree - COPY failed with "not found" even though
+          # the file existed on disk. Being explicit about the context fixes it.
+          context: .
           platforms: linux/amd64
           target: ${{matrix.target}}
           push: true

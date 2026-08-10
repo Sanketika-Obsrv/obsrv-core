@@ -41,20 +41,27 @@
         </exclusion>
       </exclusions>
     </dependency>
+    <!-- Not provided scope (was): that assumed Flink's own runtime already carries a real,
+         unshaded com.fasterxml.jackson.core/.databind/.annotations - but Flink relocates its
+         own internal Jackson usage under org.apache.flink.shaded.jackson2.*, and the one
+         unshaded copy that used to incidentally satisfy this (flink-s3-fs-hadoop's bundled
+         2.15.3) is now isolated in plugins/s3-fs-hadoop/ (a separate fix, for a version
+         conflict). Nothing in lib/ provides these classes anymore, so
+         jackson-module-scala:2.17.2 (compile-scoped, bundled) crashed with NoClassDefFoundError
+         on TreeNode the moment it was actually used. Compile scope (default) + the
+         jackson-bom:2.17.2 import above pins these to the exact version jackson-module-scala
+         needs, bundled into hudi-connector-1.0.0.jar itself. -->
     <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <scope>provided</scope>
     </dependency>
     <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
-        <scope>provided</scope>
     </dependency>
     <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
-        <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sunbird.obsrv</groupId>

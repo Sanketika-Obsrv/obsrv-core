@@ -1,10 +1,10 @@
 package org.sunbird.obsrv.core.streaming
 
-import org.apache.flink.connector.base.DeliveryGuarantee
 import org.apache.flink.connector.kafka.sink.KafkaSink
 import org.apache.flink.connector.kafka.source.KafkaSource
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
+import org.apache.flink.connector.base.DeliveryGuarantee
 import org.sunbird.obsrv.core.serde._
 
 import java.util.Properties

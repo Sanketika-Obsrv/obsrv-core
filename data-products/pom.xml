@@ -3,15 +3,18 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
+    <parent>
+        <groupId>org.sunbird.obsrv</groupId>
+        <artifactId>core</artifactId>
+        <version>1.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
     <groupId>org.sunbird.obsrv</groupId>
     <artifactId>data-products</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
 
     <properties>
         <spark.version>3.1.0</spark.version>
-        <scala.version>2.12.11</scala.version>
-        <scala.maj.version>2.12</scala.maj.version>
         <scoverage.plugin.version>1.4.0</scoverage.plugin.version>
         <java.target.runtime>11</java.target.runtime>
         <log4j.version>2.14.1</log4j.version>
@@ -258,9 +261,15 @@
             <version>${log4j.version}</version>
         </dependency>
         <dependency>
-            <groupId>it.ozimov</groupId>
+            <groupId>com.github.codemonstur</groupId>
             <artifactId>embedded-redis</artifactId>
-            <version>0.7.1</version>
+            <version>1.0.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka_${scala.maj.version}</artifactId>
+            <version>${kafka.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -296,7 +305,7 @@
             <scope>test</scope>
         </dependency>
         <!-- Was 2.8.1, whose own bundled kafka_2.12 (broker) pulls kafka-clients:2.8.1, while
-             framework brings kafka-clients:3.7.1 (nearest-wins) - the broker's own
+             framework brings kafka-clients:${kafka.version} (nearest-wins) - the broker's own
              BrokerToControllerChannelManagerImpl called a NetworkClient constructor signature
              that only exists in the older kafka-clients, so EmbeddedKafka.start() threw
              NoSuchMethodError on every run. Bumped to 3.4.0 (same version already used by every
@@ -311,13 +320,12 @@
             <version>3.4.0</version>
             <scope>test</scope>
         </dependency>
-        <!-- Literal version, not a property reference: this pom has no <parent> (fully
-             standalone, unlike the rest of the reactor), so root's kafka.version property
-             isn't visible here. 3.7.1 matches framework's kafka-clients version directly. -->
+        <!-- ${kafka.version} now resolves (this pom picked up a <parent> pointing at root as
+             part of this merge - was standalone before, needed a literal version here). -->
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka_2.12</artifactId>
-            <version>3.7.1</version>
+            <version>${kafka.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

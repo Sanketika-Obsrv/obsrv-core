@@ -33,6 +33,9 @@ object FlinkUtil {
     }
     // $COVERAGE-ON$
     val env = StreamExecutionEnvironment.getExecutionEnvironment(configuration)
+    // print("Flink Config:", ...) intentionally not restored here - removed earlier on this
+    // branch (leftover migration debugging, noisy stdout, and env.getConfiguration includes
+    // whatever's in the effective config with S3/GCS credentials in scope for the job).
     env
   }
 }

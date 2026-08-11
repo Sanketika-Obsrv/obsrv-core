@@ -120,7 +120,7 @@ class EventValidationFunction(config: PipelinePreprocessorConfig)(implicit val e
       context.output(config.systemEventsOutputTag, getSystemEvent(dataset, event, FunctionalError.DataTypeMismatch, typeFailedCount))
     }
     if (addTypeFailedCount > 0) {
-      context.output(config.systemEventsOutputTag, getSystemEvent(dataset,event,  FunctionalError.AdditionalFieldsFound, typeFailedCount))
+      context.output(config.systemEventsOutputTag, getSystemEvent(dataset,event,  FunctionalError.AdditionalFieldsFound, addTypeFailedCount))
     }
     if (unknownFailureCount > 0) {
       context.output(config.systemEventsOutputTag, getSystemEvent(dataset, event, FunctionalError.UnknownValidationError, unknownFailureCount))

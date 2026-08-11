@@ -11,7 +11,7 @@ on:
         required: true
         default: false
       only_lakehouse:
-        description: "Manual test runs only: skip the 7 legs that don't apply to this branch, build just lakehouse-connector-image. Has no effect on a tag push (real releases still build all 8)."
+        description: "Manual test runs only: skip the 5 optional per-module legs (extractor/preprocessor/denormalizer/transformer/dataset-router), build just the 3 mandatory images (unified-pipeline, lakehouse-connector, cache-indexer). Has no effect on a tag push (real releases still build all 8)."
         type: boolean
         required: false
         default: false
@@ -24,20 +24,13 @@ on:
 jobs:
   build-image:
     runs-on: ubuntu-latest
-    # optional legs must not fail the workflow or block deploy - this branch's Dockerfile only
-    # defines build-pipeline, flink-dist and lakehouse-connector-image, so every other leg
-    # targets a stage that doesn't exist here and fails immediately. This is the same tracked
-    # file path as main's, but the content has genuinely diverged, not just grown a leg:
-    # main's matrix has 7 legs (no lakehouse-connector at all) with unified-pipeline AND
-    # cache-indexer both optional: false; this branch's matrix has 8 legs, flips cache-indexer to
-    # optional: true, and makes lakehouse-connector the one optional: false leg. main's Dockerfile
-    # (build-core/build-pipeline/flink-dist/unified-image/cache-indexer-image) and this branch's
-    # (build-pipeline/flink-dist/lakehouse-connector-image) don't overlap in stage names either.
-    # A "take ours"/"take theirs" merge resolution on this file silently drops one side's
-    # mandatory image - this needs an actual reconciliation (merge both matrices, keep both sets
-    # of Dockerfile stages), not a file-level pick, whenever this branch merges forward. Same
-    # fail-fast/continue-on-error pattern #130 already applies to this same file for this same
-    # underlying problem (dead legs cancelling the workflow).
+    # optional legs (the individual pipeline modules) must not fail the workflow or block deploy;
+    # unified-pipeline, cache-indexer, and lakehouse-connector are all mandatory - this reconciles
+    # main's matrix (unified-pipeline + cache-indexer mandatory, no lakehouse-connector leg) with
+    # this branch's (lakehouse-connector mandatory, cache-indexer optional) rather than picking
+    # one side - both sets of stages now exist in the merged Dockerfile, so both sets of legs are
+    # real. Previously diverged enough that a naive take-ours/take-theirs would have silently
+    # dropped one side's mandatory image on this exact merge.
     continue-on-error: ${{ matrix.optional || false }}
     strategy:
       fail-fast: false
@@ -60,13 +53,13 @@ jobs:
             optional: true
           - image: "unified-pipeline"
             target: "unified-image"
-            optional: true
+            optional: false
           - image: "lakehouse-connector"
             target: "lakehouse-connector-image"
             optional: false
           - image: "cache-indexer"
             target: "cache-indexer-image"
-            optional: true
+            optional: false
     # only_lakehouse is workflow_dispatch-only (github.event.inputs is empty on a tag push, so
     # this is always true there and every leg still runs its steps, unaffected). matrix isn't
     # available in a job-level if:, so this is per-step instead - skips the real cost (checkout,

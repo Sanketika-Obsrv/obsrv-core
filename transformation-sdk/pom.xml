@@ -3,22 +3,19 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>core</artifactId>
+        <groupId>org.sunbird.obsrv</groupId>
+        <version>1.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
     <artifactId>transformation-sdk</artifactId>
-    <groupId>org.sunbird.obsrv</groupId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>Obsrv Transformation Library as a SDK</name>
     <properties>
         <encoding>UTF-8</encoding>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<scala.maj.version>2.12</scala.maj.version>
-		<scala.version>2.12.11</scala.version>
-		<flink.version>1.17.2</flink.version>
-		<kafka.version>3.7.1</kafka.version>
-		<java.target.runtime>11</java.target.runtime>
-		<jackson-jaxrs.version>1.9.13</jackson-jaxrs.version>
-		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
-        <log4j.version>2.14.1</log4j.version>
     </properties>
     <dependencies>
         <dependency>
@@ -48,7 +45,18 @@
                     <groupId>com.fasterxml.jackson.core</groupId>
                     <artifactId>jackson-annotations</artifactId>
                 </exclusion>
+                <!-- Fix BDSA-2022-2582 (MEDIUM): exclude vulnerable woodstox-core from JSONata4Java -->
+                <exclusion>
+                    <groupId>com.fasterxml.woodstox</groupId>
+                    <artifactId>woodstox-core</artifactId>
+                </exclusion>
             </exclusions>
+        </dependency>
+        <!-- Fix BDSA-2022-2582 (MEDIUM): safe woodstox-core replacing JSONata4Java transitive -->
+        <dependency>
+            <groupId>com.fasterxml.woodstox</groupId>
+            <artifactId>woodstox-core</artifactId>
+            <version>6.7.0</version>
         </dependency>
         <dependency>
             <groupId>com.github.bancolombia</groupId>
@@ -59,7 +67,16 @@
                     <groupId>com.fasterxml.jackson.core</groupId>
                     <artifactId>jackson-databind</artifactId>
                 </exclusion>
-            </exclusions>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-lang3</artifactId>
+                </exclusion>
+			</exclusions>
+		</dependency>
+		 <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.18.0</version>
         </dependency>
         <dependency>
             <groupId>org.scalatest</groupId>
@@ -156,7 +173,7 @@
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
-                <version>4.4.0</version>
+                <version>4.8.1</version>
                 <configuration>
                     <source>${java.target.runtime}</source>
                     <target>${java.target.runtime}</target>

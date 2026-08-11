@@ -4,8 +4,12 @@
 				 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                              http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-
-	<groupId>org.sunbird.obsrv</groupId>
+	<parent>
+		<groupId>org.sunbird.obsrv</groupId>
+		<artifactId>core</artifactId>
+		<version>1.0</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
 	<artifactId>pipeline</artifactId>
 	<version>1.0</version>
 	<packaging>pom</packaging>
@@ -17,34 +21,26 @@
 
 	<modules>
 		<module>extractor</module>
-		<module>preprocessor</module>
 		<module>denormalizer</module>
 		<module>transformer</module>
 		<module>dataset-router</module>
 		<module>unified-pipeline</module>
-		<module>hudi-connector</module>
 		<module>cache-indexer</module>
+		<module>preprocessor</module>
+		<module>hudi-connector</module>
 	</modules>
 
 	<properties>
 		<!-- maven specific properties -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<scala.maj.version>2.12</scala.maj.version>
-		<!-- 2.12.18: matches main's own scala.version (bd579898), needed for hudi-connector's
-		     build on this branch. Closer to hudi-connector in the parent chain than root
-		     pom.xml, so it was overriding that bump too. -->
-		<scala.version>2.12.18</scala.version>
-		<!-- 1.20.5: matches framework's own bump (see framework/pom.xml). Left at 1.17.2 while
-		     framework moved to 1.20.5 meant extractor/preprocessor/etc. compiled against a
-		     1.20-built framework with 1.17 Flink jars on their own classpath - scalac stubbed
-		     missing 1.20-only interfaces (e.g. LineageVertexProvider) and failed. Bumping this
-		     to match is the fix; each of the 6 modules below gets whatever compile-error fallout
-		     that surfaces addressed on its own terms, not papered over. -->
-		<flink.version>1.20.5</flink.version>
-		<kafka.version>3.7.1</kafka.version>
-		<java.target.runtime>11</java.target.runtime>
+		<!-- No local scala.maj.version/scala.version/flink.version/kafka.version override here
+		     (this branch used to have one, pinning flink.version to 1.20.5 specifically to get
+		     the other 6 modules compiling against framework's own 1.20.5 bump) - root pom.xml
+		     now provides flink.version 1.20.0 / kafka.version 3.9.1 directly, so every module
+		     under pipeline/ already gets a consistent 1.20.x line via inheritance, matching
+		     main's own pattern (which never had a local override here either). -->
 		<jackson-jaxrs.version>1.9.13</jackson-jaxrs.version>
-		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
+		<jackson-bom.version>2.17.2</jackson-bom.version>
 	</properties>
 
 	<repositories>
@@ -61,12 +57,108 @@
 	     <pluginRepository> entries removed - the URL 404s (verified), dead for years, and
 	     nothing in this reactor actually needs it. -->
 
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.fasterxml.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
+				<version>${jackson-bom.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-streaming-scala_${scala.maj.version}</artifactId>
 			<version>${flink.version}</version>
+			<scope>provided</scope>
+			<exclusions>
+				 <exclusion>
+                    <groupId>com.esotericsoftware.kryo</groupId>
+                    <artifactId>kryo</artifactId>
+                </exclusion>
+				<exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-lang3</artifactId>
+                </exclusion>
+				<exclusion>
+                    <groupId>org.lz4</groupId>
+                    <artifactId>lz4-java</artifactId>
+                </exclusion>
+			                <exclusion>
+                    <groupId>org.xerial.snappy</groupId>
+                    <artifactId>snappy-java</artifactId>
+                </exclusion>
+            </exclusions>
 		</dependency>
+		 <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.18.0</version>
+        </dependency>
+		<dependency>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo</artifactId>
+            <version>4.0.3</version>
+        </dependency>
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-connector-base</artifactId>
+			<version>${flink.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.kafka</groupId>
+					<artifactId>kafka-clients</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-core</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-connector-kafka</artifactId>
+			<version>3.3.0-1.20</version>
+			<exclusions>
+                <exclusion>
+                    <groupId>org.apache.kafka</groupId>
+                    <artifactId>kafka-clients</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.xerial.snappy</groupId>
+                    <artifactId>snappy-java</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.zookeeper</groupId>
+                    <artifactId>zookeeper</artifactId>
+                </exclusion>
+            </exclusions>
+		</dependency>
+		<dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>${kafka.version}</version>
+			<exclusions>
+				<exclusion>
+                    <groupId>org.lz4</groupId>
+                    <artifactId>lz4-java</artifactId>
+                </exclusion>
+                <!-- Fix CVE-2023-43642 / BDSA-2023-2110/2111/2113: exclude vulnerable snappy-java -->
+                <exclusion>
+                    <groupId>org.xerial.snappy</groupId>
+                    <artifactId>snappy-java</artifactId>
+                </exclusion>
+			</exclusions>
+        </dependency>
+        <!-- Fix CVE-2023-43642 / BDSA-2023-2110/2111/2113: safe snappy-java replacing kafka-clients transitive -->
+        <dependency>
+            <groupId>org.xerial.snappy</groupId>
+            <artifactId>snappy-java</artifactId>
+            <version>1.1.10.5</version>
+        </dependency>
 	</dependencies>
 
 	<build>

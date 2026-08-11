@@ -1,18 +1,38 @@
 # =============================================================================
-# Hardened Flink runtime for obsrv-core (lakehouse-connector)
+# Hardened Flink runtime for obsrv-core (unified-pipeline + cache-indexer + lakehouse-connector)
 # -----------------------------------------------------------------------------
-# * Build stages stay on the original maven image (discarded, not shipped).
-# * Flink dist is taken from the official flink image (version-matched, has
-#   the s3 plugin) — avoids downloading from archive.apache.org.
-# * Runtime uses dhi.io/eclipse-temurin:11-jdk-debian13-dev which has bash,
-#   coreutils and glibc so Flink scripts and snappy-java work correctly.
+# WHY the choices here (learned the hard way):
+#   * DHI has NO Flink runtime base and NO maven-jdk11. BUILD stages stay on the
+#     original maven image (multi-stage: discarded, not shipped).
+#   * The shipped RUNTIME uses the DHI eclipse-temurin 11 JDK **debian** (glibc)
+#     image, NOT the alpine `11-jre`. Reasons the alpine base failed:
+#       - Flink launch scripts need bash (alpine has only busybox ash).
+#       - Hadoop S3 login needs the running uid in /etc/passwd (getpwuid).
+#       - snappy-java's bundled native lib is glibc-linked (needs
+#         ld-linux-x86-64.so.2); on musl/alpine it fails and every checkpoint
+#         (snapshot-compression=true) dies.
+#     The debian (glibc) DHI image ships bash + coreutils + glibc, so it just
+#     works — we only add a flink:9999 passwd entry and own the dist.
+#   * Flink dist is taken from the official flink image (version-matched, has
+#     the s3 plugin), then carried onto the hardened runtime.
 # =============================================================================
 ARG FLINK_UID=9999
 
-# ---- build: compile hudi-connector + download extra JARs (has network) ------
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
+# ---- build stages: compile obsrv-core (original maven, discarded) ------------
+FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-core
 COPY . /app
-RUN --mount=type=cache,target=/root/.m2 mvn -pl pipeline/hudi-connector -am clean package -DskipTests -q -f /app/pom.xml
+RUN mvn clean install -DskipTests -f /app/pom.xml
+
+FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
+COPY --from=build-core /root/.m2 /root/.m2
+COPY . /app
+RUN mvn clean package -DskipTests -f /app/pipeline/pom.xml
+
+# ---- download-hudi-plugins: extra JARs for hudi-connector's S3/GCS plugin classloaders -------
+# Not produced by the maven build above - flink-shaded-hadoop-2-uber, flink-gs-fs-hadoop and
+# gcs-connector are pre-built artifacts pulled straight from Maven Central, decoupled from the
+# source compile so this stage doesn't need to rerun if only source changes.
+#
 # s3-fs-hadoop and gs-fs-hadoop each get their own subdir - Flink loads each plugins/<dir>
 # with its own isolated classloader. flink-s3-fs-hadoop-*.jar bundles its own unshaded
 # jackson-databind:2.15.3 (real com.fasterxml.jackson.databind package, not relocated); in
@@ -38,10 +58,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn -pl pipeline/hudi-connector -am clea
 # com.fasterxml.jackson/com.google.common classes), so a second copy in lib/ is safe: same
 # ClassNotFoundException-for-Hudi's-direct-FileSystem.get() problem as S3AFileSystem, same fix,
 # but no pom.xml dependency-exclusion dance needed since this jar doesn't collide.
-# flink-shaded-guava-30.1.1-jre-16.1 (Flink 1.17's own shaded guava) used to be downloaded here
-# too - verified via constant-pool string scan across every jar that ships in lib/ that nothing
-# references its guava30-relocation-prefixed package; Flink 1.20 ships its own 31.1-jre-17.0
-# already. Dropped as confirmed dead weight, not just suspected (manju flagged this as a nit).
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS download-hudi-plugins
 RUN mkdir -p /plugins/s3-fs-hadoop /plugins/gs-fs-hadoop /jars && \
     curl -fsSL -o /plugins/s3-fs-hadoop/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar && \
@@ -53,26 +70,59 @@ RUN mkdir -p /plugins/s3-fs-hadoop /plugins/gs-fs-hadoop /jars && \
     cp /plugins/gs-fs-hadoop/gcs-connector-hadoop3-2.2.11-shaded.jar /jars/ && \
     echo "Jackson jars intentionally omitted — hudi-flink bundle ships its own databind"
 
-# ---- flink-dist: Flink 1.20 dist setup (no network downloads) ---------------
-# Pinned to the exact patch hudi-connector/pom.xml compiles against (1.20.5) - was the floating
-# "1.20" tag, which combined with gs-fs-hadoop's separate 1.20.1 pin (now also 1.20.5) meant
-# three different Flink patch versions in one image (manju's nit).
+# ---- flink-dist stage: exact Flink 1.20 dist from the official image ---------
+# Pinned to the exact patch hudi-connector/pom.xml compiles against (1.20.5), not main's own
+# floating "1.20" tag - avoids three different Flink patch versions across this one image
+# (pom, gs-fs-hadoop, dist).
 FROM public.ecr.aws/docker/library/flink:1.20.5-scala_2.12-java11 AS flink-dist
 ARG FLINK_UID
 ENV FLINK_HOME=/opt/flink
 USER root
 RUN set -eux; \
-    mkdir -p "${FLINK_HOME}/plugins/s3-fs-hadoop"; \
+    mkdir -p "${FLINK_HOME}/usrlib" "${FLINK_HOME}/plugins/s3-fs-hadoop"; \
     mv "${FLINK_HOME}"/opt/flink-s3-fs-hadoop-*.jar "${FLINK_HOME}/plugins/s3-fs-hadoop/"; \
     chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}"
-    # No hardcoded s3.aws.credentials.provider here (was: WebIdentityTokenCredentialsProvider
-    # only) - the original Dockerfile had no credentials-provider override at all, relying on
-    # Hadoop-S3A's own default provider chain to try key-based SimpleAWSCredentialsProvider
-    # (fs.s3a.access.key/secret.key from core-site.xml - what MinIO needs) first, falling
-    # through to WebIdentityTokenCredentialsProvider/instance-profile for real AWS/IRSA if no
-    # keys are set. Forcing one provider broke MinIO: it went straight to
-    # EnvironmentVariableCredentialsProvider on the checkpoint S3 client and failed, since keys
-    # were never even tried.
+    # No hardcoded s3.aws.credentials.provider here (main's own Dockerfile still has one:
+    # WebIdentityTokenCredentialsProvider only) - the original pre-DHI Dockerfile had no
+    # credentials-provider override at all, relying on Hadoop-S3A's own default provider chain
+    # to try key-based SimpleAWSCredentialsProvider (fs.s3a.access.key/secret.key from
+    # core-site.xml - what MinIO needs) first, falling through to
+    # WebIdentityTokenCredentialsProvider/instance-profile for real AWS/IRSA if no keys are set.
+    # Forcing one provider broke MinIO: it went straight to EnvironmentVariableCredentialsProvider
+    # on the checkpoint S3 client and failed, since keys were never even tried. Confirmed via a
+    # real cluster redeploy against MinIO - fixed here for every image built from this stage,
+    # not just lakehouse-connector-image.
+
+# =============================================================================
+# unified-pipeline runtime  (DHI debian/glibc JDK 11 — has bash, coreutils, glibc)
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS unified-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/unified-pipeline/target/unified-pipeline-1.0.0.jar ${FLINK_HOME}/usrlib/
+# flink user so Hadoop getpwuid(9999) resolves for S3 login
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
+
+# =============================================================================
+# cache-indexer runtime
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS cache-indexer-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/cache-indexer/target/cache-indexer-1.0.0.jar ${FLINK_HOME}/usrlib/
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
 
 # =============================================================================
 # lakehouse-connector runtime (DHI debian/glibc JDK 11 — has bash + coreutils)
@@ -90,16 +140,17 @@ ENV PATH="${FLINK_HOME}/bin:${PATH}"
 # connector's own pod spec has set this same env var on both jobmanager/taskmanager since
 # before this PR, and pod-spec env: overrides image ENV - so for that deploy path the actual
 # fix for the MinIO credentials crash was removing the misnamed s3.aws.credentials.provider
-# hardcode below, not this line. Kept anyway as real, non-redundant coverage for any deploy
-# path that doesn't go through that chart (bare docker run, a different orchestrator, etc.).
+# hardcode above (in flink-dist), not this line. Kept anyway as real, non-redundant coverage
+# for any deploy path that doesn't go through that chart (bare docker run, a different
+# orchestrator, etc.).
 ENV HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
 USER 0
 RUN apt-get update -qq && apt-get install -y --no-install-recommends gettext-base && rm -rf /var/lib/apt/lists/*
 COPY --from=flink-dist /docker-entrypoint.sh /docker-entrypoint.sh
 COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
-COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /plugins/s3-fs-hadoop/ ${FLINK_HOME}/plugins/s3-fs-hadoop/
-COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /plugins/gs-fs-hadoop/ ${FLINK_HOME}/plugins/gs-fs-hadoop/
-COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /jars/ ${FLINK_HOME}/lib/
+COPY --from=download-hudi-plugins --chown=${FLINK_UID}:${FLINK_UID} /plugins/s3-fs-hadoop/ ${FLINK_HOME}/plugins/s3-fs-hadoop/
+COPY --from=download-hudi-plugins --chown=${FLINK_UID}:${FLINK_UID} /plugins/gs-fs-hadoop/ ${FLINK_HOME}/plugins/gs-fs-hadoop/
+COPY --from=download-hudi-plugins --chown=${FLINK_UID}:${FLINK_UID} /jars/ ${FLINK_HOME}/lib/
 COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/hudi-connector/target/hudi-connector-1.0.0.jar ${FLINK_HOME}/lib/
 RUN chmod +x /docker-entrypoint.sh \
     && printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \

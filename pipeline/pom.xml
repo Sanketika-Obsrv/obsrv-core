@@ -50,22 +50,10 @@
 			<id>apache-releases</id>
 			<url>https://repository.apache.org/content/groups/public</url>
 		</repository>
-		<repository>
-			<id>scala-tools.org</id>
-			<name>Scala-tools Maven2 Repository</name>
-			<url>https://oss.sonatype.org/content/groups/scala-tools</url>
-		</repository>
 	</repositories>
-
-	<pluginRepositories>
-		<pluginRepository>
-			<id>scala-tools.org</id>
-			<name>Scala-tools Maven2 Repository</name>
-			<!-- scala-tools.org itself is defunct; same content is mirrored over TLS by
-			     sonatype (matches the <repository> entry above). -->
-			<url>https://oss.sonatype.org/content/groups/scala-tools</url>
-		</pluginRepository>
-	</pluginRepositories>
+	<!-- scala-tools.org / oss.sonatype.org/content/groups/scala-tools <repository> and
+	     <pluginRepository> entries removed - the URL 404s (verified), dead for years, and
+	     nothing in this reactor actually needs it. -->
 
 	<dependencies>
 		<dependency>

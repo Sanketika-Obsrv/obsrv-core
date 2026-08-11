@@ -295,22 +295,30 @@
             <version>3.14.1</version>
             <scope>test</scope>
         </dependency>
+        <!-- Was 2.8.1, whose own bundled kafka_2.12 (broker) pulls kafka-clients:2.8.1, while
+             framework brings kafka-clients:3.7.1 (nearest-wins) - the broker's own
+             BrokerToControllerChannelManagerImpl called a NetworkClient constructor signature
+             that only exists in the older kafka-clients, so EmbeddedKafka.start() threw
+             NoSuchMethodError on every run. Bumped to 3.4.0 (same version already used by every
+             other module: framework, extractor, preprocessor, denormalizer, transformer,
+             dataset-router, unified-pipeline, cache-indexer - all pass with it), and added the
+             explicit kafka_2.12 pin below matching framework's own pattern, instead of the old
+             zookeeper exclusion+override this module had (dead weight now that the whole
+             kafka_2.12 tree resolves to a version consistent with kafka-clients). -->
         <dependency>
             <groupId>io.github.embeddedkafka</groupId>
             <artifactId>embedded-kafka_2.12</artifactId>
-            <version>2.8.1</version>
+            <version>3.4.0</version>
             <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.zookeeper</groupId>
-                    <artifactId>zookeeper</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
+        <!-- Literal version, not a property reference: this pom has no <parent> (fully
+             standalone, unlike the rest of the reactor), so root's kafka.version property
+             isn't visible here. 3.7.1 matches framework's kafka-clients version directly. -->
         <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-            <version>3.5.9</version>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka_2.12</artifactId>
+            <version>3.7.1</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>

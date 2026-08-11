@@ -1,13 +1,43 @@
 package org.sunbird.obsrv.router
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.joda.time.DateTimeZone
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.model.DatasetModels.{DatasetConfig, IndexingConfig, KeysConfig}
 import org.sunbird.obsrv.router.functions.TimestampKeyParser
 
+import java.util.TimeZone
 import scala.collection.mutable
 
-class TestTimestampKeyParser extends FlatSpec with Matchers {
+class TestTimestampKeyParser extends FlatSpec with Matchers with BeforeAndAfterAll {
+
+  // TimestampKeyParser.addTimeZone (and DateTimeFormat.parseDateTime, when no explicit
+  // datasetTimezone is set) both fall back to the ambient default timezone - every hardcoded
+  // expected value below is only correct if that default is IST (Asia/Kolkata), which is what
+  // this suite was authored/last verified against. On a CI runner defaulting to UTC,
+  // "2023-03-01" (no timezone) parses to UTC midnight instead of IST midnight, and every
+  // addTimeZone(...) result shifts by the same 5:30 offset - failing every assertion below, not
+  // just one. Setting java.util.TimeZone.setDefault() alone isn't enough - Joda-Time (which
+  // TimestampKeyParser actually uses, via DateTime/DateTimeFormat) caches its own default
+  // DateTimeZone independently and doesn't reliably pick up changes to java.util.TimeZone's
+  // default afterward (verified: still failed under TZ=UTC with only java.util.TimeZone set).
+  // Pinning both defaults (and restoring both afterward, so this doesn't leak into other suites
+  // sharing the same JVM/reactor) makes this suite deterministic without touching production
+  // code or any of the literal expected values.
+  private var originalDefaultTimeZone: TimeZone = _
+  private var originalDefaultDateTimeZone: DateTimeZone = _
+
+  override def beforeAll(): Unit = {
+    originalDefaultTimeZone = TimeZone.getDefault
+    originalDefaultDateTimeZone = DateTimeZone.getDefault
+    TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
+    DateTimeZone.setDefault(DateTimeZone.forID("Asia/Kolkata"))
+  }
+
+  override def afterAll(): Unit = {
+    TimeZone.setDefault(originalDefaultTimeZone)
+    DateTimeZone.setDefault(originalDefaultDateTimeZone)
+  }
 
   "TimestampKeyParser" should "validate all scenarios of timestamp key in number format" in {
 

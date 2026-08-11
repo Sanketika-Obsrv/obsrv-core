@@ -86,6 +86,12 @@ ENV PATH="${FLINK_HOME}/bin:${PATH}"
 # Jackson fix) also cut it off from core-site.xml, where fs.s3a.access.key/secret.key live for
 # MinIO. HADOOP_CONF_DIR is Hadoop's own env-var-based config lookup, checked independent of
 # whichever classloader is running, so this restores core-site.xml visibility for every plugin.
+# Confirmed redundant for chart-based deploys specifically: helmcharts/services/lakehouse-
+# connector's own pod spec has set this same env var on both jobmanager/taskmanager since
+# before this PR, and pod-spec env: overrides image ENV - so for that deploy path the actual
+# fix for the MinIO credentials crash was removing the misnamed s3.aws.credentials.provider
+# hardcode below, not this line. Kept anyway as real, non-redundant coverage for any deploy
+# path that doesn't go through that chart (bare docker run, a different orchestrator, etc.).
 ENV HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
 USER 0
 RUN apt-get update -qq && apt-get install -y --no-install-recommends gettext-base && rm -rf /var/lib/apt/lists/*

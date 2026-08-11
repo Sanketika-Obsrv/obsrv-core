@@ -34,7 +34,13 @@
 		     build on this branch. Closer to hudi-connector in the parent chain than root
 		     pom.xml, so it was overriding that bump too. -->
 		<scala.version>2.12.18</scala.version>
-		<flink.version>1.17.2</flink.version>
+		<!-- 1.20.5: matches framework's own bump (see framework/pom.xml). Left at 1.17.2 while
+		     framework moved to 1.20.5 meant extractor/preprocessor/etc. compiled against a
+		     1.20-built framework with 1.17 Flink jars on their own classpath - scalac stubbed
+		     missing 1.20-only interfaces (e.g. LineageVertexProvider) and failed. Bumping this
+		     to match is the fix; each of the 6 modules below gets whatever compile-error fallout
+		     that surfaces addressed on its own terms, not papered over. -->
+		<flink.version>1.20.5</flink.version>
 		<kafka.version>3.7.1</kafka.version>
 		<java.target.runtime>11</java.target.runtime>
 		<jackson-jaxrs.version>1.9.13</jackson-jaxrs.version>

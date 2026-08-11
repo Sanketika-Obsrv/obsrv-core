@@ -539,29 +539,18 @@
                     <scalaVersion>${scala.version}</scalaVersion>
                     <checkMultipleScalaVersions>false</checkMultipleScalaVersions>
                 </configuration>
-                <!-- The plugin's own compiler-bridge pulls its own scala-library/-xml versions
-                     (2.12.0 / 1.0.6, older than this project's 2.12.18), landing on the same
-                     compile classpath as the project's own scala-library:2.12.18 and corrupting
-                     the compiler's bootstrap state ("bad constant pool index" fatal errors while
-                     compiling this module's own sources). Pinning the plugin's toolchain deps to
-                     match the project's fixes it. -->
-                <dependencies>
-                    <dependency>
-                        <groupId>org.scala-lang</groupId>
-                        <artifactId>scala-library</artifactId>
-                        <version>${scala.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.scala-lang</groupId>
-                        <artifactId>scala-compiler</artifactId>
-                        <version>${scala.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.scala-lang</groupId>
-                        <artifactId>scala-reflect</artifactId>
-                        <version>${scala.version}</version>
-                    </dependency>
-                </dependencies>
+                <!-- No plugin-level <dependencies> override here (this branch used to have one,
+                     pinning scala-library/-compiler/-reflect to ${scala.version} as a workaround
+                     for a "bad constant pool index" issue against scala-maven-plugin 4.4.0/
+                     scala.version 2.12.11, before the later scala.version bump to 2.12.18 made
+                     it unnecessary). Left in place, it broke 4.8.1 (main's own plugin version,
+                     picked up by this merge): an unconditional plugin-level "scala-library"
+                     pin wins nearest-wins over zinc_2.13's own transitive need for
+                     scala-library:2.13.x, starving zinc's internal 2.13-based incremental-
+                     compiler toolchain down to 2.12.18 - which is missing 2.13-only classes
+                     like scala.collection.IterableOnce that zinc's own code needs, throwing
+                     NoClassDefFoundError during scala-compile-first. main's own framework/pom.xml
+                     never had this override and builds fine with 4.8.1 as-is. -->
                 <executions>
                     <execution>
                         <id>scala-compile-first</id>

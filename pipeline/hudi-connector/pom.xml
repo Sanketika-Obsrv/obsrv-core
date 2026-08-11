@@ -136,6 +136,40 @@
         </exclusion>
       </exclusions>
     </dependency>
+    <!-- hudi-connector's own code calls Hadoop's plain org.apache.hadoop.fs.FileSystem.get()
+         directly for checkpoint/table I/O - that resolves fs.s3a.impl via the thread context
+         classloader (Flink's user-code classloader: lib/ + job jars), which is a completely
+         separate mechanism from Flink's own isolated plugins/ classloaders (those only serve
+         org.apache.flink.core.fs.FileSystem, used by Flink's checkpoint storage client - not by
+         Hudi's direct Hadoop calls). Isolating flink-s3-fs-hadoop into plugins/ (above, for the
+         Jackson conflict) removed org.apache.hadoop.fs.s3a.S3AFileSystem from lib/ entirely,
+         so Hudi's own FileSystem.get() threw ClassNotFoundException. hadoop-aws, version-matched
+         to flink-shaded-hadoop-2-uber:2.8.3-10.0 already in lib/ (provides the hadoop-common
+         base classes S3AFileSystem extends), restores it without re-adding flink-s3-fs-hadoop's
+         own unshaded jackson-databind:2.15.3 that caused that earlier conflict. -->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-aws</artifactId>
+      <version>2.8.3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-table-api-scala-bridge_${scala.maj.version}</artifactId>

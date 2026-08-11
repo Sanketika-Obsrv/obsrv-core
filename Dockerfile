@@ -38,21 +38,26 @@ RUN --mount=type=cache,target=/root/.m2 mvn -pl pipeline/hudi-connector -am clea
 # com.fasterxml.jackson/com.google.common classes), so a second copy in lib/ is safe: same
 # ClassNotFoundException-for-Hudi's-direct-FileSystem.get() problem as S3AFileSystem, same fix,
 # but no pom.xml dependency-exclusion dance needed since this jar doesn't collide.
+# flink-shaded-guava-30.1.1-jre-16.1 (Flink 1.17's own shaded guava) used to be downloaded here
+# too - verified via constant-pool string scan across every jar that ships in lib/ that nothing
+# references its guava30-relocation-prefixed package; Flink 1.20 ships its own 31.1-jre-17.0
+# already. Dropped as confirmed dead weight, not just suspected (manju flagged this as a nit).
 RUN mkdir -p /plugins/s3-fs-hadoop /plugins/gs-fs-hadoop /jars && \
     curl -fsSL -o /plugins/s3-fs-hadoop/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar && \
     cp /plugins/s3-fs-hadoop/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar /jars/ && \
-    curl -fsSL -o /plugins/gs-fs-hadoop/flink-gs-fs-hadoop-1.20.1.jar \
-        https://repo1.maven.org/maven2/org/apache/flink/flink-gs-fs-hadoop/1.20.1/flink-gs-fs-hadoop-1.20.1.jar && \
+    curl -fsSL -o /plugins/gs-fs-hadoop/flink-gs-fs-hadoop-1.20.5.jar \
+        https://repo1.maven.org/maven2/org/apache/flink/flink-gs-fs-hadoop/1.20.5/flink-gs-fs-hadoop-1.20.5.jar && \
     curl -fsSL -o /plugins/gs-fs-hadoop/gcs-connector-hadoop3-2.2.11-shaded.jar \
         https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.11/gcs-connector-hadoop3-2.2.11-shaded.jar && \
     cp /plugins/gs-fs-hadoop/gcs-connector-hadoop3-2.2.11-shaded.jar /jars/ && \
-    curl -fsSL -o /jars/flink-shaded-guava-30.1.1-jre-16.1.jar \
-        https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-guava/30.1.1-jre-16.1/flink-shaded-guava-30.1.1-jre-16.1.jar && \
     echo "Jackson jars intentionally omitted — hudi-flink bundle ships its own databind"
 
 # ---- flink-dist: Flink 1.20 dist setup (no network downloads) ---------------
-FROM public.ecr.aws/docker/library/flink:1.20-scala_2.12-java11 AS flink-dist
+# Pinned to the exact patch hudi-connector/pom.xml compiles against (1.20.5) - was the floating
+# "1.20" tag, which combined with gs-fs-hadoop's separate 1.20.1 pin (now also 1.20.5) meant
+# three different Flink patch versions in one image (manju's nit).
+FROM public.ecr.aws/docker/library/flink:1.20.5-scala_2.12-java11 AS flink-dist
 ARG FLINK_UID
 ENV FLINK_HOME=/opt/flink
 USER root
@@ -95,4 +100,8 @@ RUN chmod +x /docker-entrypoint.sh \
     && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
 USER ${FLINK_UID}:${FLINK_UID}
 WORKDIR ${FLINK_HOME}
+EXPOSE 6123 8081
 ENTRYPOINT ["/docker-entrypoint.sh"]
+# Matches the official Flink image's own pairing: without a CMD, `docker run <image>` with no
+# args hits the entrypoint's pass-through `exec "$@"` with empty argv and exits 0 immediately.
+CMD ["help"]

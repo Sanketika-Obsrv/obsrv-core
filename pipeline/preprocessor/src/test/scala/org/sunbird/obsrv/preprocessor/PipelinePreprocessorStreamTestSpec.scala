@@ -190,7 +190,10 @@ class PipelinePreprocessorStreamTestSpec extends BaseSpecWithDatasetRegistry {
     d4Metrics(pConfig.validationTotalMetricsCount) should be(2)
     d4Metrics(pConfig.validationFailureMetricsCount) should be(2)
 
-    val d5Metrics = getMetrics(metricsReporter, "d5")
+    // TEMP DIAGNOSTIC (remove before merge): dump every raw metric group/key/value for "d5" to
+    // find out whether multiple retained InMemoryReporter groups are being summed together.
+    val d5Metrics = getMetrics(metricsReporter, "d5", Some(true))
+    Console.println("DIAG groups.size=" + metricsReporter.findGroups("d5").size())
     d5Metrics(pConfig.validationTotalMetricsCount) should be(1)
     d5Metrics(pConfig.validationSuccessMetricsCount) should be(1)
     d5Metrics(pConfig.duplicationTotalMetricsCount) should be(1)

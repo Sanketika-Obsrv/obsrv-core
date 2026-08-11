@@ -107,4 +107,12 @@ jobs:
 
       # Not MiniCluster-based - no retry needed, a failure here is a real failure.
       - name: Test remaining modules
-        run: mvn -pl dataset-registry,transformation-sdk,pipeline/hudi-connector,data-products test
+        run: mvn -pl dataset-registry,transformation-sdk,pipeline/hudi-connector test
+
+      # data-products declares a <parent> pointing at root (picked up via the merge with main),
+      # but isn't listed in root's own <modules> - "-pl ...,data-products" from root's reactor
+      # context fails with "Could not find the selected project in the reactor" as a result
+      # (a stricter parent/child consistency check that didn't apply back when this pom had no
+      # parent at all). -f pointing straight at its own pom sidesteps that entirely.
+      - name: Test data-products
+        run: mvn -f data-products/pom.xml test

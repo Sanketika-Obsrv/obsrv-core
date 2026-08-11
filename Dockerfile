@@ -32,6 +32,12 @@ RUN --mount=type=cache,target=/root/.m2 mvn -pl pipeline/hudi-connector -am clea
 # that. This jar's own Jackson is relocated under org.apache.htrace.* (verified - not the real
 # com.fasterxml.jackson package), so a second copy in lib/ doesn't reintroduce the Jackson
 # conflict the plugins/ move was fixing in the first place.
+#
+# gcs-connector-hadoop3-*-shaded.jar (unlike flink-s3-fs-hadoop) relocates its own Jackson AND
+# Guava under com/google/cloud/hadoop/repackaged/gcs/* (verified via unzip - zero unrelocated
+# com.fasterxml.jackson/com.google.common classes), so a second copy in lib/ is safe: same
+# ClassNotFoundException-for-Hudi's-direct-FileSystem.get() problem as S3AFileSystem, same fix,
+# but no pom.xml dependency-exclusion dance needed since this jar doesn't collide.
 RUN mkdir -p /plugins/s3-fs-hadoop /plugins/gs-fs-hadoop /jars && \
     curl -fsSL -o /plugins/s3-fs-hadoop/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar && \
@@ -40,6 +46,7 @@ RUN mkdir -p /plugins/s3-fs-hadoop /plugins/gs-fs-hadoop /jars && \
         https://repo1.maven.org/maven2/org/apache/flink/flink-gs-fs-hadoop/1.20.1/flink-gs-fs-hadoop-1.20.1.jar && \
     curl -fsSL -o /plugins/gs-fs-hadoop/gcs-connector-hadoop3-2.2.11-shaded.jar \
         https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.11/gcs-connector-hadoop3-2.2.11-shaded.jar && \
+    cp /plugins/gs-fs-hadoop/gcs-connector-hadoop3-2.2.11-shaded.jar /jars/ && \
     curl -fsSL -o /jars/flink-shaded-guava-30.1.1-jre-16.1.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-guava/30.1.1-jre-16.1/flink-shaded-guava-30.1.1-jre-16.1.jar && \
     echo "Jackson jars intentionally omitted — hudi-flink bundle ships its own databind"

@@ -168,6 +168,35 @@
           <groupId>com.fasterxml.jackson.core</groupId>
           <artifactId>jackson-annotations</artifactId>
         </exclusion>
+        <!-- hadoop-aws:2.8.3's own pinned aws-java-sdk-s3 is 1.10.6 (2015) - predates
+             com.amazonaws.auth.WebIdentityTokenCredentialsProvider (added ~1.11.704, for EKS
+             IRSA). global-cloud-values-aws.yaml configures exactly that provider for the real
+             AWS/service-account deployment path. Excluded so the explicit 1.12.779 declaration
+             below (version-matched to flink-s3-fs-hadoop-1.20.5's own bundled SDK, verified to
+             contain the real class) wins instead of this ancient transitive one. -->
+        <exclusion>
+          <groupId>com.amazonaws</groupId>
+          <artifactId>aws-java-sdk-s3</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-s3</artifactId>
+      <version>1.12.779</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>

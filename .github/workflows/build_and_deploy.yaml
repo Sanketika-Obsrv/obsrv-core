@@ -15,6 +15,11 @@ on:
         type: boolean
         required: false
         default: false
+      image_tag:
+        description: "Manual test runs only: push under this Docker tag instead of the branch name (e.g. '2.2.0') - lets you test against an image tag your cluster expects without moving/creating a real git tag. Empty = use github.ref_name. Has no effect on a tag push (real releases always use the pushed git tag)."
+        type: string
+        required: false
+        default: ""
 
 jobs:
   build-image:
@@ -87,7 +92,10 @@ jobs:
           platforms: linux/amd64
           target: ${{matrix.target}}
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
+          # github.event.inputs is empty on a real tag push, so this always falls through to
+          # github.ref_name (the pushed tag) there, unaffected. image_tag only takes effect on
+          # a manual workflow_dispatch run where it's explicitly set.
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.event.inputs.image_tag != '' && github.event.inputs.image_tag || github.ref_name }}
 
 
   aws-deploy:

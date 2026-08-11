@@ -33,7 +33,6 @@ object FlinkUtil {
     }
     // $COVERAGE-ON$
     val env = StreamExecutionEnvironment.getExecutionEnvironment(configuration)
-    print("Flink Config:", env.getConfiguration)
     env
   }
 }

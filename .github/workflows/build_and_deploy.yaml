@@ -65,6 +65,14 @@ jobs:
     # buildx, login, build+push) for the 7 legs that don't apply to this branch on a manual
     # test run, without touching the tag-push path any real release uses.
     steps:
+      # Without this, a skipped leg's job still shows a plain green tick with zero executed
+      # steps - indistinguishable in the checks list from a leg that actually built and pushed.
+      # This step runs on exactly the opposite condition of every real step below, so exactly
+      # one of the two branches is ever visible per leg.
+      - name: Skipped (only_lakehouse dispatch mode)
+        if: matrix.optional == true && github.event.inputs.only_lakehouse == 'true'
+        run: echo "Skipped - manual only_lakehouse test run, this leg doesn't apply to this branch's Dockerfile. Unaffected on a real tag push."
+
       - uses: actions/checkout@v4
         if: matrix.optional == false || github.event.inputs.only_lakehouse != 'true'
         with:

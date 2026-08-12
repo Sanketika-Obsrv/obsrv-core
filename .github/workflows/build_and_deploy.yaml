@@ -107,7 +107,7 @@ jobs:
           cd deploy/terraform/aws
           terragrunt init
           terragrunt apply -auto-approve -var unified_pipeline_enabled={{ vars.MERGED_PIPELINE || 'true' }} --replace='module.flink.helm_release.flink' \
-          -var flink_image_tag=${{ github.ref_name }}
+          -var flink_image_tag=${{ github.event.inputs.image_tag != '' && github.event.inputs.image_tag || github.ref_name }}
 
   azure-deploy:
     needs: build-image
@@ -132,4 +132,4 @@ jobs:
           terragrunt init
           terragrunt apply -auto-approve -replace=module.flink.helm_release.flink \
           -var flink_container_registry=${{ secrets.DOCKERHUB_USERNAME }} \
-          -var flink_image_tag=${{ github.ref_name }}
+          -var flink_image_tag=${{ github.event.inputs.image_tag != '' && github.event.inputs.image_tag || github.ref_name }}

@@ -78,16 +78,14 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- framework still pins flink.version=1.17.2, so flink-connector-kafka rides in
-         transitively at 1.17.2 via framework's FlinkKafkaConnector (which
-         HudiConnectorStreamTask uses for its Kafka source). Pinned here explicitly, same
-         pattern already used below for flink-streaming-scala / flink-table-api-scala-bridge /
-         flink-statebackend-rocksdb, so Maven's nearest-wins resolution picks this declaration
-         over framework's 1.17.2 one. NOT ${flink.version}: flink-connector-kafka was
-         externalized from the Flink release train after 1.17 onto its own versioning
-         (3.x-1.20 for the Flink-1.20 line) - "1.20.5" doesn't exist as a coordinate and 404s.
-         FlinkKafkaConnector.scala only uses the modern KafkaSource/KafkaSink/OffsetsInitializer
-         API, which 3.x provides. -->
+    <!-- framework now pins flink.version=1.20.5 too (matches this module), so this isn't about
+         overriding a version mismatch between the two - it's pinned explicitly, same pattern
+         already used below for flink-streaming-scala / flink-table-api-scala-bridge /
+         flink-statebackend-rocksdb, because flink-connector-kafka simply doesn't follow
+         flink.version's own numbering at all: it was externalized from the Flink release train
+         after 1.17 onto its own versioning (3.x-1.20 for the Flink-1.20 line) - "1.20.5" doesn't
+         exist as a coordinate and 404s. FlinkKafkaConnector.scala only uses the modern
+         KafkaSource/KafkaSink/OffsetsInitializer API, which 3.x provides. -->
     <dependency>
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-connector-kafka</artifactId>

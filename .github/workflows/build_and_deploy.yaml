@@ -11,12 +11,12 @@ on:
         required: true
         default: false
       only_lakehouse:
-        description: "Manual test runs only: skip the 5 optional per-module legs (extractor/preprocessor/denormalizer/transformer/dataset-router), build just the 3 mandatory images (unified-pipeline, lakehouse-connector, cache-indexer). Has no effect on a tag push (real releases still build all 8)."
+        description: "Build only the mandatory images, skip the optional ones. No effect on a tag push."
         type: boolean
         required: false
         default: false
       image_tag:
-        description: "Manual test runs only: push under this Docker tag instead of the branch name (e.g. '2.2.0') - lets you test against an image tag your cluster expects without moving/creating a real git tag. Empty = use github.ref_name. Has no effect on a tag push (real releases always use the pushed git tag)."
+        description: "Override the pushed Docker tag. Empty = use branch name. No effect on a tag push."
         type: string
         required: false
         default: ""

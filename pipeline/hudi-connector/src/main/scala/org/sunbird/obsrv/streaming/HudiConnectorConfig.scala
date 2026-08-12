@@ -62,7 +62,11 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
   // None of these 4 keys exist in hudi-writer.conf - mandatory config.getString(...) calls
   // crashed HudiConnectorConfig's constructor immediately on startup with
   // ConfigException.Missing, every single time, with the default shipped config.
-  val hudiFsAtomicCreationSupport: String = if (config.hasPath("hudi.fs.atomic_creation.support")) config.getString("hudi.fs.atomic_creation.support") else "true"
+  // hoodie.fs.atomic_creation.support takes a comma-separated list of filesystem schemes
+  // (e.g. "hdfs,file,viewfs") that support atomic creation, for Hudi's FileSystemBasedLockProvider
+  // - not a boolean. "true" would never match a real scheme; empty default leaves Hudi's own
+  // built-in scheme list untouched.
+  val hudiFsAtomicCreationSupport: String = if (config.hasPath("hudi.fs.atomic_creation.support")) config.getString("hudi.fs.atomic_creation.support") else ""
 
   // Metrics
 

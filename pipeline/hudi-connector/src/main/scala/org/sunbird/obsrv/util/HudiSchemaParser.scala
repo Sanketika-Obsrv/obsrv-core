@@ -11,7 +11,7 @@ import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.registry.DatasetRegistry
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 
@@ -116,15 +116,20 @@ class HudiSchemaParser {
                     }
                     if(field.name.equalsIgnoreCase(partitionField.name)){
                       if(fieldDataType.equalsIgnoreCase("timestamp")) {
+                        // Was ts.toLocalDateTime (JVM default zone) - different TaskManagers can
+                        // have different default zones, placing the same instant into different
+                        // yyyy-MM-dd Hudi partitions depending on which TM processed it. Fixed
+                        // zone (UTC) makes this deterministic regardless of host.
                         val ts = objectMapper.treeToValue(nodeValue, classOf[Timestamp])
-                        flattenedEventData.put(field.name + "_partition", ts.toLocalDateTime.format(df))
+                        val localDateTime = LocalDateTime.ofInstant(ts.toInstant, ZoneOffset.UTC)
+                        flattenedEventData.put(field.name + "_partition", localDateTime.format(df))
                       }
                       else if(fieldDataType.equalsIgnoreCase("epoch")) {
                         // Was df.format(Long) with a SimpleDateFormat - format(Object) expects a
                         // Date, so passing a boxed Long here would have thrown
                         // IllegalArgumentException at runtime, not silently misformatted.
                         val epochMillis = objectMapper.treeToValue(nodeValue, classOf[Long])
-                        val localDateTime = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(epochMillis), java.time.ZoneId.systemDefault())
+                        val localDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneOffset.UTC)
                         flattenedEventData.put(field.name + "_partition", localDateTime.format(df))
                       }
                     }

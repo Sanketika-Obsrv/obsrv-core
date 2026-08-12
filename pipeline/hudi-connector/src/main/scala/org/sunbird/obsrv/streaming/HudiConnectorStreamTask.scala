@@ -67,7 +67,9 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
         val conf: Configuration = new Configuration()
         setHudiBaseConfigurations(conf)
         setDatasetConf(conf, datasetId, schemaParser)
-        logger.info("conf: " + conf.toMap.toString)
+        // Was logger.info("conf: " + conf.toMap.toString) - setHudiBaseConfigurations sets
+        // hive_sync.password directly on this same conf when hmsEnabled is true, so this wrote
+        // the Hive metastore password to application logs in plaintext.
         val rowType = schemaParser.rowTypeMap(datasetId)
 
         val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)

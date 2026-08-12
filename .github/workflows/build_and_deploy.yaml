@@ -10,11 +10,6 @@ on:
         type: boolean
         required: true
         default: false
-      only_lakehouse:
-        description: "Build only the mandatory images, skip the optional ones. No effect on a tag push."
-        type: boolean
-        required: false
-        default: false
       image_tag:
         description: "Override the pushed Docker tag. Empty = use branch name. No effect on a tag push."
         type: string
@@ -60,38 +55,21 @@ jobs:
           - image: "cache-indexer"
             target: "cache-indexer-image"
             optional: false
-    # only_lakehouse is workflow_dispatch-only (github.event.inputs is empty on a tag push, so
-    # this is always true there and every leg still runs its steps, unaffected). matrix isn't
-    # available in a job-level if:, so this is per-step instead - skips the real cost (checkout,
-    # buildx, login, build+push) for the 7 legs that don't apply to this branch on a manual
-    # test run, without touching the tag-push path any real release uses.
     steps:
-      # Without this, a skipped leg's job still shows a plain green tick with zero executed
-      # steps - indistinguishable in the checks list from a leg that actually built and pushed.
-      # This step runs on exactly the opposite condition of every real step below, so exactly
-      # one of the two branches is ever visible per leg.
-      - name: Skipped (only_lakehouse dispatch mode)
-        if: matrix.optional == true && github.event.inputs.only_lakehouse == 'true'
-        run: echo "Skipped - manual only_lakehouse test run, this leg doesn't apply to this branch's Dockerfile. Unaffected on a real tag push."
-
       - uses: actions/checkout@v4
-        if: matrix.optional == false || github.event.inputs.only_lakehouse != 'true'
         with:
           fetch-depth: 0
 
       - name: Set up Docker Buildx
-        if: matrix.optional == false || github.event.inputs.only_lakehouse != 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to docker hub
-        if: matrix.optional == false || github.event.inputs.only_lakehouse != 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build ${{matrix.image}} image and push
-        if: matrix.optional == false || github.event.inputs.only_lakehouse != 'true'
         uses: docker/build-push-action@v5
         with:
           # Confirmed on a sibling branch: without this, build-push-action can resolve a

@@ -59,7 +59,10 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
   // Memory
   val hudiWriteTaskMemory: Int = config.getInt("hudi.write.task.max.memory")
   val hudiCompactionTaskMemory: Int = config.getInt("hudi.write.compaction.max.memory")
-  val hudiFsAtomicCreationSupport: String = config.getString("hudi.fs.atomic_creation.support")
+  // None of these 4 keys exist in hudi-writer.conf - mandatory config.getString(...) calls
+  // crashed HudiConnectorConfig's constructor immediately on startup with
+  // ConfigException.Missing, every single time, with the default shipped config.
+  val hudiFsAtomicCreationSupport: String = if (config.hasPath("hudi.fs.atomic_creation.support")) config.getString("hudi.fs.atomic_creation.support") else "true"
 
   // Metrics
 
@@ -67,9 +70,9 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
   val failedEventCountMetric = "failed-event-count"
 
   // Metrics Exporter
-  val metricsReportType: String =  config.getString("metrics.reporter.type")
-  val metricsReporterHost: String = config.getString("metrics.reporter.host")
-  val metricsReporterPort: String = config.getString("metrics.reporter.port")
+  val metricsReportType: String = if (config.hasPath("metrics.reporter.type")) config.getString("metrics.reporter.type") else "NONE"
+  val metricsReporterHost: String = if (config.hasPath("metrics.reporter.host")) config.getString("metrics.reporter.host") else "localhost"
+  val metricsReporterPort: String = if (config.hasPath("metrics.reporter.port")) config.getString("metrics.reporter.port") else "9091"
 
 
 }

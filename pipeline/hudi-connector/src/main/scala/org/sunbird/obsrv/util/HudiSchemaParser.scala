@@ -11,8 +11,8 @@ import org.sunbird.obsrv.core.model.Constants
 import org.sunbird.obsrv.core.util.JSONUtil
 import org.sunbird.obsrv.registry.DatasetRegistry
 import java.sql.Timestamp
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 
 
@@ -34,7 +34,9 @@ class HudiSchemaParser {
     .enable(Feature.WRITE_BIGDECIMAL_AS_PLAIN)
     .build()
 
-  val df = new SimpleDateFormat("yyyy-MM-dd")
+  // DateTimeFormatter over SimpleDateFormat: SimpleDateFormat isn't thread-safe, and this field
+  // is shared across every parseJson(...) call on this instance.
+  val df: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
   objectMapper.setSerializationInclusion(Include.NON_ABSENT)
 
   val hudiSchemaMap = new mutable.HashMap[String, HudiSchemaSpec]()
@@ -57,20 +59,24 @@ class HudiSchemaParser {
     val primaryKey = schema.schema.primaryKey
     val partitionColumn = schema.schema.partitionColumn
     val timeStampColumn = schema.schema.timestampColumn
-    val partitionField = schema.schema.columnSpec.filter(f => f.name.equalsIgnoreCase(schema.schema.partitionColumn)).head
+    val partitionField = schema.schema.columnSpec.find(f => f.name.equalsIgnoreCase(schema.schema.partitionColumn))
+      .getOrElse(throw new IllegalArgumentException(s"partitionColumn '${schema.schema.partitionColumn}' not found in columnSpec for dataset '${schema.dataset}'"))
     val rowTypeMap = mutable.SortedMap[String, LogicalType]()
     columnSpec.sortBy(_.name).map {
       spec =>
         val isNullable = if (spec.name.matches(s"$primaryKey|$partitionColumn|$timeStampColumn")) false else true
         val columnType = spec.`type` match {
-          case "string" => new VarCharType(isNullable, 20)
+          // Was VarCharType(isNullable, 20) - hard-capped every string column (email, URLs,
+          // arbitrary payload content, UUIDs) to 20 chars, silently truncating or failing schema
+          // conversion for anything longer.
+          case "string" => new VarCharType(isNullable, VarCharType.MAX_LENGTH)
           case "double" => new DoubleType(isNullable)
           case "long" => new BigIntType(isNullable)
           case "int" => new IntType(isNullable)
           case "boolean" => new BooleanType(true)
           case "map[string, string]" => new MapType(new VarCharType(), new VarCharType())
           case "epoch" => new BigIntType(isNullable)
-          case _ => new VarCharType(isNullable, 20)
+          case _ => new VarCharType(isNullable, VarCharType.MAX_LENGTH)
         }
         rowTypeMap.put(spec.name, columnType)
     }
@@ -88,7 +94,8 @@ class HudiSchemaParser {
     val flattenedEventData = mutable.Map[String, Any]()
     parserSpec.map { spec =>
       val columnSpec = spec.schema.columnSpec
-      val partitionField = spec.schema.columnSpec.filter(f => f.name.equalsIgnoreCase(spec.schema.partitionColumn)).head
+      val partitionField = spec.schema.columnSpec.find(f => f.name.equalsIgnoreCase(spec.schema.partitionColumn))
+        .getOrElse(throw new IllegalArgumentException(s"partitionColumn '${spec.schema.partitionColumn}' not found in columnSpec for dataset '$dataset'"))
       spec.inputFormat.flattenSpec.map {
         flattenSpec =>
           flattenSpec.fields.map {
@@ -97,7 +104,8 @@ class HudiSchemaParser {
               node.map {
                 nodeValue =>
                   try {
-                    val fieldDataType = columnSpec.filter(_.name.equalsIgnoreCase(field.name)).head.`type`
+                    val fieldDataType = columnSpec.find(_.name.equalsIgnoreCase(field.name))
+                      .getOrElse(throw new IllegalArgumentException(s"field '${field.name}' not found in columnSpec for dataset '$dataset'")).`type`
                     val fieldValue = fieldDataType match {
                       case "string" => objectMapper.treeToValue(nodeValue, classOf[String])
                       case "int" => objectMapper.treeToValue(nodeValue, classOf[Int])
@@ -108,10 +116,16 @@ class HudiSchemaParser {
                     }
                     if(field.name.equalsIgnoreCase(partitionField.name)){
                       if(fieldDataType.equalsIgnoreCase("timestamp")) {
-                        flattenedEventData.put(field.name + "_partition", df.format(objectMapper.treeToValue(nodeValue, classOf[Timestamp])))
+                        val ts = objectMapper.treeToValue(nodeValue, classOf[Timestamp])
+                        flattenedEventData.put(field.name + "_partition", ts.toLocalDateTime.format(df))
                       }
                       else if(fieldDataType.equalsIgnoreCase("epoch")) {
-                        flattenedEventData.put(field.name + "_partition", df.format(objectMapper.treeToValue(nodeValue, classOf[Long])))
+                        // Was df.format(Long) with a SimpleDateFormat - format(Object) expects a
+                        // Date, so passing a boxed Long here would have thrown
+                        // IllegalArgumentException at runtime, not silently misformatted.
+                        val epochMillis = objectMapper.treeToValue(nodeValue, classOf[Long])
+                        val localDateTime = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(epochMillis), java.time.ZoneId.systemDefault())
+                        flattenedEventData.put(field.name + "_partition", localDateTime.format(df))
                       }
                     }
                     flattenedEventData.put(field.name, fieldValue)
@@ -131,10 +145,15 @@ class HudiSchemaParser {
   }
 
   def retrieveFieldFromJson(jsonNode: JsonNode, field: JsonFieldParserSpec): Option[JsonNode] = {
-    if (field.`type`.equalsIgnoreCase("path")) {
-      field.expr.map{ f => jsonNode.at(s"/${f.split("\\.").tail.mkString("/")}") }
+    // jsonNode.at(...) returns MissingNode (a real, non-null JsonNode), not Java null, for a
+    // path that doesn't resolve - Option(missingNode) evaluated to Some(missingNode), so a
+    // genuinely-absent path-type field looked "found" here and blew up later in
+    // objectMapper.treeToValue(missingNode, ...), silently swallowed by the catch in parseJson.
+    val node = if (field.`type`.equalsIgnoreCase("path")) {
+      field.expr.map { f => jsonNode.at(s"/${f.split("\\.").tail.mkString("/")}") }.orNull
     } else {
-      Option(jsonNode.get(field.name))
+      jsonNode.get(field.name)
     }
+    if (node != null && !node.isMissingNode && !node.isNull) Some(node) else None
   }
 }

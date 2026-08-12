@@ -48,26 +48,39 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
   def process(env: StreamExecutionEnvironment): Unit = {
     val schemaParser = new HudiSchemaParser()
     val dataSourceConfig = DatasetRegistry.getAllDatasources().filter(f => f.`type`.nonEmpty && f.`type`.equalsIgnoreCase(Constants.DATALAKE_TYPE) && f.status.equalsIgnoreCase("Live"))
-    dataSourceConfig.map{ dataSource =>
-      val datasetId = dataSource.datasetId
-      val dataStream = getMapDataStream(env, config, List(datasetId), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
-        .map(new RowDataConverterFunction(config, datasetId))
-        .setParallelism(config.downstreamOperatorsParallelism)
+    // Was `dataSourceConfig.map{...}.orElse(List(addDefaultOperator(...)))` - List inherits
+    // PartialFunction[Int, A], so that .orElse built a combined partial function that was never
+    // actually applied (discarded, not the intended "run this only when dataSourceConfig is
+    // empty" branch). Worse: List(addDefaultOperator(...))'s argument is evaluated eagerly
+    // (Scala is call-by-value here, not by-name) to construct the list *before* .orElse even
+    // runs, so addDefaultOperator ran unconditionally every time regardless of dataSourceConfig -
+    // wiring up a second, unwanted Kafka source/sink alongside the real per-dataset pipelines
+    // whenever dataSourceConfig was non-empty. Explicit if/else makes addDefaultOperator run only
+    // when there's genuinely nothing else configured.
+    if (dataSourceConfig.nonEmpty) {
+      dataSourceConfig.foreach { dataSource =>
+        val datasetId = dataSource.datasetId
+        val dataStream = getMapDataStream(env, config, List(datasetId), config.kafkaConsumerProperties(), consumerSourceName = s"kafka-${datasetId}", kafkaConnector)
+          .map(new RowDataConverterFunction(config, datasetId))
+          .setParallelism(config.downstreamOperatorsParallelism)
 
-      val conf: Configuration = new Configuration()
-      setHudiBaseConfigurations(conf)
-      setDatasetConf(conf, datasetId, schemaParser)
-      logger.info("conf: " + conf.toMap.toString)
-      val rowType = schemaParser.rowTypeMap(datasetId)
+        val conf: Configuration = new Configuration()
+        setHudiBaseConfigurations(conf)
+        setDatasetConf(conf, datasetId, schemaParser)
+        logger.info("conf: " + conf.toMap.toString)
+        val rowType = schemaParser.rowTypeMap(datasetId)
 
-      val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)
-      val pipeline = Pipelines.hoodieStreamWrite(conf, rowType, hoodieRecordDataStream)
-      if (OptionsResolver.needsAsyncCompaction(conf)) {
-        Pipelines.compact(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
-      } else {
-        Pipelines.clean(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
+        val hoodieRecordDataStream = Pipelines.bootstrap(conf, rowType, dataStream)
+        val pipeline = Pipelines.hoodieStreamWrite(conf, rowType, hoodieRecordDataStream)
+        if (OptionsResolver.needsAsyncCompaction(conf)) {
+          Pipelines.compact(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
+        } else {
+          Pipelines.clean(conf, pipeline).setParallelism(config.downstreamOperatorsParallelism)
+        }
       }
-    }.orElse(List(addDefaultOperator(env, config, kafkaConnector)))
+    } else {
+      addDefaultOperator(env, config, kafkaConnector)
+    }
     env.execute("Flink-Hudi-Connector")
   }
 

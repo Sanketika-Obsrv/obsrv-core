@@ -289,11 +289,6 @@
       <version>3.2.17</version>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.sunbird.obsrv</groupId>
-      <artifactId>dataset-registry</artifactId>
-      <version>1.0.0</version>
-    </dependency>
 
   </dependencies>
 

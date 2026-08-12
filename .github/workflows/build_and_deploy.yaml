@@ -19,22 +19,38 @@ on:
 jobs:
   build-image:
     runs-on: ubuntu-latest
-    # All 3 legs are mandatory - unified-pipeline replaced the old per-module images
-    # (extractor/preprocessor/denormalizer/transformer/dataset-router) as the shipped topology,
-    # and this Dockerfile (matching main's) has never had stages for those 5 removed legs -
-    # kept in the matrix before, they always failed (harmlessly, via continue-on-error), which
-    # is dead weight rather than real signal. Dropped them instead of masking the always-fail
-    # with continue-on-error.
+    # optional legs (the individual pipeline modules) must not fail the workflow or block deploy;
+    # only unified-pipeline + lakehouse-connector + cache-indexer are mandatory (merged-pipeline
+    # is the shipped topology).
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
       fail-fast: false
       matrix:
         include:
+          - image: "extractor"
+            target: "extractor-image"
+            optional: true
+          - image: "preprocessor"
+            target: "preprocessor-image"
+            optional: true
+          - image: "denormalizer"
+            target: "denormalizer-image"
+            optional: true
+          - image: "transformer"
+            target: "transformer-image"
+            optional: true
+          - image: "dataset-router"
+            target: "dataset-router-image"
+            optional: true
           - image: "unified-pipeline"
             target: "unified-image"
+            optional: false
           - image: "lakehouse-connector"
             target: "lakehouse-connector-image"
+            optional: false
           - image: "cache-indexer"
             target: "cache-indexer-image"
+            optional: false
     steps:
       - uses: actions/checkout@v4
         with:

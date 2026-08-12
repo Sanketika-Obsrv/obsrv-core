@@ -283,10 +283,50 @@
       <version>${flink.version}</version>
       <scope>provided</scope>
     </dependency>
+    <!-- 3.0.6, not 3.2.17: matches what every other module in the reactor resolves to (nearest
+         wins), and what BaseSpecWithPostgres/BaseSpecWithDatasetRegistry (framework/dataset-
+         registry test-jars, needed below) were compiled against - 3.2.x renamed/removed the
+         classic org.scalatest.FlatSpec/Matchers API those depend on. This module had no tests
+         before, so the mismatch never surfaced until now. -->
     <dependency>
       <groupId>org.scalatest</groupId>
       <artifactId>scalatest_2.12</artifactId>
-      <version>3.2.17</version>
+      <version>3.0.6</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- scope=test dependencies never propagate transitively, even via test-jar - framework's
+         own embedded-postgres/embedded-redis (used by BaseSpecWithPostgres) need redeclaring
+         here too, same pattern already used by cache-indexer/denormalizer. -->
+    <dependency>
+      <groupId>org.sunbird.obsrv</groupId>
+      <artifactId>framework</artifactId>
+      <version>1.0.0</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.sunbird.obsrv</groupId>
+      <artifactId>dataset-registry</artifactId>
+      <version>1.0.0</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.zonky.test</groupId>
+      <artifactId>embedded-postgres</artifactId>
+      <version>2.0.3</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-compress</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.github.codemonstur</groupId>
+      <artifactId>embedded-redis</artifactId>
+      <version>1.0.0</version>
       <scope>test</scope>
     </dependency>
 

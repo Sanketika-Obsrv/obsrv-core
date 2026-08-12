@@ -75,13 +75,21 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
     insertDataset(postgresConnect, "ds_bad_partition")
     insertDatasource(postgresConnect, "ds_bad_partition",
       """{"dataset":"ds_bad_partition","schema":{"table":"t","partitionColumn":"does_not_exist","timestampColumn":"id","primaryKey":"id","columnSpec":[{"name":"id","type":"string"}]},"inputFormat":{"type":"json","flattenSpec":{"fields":[{"type":"field","name":"id"}]}}}""")
-    postgresConnect.closeConnection()
 
-    val ex = intercept[IllegalArgumentException] {
-      new HudiSchemaParser()
+    try {
+      val ex = intercept[IllegalArgumentException] {
+        new HudiSchemaParser()
+      }
+      ex.getMessage should include("does_not_exist")
+      ex.getMessage should include("ds_bad_partition")
+    } finally {
+      // getAllDatasources() returns every live datalake datasource - leaving this row in place
+      // would make every later test's own `new HudiSchemaParser()` call throw on THIS entry too,
+      // since readSchema()'s .map is eager/strict and aborts the whole load on the first bad one.
+      postgresConnect.execute("delete from datasources where id = 'ds_bad_partition';")
+      postgresConnect.execute("delete from datasets where id = 'ds_bad_partition';")
+      postgresConnect.closeConnection()
     }
-    ex.getMessage should include("does_not_exist")
-    ex.getMessage should include("ds_bad_partition")
   }
 
   "retrieveFieldFromJson" should "return None for a direct field that's genuinely absent" in {

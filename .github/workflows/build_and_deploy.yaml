@@ -10,11 +10,6 @@ on:
         type: boolean
         required: true
         default: false
-      image_tag:
-        description: "Override the pushed Docker tag. Empty = use branch name. No effect on a tag push."
-        type: string
-        required: false
-        default: ""
 
 jobs:
   build-image:
@@ -75,10 +70,7 @@ jobs:
           platforms: linux/amd64
           target: ${{matrix.target}}
           push: true
-          # github.event.inputs is empty on a real tag push, so this always falls through to
-          # github.ref_name (the pushed tag) there, unaffected. image_tag only takes effect on
-          # a manual workflow_dispatch run where it's explicitly set.
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.event.inputs.image_tag != '' && github.event.inputs.image_tag || github.ref_name }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}
 
 
   aws-deploy:
@@ -123,7 +115,7 @@ jobs:
           cd deploy/terraform/aws
           terragrunt init
           terragrunt apply -auto-approve -var unified_pipeline_enabled={{ vars.MERGED_PIPELINE || 'true' }} --replace='module.flink.helm_release.flink' \
-          -var flink_image_tag=${{ github.event.inputs.image_tag != '' && github.event.inputs.image_tag || github.ref_name }}
+          -var flink_image_tag=${{ github.ref_name }}
 
   azure-deploy:
     needs: build-image
@@ -148,4 +140,4 @@ jobs:
           terragrunt init
           terragrunt apply -auto-approve -replace=module.flink.helm_release.flink \
           -var flink_container_registry=${{ secrets.DOCKERHUB_USERNAME }} \
-          -var flink_image_tag=${{ github.event.inputs.image_tag != '' && github.event.inputs.image_tag || github.ref_name }}
+          -var flink_image_tag=${{ github.ref_name }}

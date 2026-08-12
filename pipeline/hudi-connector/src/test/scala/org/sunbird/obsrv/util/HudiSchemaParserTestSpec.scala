@@ -107,14 +107,17 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
   it should "return None for a path that doesn't resolve, instead of Some(MissingNode)" in {
     // jsonNode.at(...) returns MissingNode (not Java null) for an unresolved pointer - before
     // the fix, Option(missingNode) evaluated to Some(missingNode), so this looked "found".
+    // retrieveFieldFromJson drops expr's first segment and resolves the rest from jsonNode's
+    // own root (field.expr.split(".").tail), so "root.value" looks up top-level "/value" -
+    // "root" here is just a placeholder first segment, not an actual nesting level.
     val parser = new HudiSchemaParser()
-    val node = jackson.readTree("""{"root":{"other":"x"}}""")
+    val node = jackson.readTree("""{"other":"x"}""")
     parser.retrieveFieldFromJson(node, JsonFieldParserSpec("path", "unused", Some("root.value"))) should be(None)
   }
 
   it should "return Some for a path that does resolve" in {
     val parser = new HudiSchemaParser()
-    val node = jackson.readTree("""{"root":{"value":"present"}}""")
+    val node = jackson.readTree("""{"value":"present"}""")
     val result = parser.retrieveFieldFromJson(node, JsonFieldParserSpec("path", "unused", Some("root.value")))
     result should not be None
     result.get.asText() should be("present")
@@ -122,18 +125,20 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
 
   "parseJson" should "compute the epoch partition date in UTC, not the JVM default zone" in {
     val parser = new HudiSchemaParser()
-    // 2023-11-14T02:00:00Z - deliberately near a day boundary so a systemDefault()-based bug
-    // (America/Los_Angeles, UTC-8 in November) would compute 2023-11-13 instead of 2023-11-14.
+    // 1700013600000 = 2023-11-15T02:00:00Z (verified via python3 datetime.fromtimestamp, not
+    // hand arithmetic) - deliberately near a day boundary so a systemDefault()-based bug
+    // (America/Los_Angeles, UTC-8 in November: 2023-11-15T02:00Z -> 2023-11-14T18:00 PST) would
+    // compute 2023-11-14 instead of the correct UTC 2023-11-15.
     val event = """{"id":"rec1","event_ts":1700013600000,"payload":"hello"}"""
     val result = parser.parseJson("ds_ok", event)
-    result("event_ts_partition") should be("2023-11-14")
+    result("event_ts_partition") should be("2023-11-15")
   }
 
   it should "compute the timestamp partition date in UTC, not the JVM default zone" in {
     val parser = new HudiSchemaParser()
     val event = """{"id":"rec1","when_col":1700013600000}"""
     val result = parser.parseJson("ds_ts_partition", event)
-    result("when_col_partition") should be("2023-11-14")
+    result("when_col_partition") should be("2023-11-15")
   }
 
 }

@@ -32,6 +32,13 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
     insertDataset(postgresConnect, "ds_ts_partition")
     insertDatasource(postgresConnect, "ds_ts_partition",
       """{"dataset":"ds_ts_partition","schema":{"table":"ds_ts_partition_table","partitionColumn":"when_col","timestampColumn":"when_col","primaryKey":"id","columnSpec":[{"name":"id","type":"string"},{"name":"when_col","type":"timestamp"}]},"inputFormat":{"type":"json","flattenSpec":{"fields":[{"type":"field","name":"id"},{"type":"field","name":"when_col"}]}}}""")
+    insertDataset(postgresConnect, "financial_transactions")
+    // Exact content of src/main/resources/schemas/schema.json, the connector's own real shipped
+    // example - end-to-end proof that none of this round's changes broke the actual production
+    // shape: "root" (non-"path") field types, "$."-prefixed nested paths, a string (not
+    // timestamp/epoch) partitionColumn.
+    insertDatasource(postgresConnect, "financial_transactions",
+      """{"dataset": "financial_transactions", "schema": {"table": "financial_transactions", "partitionColumn": "receiver_ifsc_code", "timestampColumn": "txn_date", "primaryKey": "txn_id", "columnSpec": [{"name": "receiver_account_number", "type": "string"}, {"name": "receiver_ifsc_code", "type": "string"}, {"name": "sender_account_number", "type": "string"}, {"name": "sender_contact_email", "type": "string"}, {"name": "sender_ifsc_code", "type": "string"}, {"name": "currency", "type": "string"}, {"name": "txn_amount", "type": "int"}, {"name": "txn_date", "type": "string"}, {"name": "txn_id", "type": "string"}, {"name": "txn_status", "type": "string"}, {"name": "txn_type", "type": "string"}]}, "inputFormat": {"type": "json", "flattenSpec": {"fields": [{"type": "root", "name": "receiver_account_number"}, {"type": "path", "name": "sender_account_number", "expr": "$.sender.account_number"}, {"type": "path", "name": "sender_ifsc_code", "expr": "$.sender.ifsc_code"}, {"type": "root", "name": "receiver_ifsc_code"}, {"type": "root", "name": "sender_contact_email"}, {"type": "root", "name": "currency"}, {"type": "root", "name": "txn_amount"}, {"type": "root", "name": "txn_date"}, {"type": "root", "name": "txn_id"}, {"type": "root", "name": "txn_status"}, {"type": "root", "name": "txn_type"}]}}}""")
     postgresConnect.closeConnection()
 
     // Different from UTC in both hemispheres/offset directions, so a test asserting UTC-based
@@ -193,6 +200,47 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
     val event = """{"id":"rec1","when_col":"2023-11-15 02:00:00"}"""
     val result = parser.parseJson("ds_ts_partition", event)
     result("when_col_partition") should be("2023-11-15")
+  }
+
+  "the connector's own real shipped example (schemas/schema.json)" should "still create the expected RowType" in {
+    val parser = new HudiSchemaParser()
+    val rowType = parser.rowTypeMap("financial_transactions")
+    // partitionColumn (receiver_ifsc_code) is type "string", not timestamp/epoch - no derived
+    // "_partition" column should be added, unlike the ds_ok/ds_ts_partition datasets above.
+    rowType.getFieldNames.contains("receiver_ifsc_code_partition") should be(false)
+    rowType.getFieldNames.size should be(11)
+    val amountType = rowType.getFields.get(rowType.getFieldNames.indexOf("txn_amount")).getType
+    amountType.asInstanceOf[org.apache.flink.table.types.logical.IntType].isNullable should be(true)
+    val txnIdType = rowType.getFields.get(rowType.getFieldNames.indexOf("txn_id")).getType
+    txnIdType.asInstanceOf[VarCharType].isNullable should be(false) // primaryKey
+  }
+
+  it should "parse a realistic event end to end - both \"root\" and \"$.\"-nested \"path\" fields" in {
+    val parser = new HudiSchemaParser()
+    val event =
+      """{
+        |  "receiver_account_number": "ACC001",
+        |  "receiver_ifsc_code": "HDFC0001",
+        |  "sender": {"account_number": "ACC999", "ifsc_code": "ICIC0002"},
+        |  "sender_contact_email": "sender@example.com",
+        |  "currency": "INR",
+        |  "txn_amount": 5000,
+        |  "txn_date": "2023-11-15",
+        |  "txn_id": "TXN123",
+        |  "txn_status": "SUCCESS",
+        |  "txn_type": "TRANSFER"
+        |}""".stripMargin
+    val result = parser.parseJson("financial_transactions", event)
+    // "root" type fields (direct top-level lookup)
+    result("receiver_account_number") should be("ACC001")
+    result("receiver_ifsc_code") should be("HDFC0001")
+    result("txn_amount") should be(5000)
+    result("txn_id") should be("TXN123")
+    // "path" type fields with a "$."-prefixed expr, nested under "sender"
+    result("sender_account_number") should be("ACC999")
+    result("sender_ifsc_code") should be("ICIC0002")
+    // string partitionColumn - no derived "_partition" key
+    result.contains("receiver_ifsc_code_partition") should be(false)
   }
 
 }

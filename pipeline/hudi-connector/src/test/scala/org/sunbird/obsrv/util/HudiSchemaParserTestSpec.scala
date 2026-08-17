@@ -9,7 +9,7 @@ import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 import java.util.TimeZone
 
 /**
- * Regression coverage for the bugs found in PR #131's review (manju + CodeRabbit):
+ * Regression coverage for HudiSchemaParser:
  *  - VarCharType(isNullable, 20) truncating string columns -> VarCharType.MAX_LENGTH
  *  - unguarded .head on filtered collections for a missing partitionColumn -> clear
  *    IllegalArgumentException instead of a bare NoSuchElementException

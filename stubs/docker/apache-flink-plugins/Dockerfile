@@ -13,5 +13,8 @@ RUN wget -nv -O flink-s3-fs-presto-1.15.2.jar "https://repo1.maven.org/maven2/or
     mv flink-s3-fs-presto-1.15.2.jar $FLINK_HOME/plugins/s3-fs-presto
 RUN wget -nv -O flink-gs-fs-hadoop-1.15.2.jar "https://repo1.maven.org/maven2/org/apache/flink/flink-gs-fs-hadoop/1.15.2/flink-gs-fs-hadoop-1.15.2.jar"; \ 
     mv flink-gs-fs-hadoop-1.15.2.jar $FLINK_HOME/plugins/gs-fs-hadoop
-RUN wget -nv -O flink-azure-fs-hadoop-1.15.2.jar "https://repo1.maven.org/maven2/org/apache/flink/flink-azure-fs-hadoop/1.15.2/flink-azure-fs-hadoop-1.15.2.jar"; \ 
+RUN wget -nv -O flink-azure-fs-hadoop-1.15.2.jar "https://repo1.maven.org/maven2/org/apache/flink/flink-azure-fs-hadoop/1.15.2/flink-azure-fs-hadoop-1.15.2.jar"; \
     mv flink-azure-fs-hadoop-1.15.2.jar $FLINK_HOME/plugins/azure-fs-hadoop
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"

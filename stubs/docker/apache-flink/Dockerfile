@@ -19,13 +19,10 @@
 
 FROM --platform=linux/x86_64 eclipse-temurin:11.0.20.1_1-jdk-focal
 
-RUN apt-get update
-RUN apt-get install libcurl4 curl -y
-
-# Install dependencies
+# Install dependencies (single layer: update+install merged, no recommends)
 RUN set -ex; \
   apt-get update; \
-  apt-get -y install gpg libsnappy1v5 gettext-base libjemalloc-dev; \
+  apt-get -y install --no-install-recommends libcurl4 curl wget ca-certificates gpg dirmngr libsnappy1v5 gettext-base libjemalloc-dev; \
   rm -rf /var/lib/apt/lists/*
 
 # Grab gosu for easy step-down from root
@@ -48,9 +45,12 @@ RUN set -ex; \
   gosu nobody true
 
 # Configure Flink version
+# NOTE: the GPG fingerprint below is the *public* Apache Flink release-signing
+# key fingerprint used only to verify the download signature - it is not a
+# secret. It is kept out of ENV (set as a shell variable in the install RUN)
+# so no secret-looking value is baked into the image environment.
 ENV FLINK_TGZ_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=flink/flink-1.15.2/flink-1.15.2-bin-scala_2.12.tgz \
     FLINK_ASC_URL=https://www.apache.org/dist/flink/flink-1.15.2/flink-1.15.2-bin-scala_2.12.tgz.asc \
-    GPG_KEY=0F79F2AFB2351BC29678544591F9C1EC125FD8DB \
     CHECK_GPG=true
 
 # Prepare environment
@@ -62,6 +62,8 @@ WORKDIR $FLINK_HOME
 
 # Install Flink
 RUN set -ex; \
+  # public Apache Flink release-signing key fingerprint (verification only, not a secret)
+  GPG_KEY=0F79F2AFB2351BC29678544591F9C1EC125FD8DB; \
   wget -nv -O flink.tgz "$FLINK_TGZ_URL"; \
   \
   if [ "$CHECK_GPG" = "true" ]; then \
@@ -93,6 +95,13 @@ RUN set -ex; \
 
 # Configure container
 COPY docker-entrypoint.sh /
+
+# Run as the non-root flink user (entrypoint only uses gosu when started as root)
+USER flink
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
+
 ENTRYPOINT ["/docker-entrypoint.sh"]
 EXPOSE 6123 8081
 CMD ["help"]

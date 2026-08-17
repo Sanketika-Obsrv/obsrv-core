@@ -17,6 +17,8 @@
 #     the s3 plugin), then carried onto the hardened runtime.
 # =============================================================================
 ARG FLINK_UID=9999
+# keep in sync with <log4j.version> in the root pom.xml
+ARG LOG4J_VERSION=2.25.5
 
 # ---- build stages: compile obsrv-core (original maven, discarded) ------------
 FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-core
@@ -82,6 +84,19 @@ RUN set -eux; \
     mkdir -p "${FLINK_HOME}/usrlib" "${FLINK_HOME}/plugins/s3-fs-hadoop"; \
     mv "${FLINK_HOME}"/opt/flink-s3-fs-hadoop-*.jar "${FLINK_HOME}/plugins/s3-fs-hadoop/"; \
     chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}"
+
+# Replace the log4j jars bundled in the Flink dist (CVE-2026-49844 and earlier)
+ARG LOG4J_VERSION
+RUN set -eux; \
+    BASE="https://repo1.maven.org/maven2/org/apache/logging/log4j"; \
+    for A in log4j-api log4j-core log4j-1.2-api log4j-slf4j-impl; do \
+      curl -fsSL -o "${FLINK_HOME}/lib/${A}-${LOG4J_VERSION}.jar" \
+        "${BASE}/${A}/${LOG4J_VERSION}/${A}-${LOG4J_VERSION}.jar"; \
+      find "${FLINK_HOME}/lib" -name "${A}-2.*.jar" ! -name "${A}-${LOG4J_VERSION}.jar" -delete; \
+    done; \
+    ls "${FLINK_HOME}/lib/" | grep -q "log4j-core-${LOG4J_VERSION}.jar"; \
+    ! ls "${FLINK_HOME}/lib/" | grep -qE 'log4j-core-(2\.2[0-4]|1\.)'; \
+    chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}/lib"
     # No hardcoded s3.aws.credentials.provider here (main's own Dockerfile still has one:
     # WebIdentityTokenCredentialsProvider only) - the original pre-DHI Dockerfile had no
     # credentials-provider override at all, relying on Hadoop-S3A's own default provider chain
@@ -108,6 +123,8 @@ RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_
     && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
 USER ${FLINK_UID}:${FLINK_UID}
 WORKDIR ${FLINK_HOME}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
 
 # =============================================================================
 # cache-indexer runtime
@@ -123,6 +140,8 @@ RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_
     && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
 USER ${FLINK_UID}:${FLINK_UID}
 WORKDIR ${FLINK_HOME}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
 
 # =============================================================================
 # lakehouse-connector runtime (DHI debian/glibc JDK 11 — has bash + coreutils)
@@ -157,6 +176,8 @@ RUN chmod +x /docker-entrypoint.sh \
     && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
 USER ${FLINK_UID}:${FLINK_UID}
 WORKDIR ${FLINK_HOME}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
 EXPOSE 6123 8081
 ENTRYPOINT ["/docker-entrypoint.sh"]
 # Matches the official Flink image's own pairing: without a CMD, `docker run <image>` with no

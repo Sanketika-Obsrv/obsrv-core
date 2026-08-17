@@ -64,7 +64,12 @@ class BaseSpecWithDatasetRegistry extends BaseSpecWithPostgres {
   }
 
   def getMetrics(metricsReporter: InMemoryReporter, dataset: String, debug: Option[Boolean] = None): Map[String, Long] = {
+    // findGroups matches the dataset as a SUBSTRING of the full group identifier, which includes
+    // random hex ids (job/task/attempt) — short dataset ids like "d3" are valid hex and can match
+    // foreign groups, silently inflating counts. Keep only groups where the dataset is an exact
+    // scope component (BaseProcessFunction registers metrics under addGroup(jobName).addGroup(dataset)).
     val groups = metricsReporter.findGroups(dataset).asScala
+      .filter(group => group.getScopeComponents.contains(dataset))
     groups.map(group => metricsReporter.getMetricsByGroup(group).asScala)
       .map(group => group.map { case (k, v) =>
         val value = if(v.isInstanceOf[ScalaGauge[Long]]) v.asInstanceOf[ScalaGauge[Long]].getValue() else 0

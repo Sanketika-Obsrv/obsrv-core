@@ -17,9 +17,9 @@
         <spark.version>3.1.0</spark.version>
         <scoverage.plugin.version>1.4.0</scoverage.plugin.version>
         <java.target.runtime>11</java.target.runtime>
-        <log4j.version>2.14.1</log4j.version>
+        <log4j.version>2.25.5</log4j.version>
         <!-- <jackson-bom.version>2.13.4.20221013</jackson-bom.version> -->
-        <jackson-bom.version>2.17.2</jackson-bom.version>
+        <jackson-bom.version>2.18.9</jackson-bom.version>
     </properties>
 
     <dependencyManagement>
@@ -30,6 +30,20 @@
                 <version>${jackson-bom.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- Pin transitive Netty (from Spark/ZooKeeper) to a version with all known CVEs fixed -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.136.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Fix CVE-2025-48924: pin transitive commons-lang3 (from Spark/Hadoop) -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.18.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -53,6 +67,15 @@
                     <groupId>org.apache.zookeeper</groupId>
                     <artifactId>zookeeper</artifactId>
                 </exclusion>
+                <!-- Exclude EOL log4j 1.x (CVE-2019-17571, CVE-2022-23305/23307, no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -65,6 +88,17 @@
             <artifactId>spark-sql_${scala.maj.version}</artifactId>
             <version>${spark.version}</version>
             <scope>provided</scope>
+            <exclusions>
+                <!-- Exclude EOL log4j 1.x (no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.scala-lang</groupId>
@@ -79,7 +113,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
-            <version>1.6</version>
+            <version>1.10.0</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -185,6 +219,17 @@
             <artifactId>hadoop-client</artifactId>
             <version>2.7.3</version>
             <scope>provided</scope>
+            <exclusions>
+                <!-- Exclude EOL log4j 1.x (no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -200,6 +245,15 @@
                     <groupId>org.apache.zookeeper</groupId>
                     <artifactId>zookeeper</artifactId>
                 </exclusion>
+                <!-- Exclude EOL log4j 1.x (no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -207,6 +261,17 @@
             <artifactId>hadoop-aws</artifactId>
             <version>2.7.3</version>
             <scope>provided</scope>
+            <exclusions>
+                <!-- Exclude EOL log4j 1.x (no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -236,6 +301,13 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <!-- log4j 1.x API bridge backed by log4j2: replaces excluded EOL log4j:log4j 1.2.17
+             (Spark 3.1 still needs org.apache.log4j.* classes at runtime) -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-1.2-api</artifactId>
             <version>${log4j.version}</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.mockito/mockito-scala-scalatest -->
@@ -325,6 +397,17 @@
             <artifactId>embedded-kafka_2.12</artifactId>
             <version>${kafka.version}</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.zookeeper</groupId>
+                    <artifactId>zookeeper</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.zookeeper</groupId>
+            <artifactId>zookeeper</artifactId>
+            <version>3.9.5</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>

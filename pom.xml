@@ -29,11 +29,11 @@
 		<scala.version>2.12.18</scala.version>
 		<flink.version>1.20.0</flink.version>
 		<flink.maj.version>1.20</flink.maj.version>
-		<kafka.version>3.9.1</kafka.version>
+		<kafka.version>3.9.2</kafka.version>
 		<java.target.runtime>11</java.target.runtime>
 		<jackson-jaxrs.version>1.9.13</jackson-jaxrs.version>
 		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
-		<log4j.version>2.25.3</log4j.version>
+		<log4j.version>2.25.5</log4j.version>
 	</properties>
 
 	<repositories>
@@ -54,11 +54,32 @@
 
 	<dependencyManagement>
 		<dependencies>
+			<!-- Fix GHSA-r7wm-3cxj-wff9, CVE-2026-54512/54513 (HIGH), CVE-2026-54515/59889 + GHSA-mhm7-754m-9p8w (MEDIUM):
+			     jackson async-parser bypass / polymorphic deser RCE / ignored-property manipulation -->
+			<dependency>
+				<groupId>com.fasterxml.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
+				<version>2.18.9</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<!-- Fix CVE-2025-48924 (MEDIUM): commons-lang3 uncontrolled recursion in ClassUtils.getClass -->
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-lang3</artifactId>
+				<version>3.18.0</version>
+			</dependency>
+			<!-- Fix CVE-2026-59949 (MEDIUM): lz4-java native XXHash JVM crash -->
+			<dependency>
+				<groupId>at.yawk.lz4</groupId>
+				<artifactId>lz4-java</artifactId>
+				<version>1.11.1</version>
+			</dependency>
 			<!-- Fix BDSA-2025-5099 (HIGH): PostgreSQL JDBC channel-binding bypass -->
 			<dependency>
 				<groupId>org.postgresql</groupId>
 				<artifactId>postgresql</artifactId>
-				<version>42.7.7</version>
+				<version>42.7.12</version>
 			</dependency>
 			<!-- Fix BDSA-2025-20661 (MEDIUM): SMTP injection in Jakarta Mail / mailapi -->
 			<dependency>
@@ -82,12 +103,12 @@
 			<dependency>
 				<groupId>org.apache.zookeeper</groupId>
 				<artifactId>zookeeper</artifactId>
-				<version>3.9.3</version>
+				<version>3.9.5</version>
 			</dependency>
 			<dependency>
 				<groupId>org.apache.zookeeper</groupId>
 				<artifactId>zookeeper-jute</artifactId>
-				<version>3.9.3</version>
+				<version>3.9.5</version>
 			</dependency>
 			<!-- Fix CVE-2023-6378 (MEDIUM): Logback serialization vulnerability -->
 			<dependency>

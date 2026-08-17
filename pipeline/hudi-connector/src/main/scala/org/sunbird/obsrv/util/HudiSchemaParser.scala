@@ -64,7 +64,13 @@ class HudiSchemaParser {
     val rowTypeMap = mutable.SortedMap[String, LogicalType]()
     columnSpec.sortBy(_.name).map {
       spec =>
-        val isNullable = if (spec.name.matches(s"$primaryKey|$partitionColumn|$timeStampColumn")) false else true
+        // Was spec.name.matches(s"$primaryKey|$partitionColumn|$timeStampColumn") - primaryKey/
+        // partitionColumn/timeStampColumn get interpolated straight into a regex, unescaped, so
+        // a column name containing regex metacharacters (e.g. a dataset field literally named
+        // "a.b" - "." meaning "any character") could false-match unrelated names. Explicit Set
+        // containment sidesteps regex entirely.
+        val nonNullableFields = Set(primaryKey, partitionColumn, timeStampColumn).filter(_.nonEmpty)
+        val isNullable = !nonNullableFields.contains(spec.name)
         val columnType = spec.`type` match {
           // Was VarCharType(isNullable, 20) - hard-capped every string column (email, URLs,
           // arbitrary payload content, UUIDs) to 20 chars, silently truncating or failing schema
@@ -116,12 +122,25 @@ class HudiSchemaParser {
                     }
                     if(field.name.equalsIgnoreCase(partitionField.name)){
                       if(fieldDataType.equalsIgnoreCase("timestamp")) {
-                        // Was ts.toLocalDateTime (JVM default zone) - different TaskManagers can
-                        // have different default zones, placing the same instant into different
-                        // yyyy-MM-dd Hudi partitions depending on which TM processed it. Fixed
-                        // zone (UTC) makes this deterministic regardless of host.
-                        val ts = objectMapper.treeToValue(nodeValue, classOf[Timestamp])
-                        val localDateTime = LocalDateTime.ofInstant(ts.toInstant, ZoneOffset.UTC)
+                        // Was objectMapper.treeToValue(nodeValue, classOf[Timestamp]) - Jackson's
+                        // default Timestamp string deserializer expects SQL format
+                        // ("yyyy-MM-dd HH:mm:ss[.fffffffff]"), not ISO-8601 - real timestamp data
+                        // shaped like "2023-11-15T02:00:00Z" threw IllegalArgumentException here,
+                        // which aborted this whole try block, skipping the "_partition" put below
+                        // (though not the fieldValue one, already computed above) - since
+                        // "_partition" is declared non-nullable in the schema (createRowType), the
+                        // missing key later NPE'd in JsonToRowDataConverter and crashed the
+                        // TaskManager. Also (unrelated to Jackson's format) ts.toLocalDateTime used
+                        // the JVM's default zone - different TaskManagers can have different
+                        // default zones, placing the same instant in different Hudi partitions
+                        // depending on which TM processed it. Handles both representations
+                        // (ISO-8601 string or epoch-millis number) and always resolves to UTC.
+                        val localDateTime = if (nodeValue.isTextual) {
+                          LocalDateTime.ofInstant(Instant.parse(nodeValue.asText()), ZoneOffset.UTC)
+                        } else {
+                          val ts = objectMapper.treeToValue(nodeValue, classOf[Timestamp])
+                          LocalDateTime.ofInstant(ts.toInstant, ZoneOffset.UTC)
+                        }
                         flattenedEventData.put(field.name + "_partition", localDateTime.format(df))
                       }
                       else if(fieldDataType.equalsIgnoreCase("epoch")) {
@@ -154,8 +173,21 @@ class HudiSchemaParser {
     // path that doesn't resolve - Option(missingNode) evaluated to Some(missingNode), so a
     // genuinely-absent path-type field looked "found" here and blew up later in
     // objectMapper.treeToValue(missingNode, ...), silently swallowed by the catch in parseJson.
+    // Was `f.split("\\.").tail.mkString("/")` - unconditionally dropped the FIRST dotted
+    // segment. That's correct for the "$.foo.bar" JSONPath-style convention this connector's
+    // own shipped example (schemas/schema.json) actually uses ("$" is a root indicator meant to
+    // be dropped, "$.sender.account_number" -> "/sender/account_number", verified correct), but
+    // wrong for any expr that doesn't start with that "$." prefix: "actor.id" would drop "actor"
+    // and look up top-level "/id" instead of nested "/actor/id", and a single-segment expr with
+    // no dot at all (e.g. "id") would drop its only segment and look up "/" instead of "/id".
+    // Only strip a leading "$" segment specifically (the documented convention), otherwise use
+    // every segment - handles both the "$."-prefixed convention and a bare dotted/single path.
     val node = if (field.`type`.equalsIgnoreCase("path")) {
-      field.expr.map { f => jsonNode.at(s"/${f.split("\\.").tail.mkString("/")}") }.orNull
+      field.expr.map { f =>
+        val segments = f.split("\\.")
+        val pathSegments = if (segments.nonEmpty && segments.head == "$") segments.tail else segments
+        jsonNode.at("/" + pathSegments.mkString("/"))
+      }.orNull
     } else {
       jsonNode.get(field.name)
     }

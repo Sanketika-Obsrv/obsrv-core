@@ -104,23 +104,44 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
     parser.retrieveFieldFromJson(node, JsonFieldParserSpec("field", "id")) should not be None
   }
 
-  it should "return None for a path that doesn't resolve, instead of Some(MissingNode)" in {
+  it should "return None for a \"$.\" path that doesn't resolve, instead of Some(MissingNode)" in {
     // jsonNode.at(...) returns MissingNode (not Java null) for an unresolved pointer - before
     // the fix, Option(missingNode) evaluated to Some(missingNode), so this looked "found".
-    // retrieveFieldFromJson drops expr's first segment and resolves the rest from jsonNode's
-    // own root (field.expr.split(".").tail), so "root.value" looks up top-level "/value" -
-    // "root" here is just a placeholder first segment, not an actual nesting level.
+    // "$." is the real convention this connector's own shipped example uses
+    // (schemas/schema.json: "$.sender.account_number") - "$" is a root indicator, stripped;
+    // the rest is a real nesting path.
     val parser = new HudiSchemaParser()
-    val node = jackson.readTree("""{"other":"x"}""")
-    parser.retrieveFieldFromJson(node, JsonFieldParserSpec("path", "unused", Some("root.value"))) should be(None)
+    val node = jackson.readTree("""{"sender":{"other":"x"}}""")
+    parser.retrieveFieldFromJson(node, JsonFieldParserSpec("path", "unused", Some("$.sender.account_number"))) should be(None)
   }
 
-  it should "return Some for a path that does resolve" in {
+  it should "return Some for a \"$.\" path that does resolve (matches schemas/schema.json's own convention)" in {
     val parser = new HudiSchemaParser()
-    val node = jackson.readTree("""{"value":"present"}""")
-    val result = parser.retrieveFieldFromJson(node, JsonFieldParserSpec("path", "unused", Some("root.value")))
+    val node = jackson.readTree("""{"sender":{"account_number":"12345"}}""")
+    val result = parser.retrieveFieldFromJson(node, JsonFieldParserSpec("path", "unused", Some("$.sender.account_number")))
     result should not be None
-    result.get.asText() should be("present")
+    result.get.asText() should be("12345")
+  }
+
+  it should "resolve a bare dotted path (no \"$.\" prefix) using every segment, not dropping the first" in {
+    // Regression for a real bug: the old code unconditionally dropped expr's first segment
+    // regardless of whether it started with "$" - "actor.id" would drop "actor" and look up
+    // top-level "/id" instead of the actually-nested "/actor/id".
+    val parser = new HudiSchemaParser()
+    val node = jackson.readTree("""{"actor":{"id":"u1"}, "id":"wrong-if-first-segment-dropped"}""")
+    val result = parser.retrieveFieldFromJson(node, JsonFieldParserSpec("path", "unused", Some("actor.id")))
+    result should not be None
+    result.get.asText() should be("u1")
+  }
+
+  it should "resolve a single-segment bare path (no dot at all)" in {
+    // Regression: the old code's .tail on a 1-element split() returned an empty array,
+    // building pointer "/" (looks up a literal empty-string key at root) instead of "/id".
+    val parser = new HudiSchemaParser()
+    val node = jackson.readTree("""{"id":"rec1"}""")
+    val result = parser.retrieveFieldFromJson(node, JsonFieldParserSpec("path", "unused", Some("id")))
+    result should not be None
+    result.get.asText() should be("rec1")
   }
 
   "parseJson" should "compute the epoch partition date in UTC, not the JVM default zone" in {
@@ -134,11 +155,24 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
     result("event_ts_partition") should be("2023-11-15")
   }
 
-  it should "compute the timestamp partition date in UTC, not the JVM default zone" in {
+  it should "compute the timestamp partition date in UTC for a numeric (epoch-millis) timestamp value" in {
     val parser = new HudiSchemaParser()
     val event = """{"id":"rec1","when_col":1700013600000}"""
     val result = parser.parseJson("ds_ts_partition", event)
     result("when_col_partition") should be("2023-11-15")
+  }
+
+  it should "parse an ISO-8601 string timestamp value without crashing (regression: this used to throw)" in {
+    // Real timestamp data is far more likely to be shaped like this than a raw epoch-millis
+    // number - Jackson's default Timestamp string deserializer expects SQL format
+    // ("yyyy-MM-dd HH:mm:ss[.fffffffff]"), not ISO-8601, and used to throw
+    // IllegalArgumentException here, silently dropping the non-nullable "_partition" key and
+    // crashing later downstream in JsonToRowDataConverter with a NullPointerException.
+    val parser = new HudiSchemaParser()
+    val event = """{"id":"rec1","when_col":"2023-11-15T02:00:00Z"}"""
+    val result = parser.parseJson("ds_ts_partition", event)
+    result("when_col_partition") should be("2023-11-15")
+    result("when_col") should be("2023-11-15T02:00:00Z")
   }
 
 }

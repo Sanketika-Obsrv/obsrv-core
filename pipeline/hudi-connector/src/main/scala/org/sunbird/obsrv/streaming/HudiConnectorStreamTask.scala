@@ -97,7 +97,11 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
   def setDatasetConf(conf: Configuration, dataset: String, schemaParser: HudiSchemaParser): Unit = {
     val datasetSchema = schemaParser.hudiSchemaMap(dataset)
     val rowType = schemaParser.rowTypeMap(dataset)
-    val avroSchema = AvroSchemaConverter.convertToSchema(rowType, dataset.replace("-", "_"))
+    // Was dataset.replace("-", "_") - only handled hyphens. Avro record names must match
+    // [A-Za-z_][A-Za-z0-9_]* - a dataset id containing dots (e.g. "dataset.1.0") still violated
+    // the spec and threw during schema generation. Replace every non-alphanumeric/underscore
+    // character instead of just hyphens.
+    val avroSchema = AvroSchemaConverter.convertToSchema(rowType, dataset.replaceAll("[^a-zA-Z0-9_]", "_"))
     conf.setString(FlinkOptions.PATH.key, s"${config.hudiBasePath}/${datasetSchema.schema.table}")
     conf.setString("hoodie.base.path", s"${config.hudiBasePath}/${datasetSchema.schema.table}")
     conf.setString(FlinkOptions.TABLE_NAME, datasetSchema.schema.table)
@@ -116,7 +120,11 @@ class HudiConnectorStreamTask(config: HudiConnectorConfig, kafkaConnector: Flink
       conf.setString("hoodie.metrics.jmx.host", config.metricsReporterHost)
       conf.setString("hoodie.metrics.jmx.port", config.metricsReporterPort)
     }
-    val partitionField = datasetSchema.schema.columnSpec.filter(f => f.name.equalsIgnoreCase(datasetSchema.schema.partitionColumn)).head
+    // Was .filter(...).head - threw a bare NoSuchElementException if partitionColumn didn't
+    // match any columnSpec entry. Same pattern already fixed in HudiSchemaParser.scala; this
+    // occurrence in a different file was missed in that earlier pass.
+    val partitionField = datasetSchema.schema.columnSpec.find(f => f.name.equalsIgnoreCase(datasetSchema.schema.partitionColumn))
+      .getOrElse(throw new IllegalArgumentException(s"partitionColumn '${datasetSchema.schema.partitionColumn}' not found in columnSpec for dataset '$dataset'"))
     if(partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch")) {
       conf.setString(FlinkOptions.PARTITION_PATH_FIELD.key, datasetSchema.schema.partitionColumn + "_partition")
     }

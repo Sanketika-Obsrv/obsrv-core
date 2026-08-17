@@ -41,10 +41,13 @@ class HudiConnectorConfig(override val config: Config) extends BaseJobConfig[mut
   val hudiBasePath: String = config.getString("hudi.table.base.path")
 
   val hmsEnabled: Boolean = if (config.hasPath("hudi.hms.enabled")) config.getBoolean("hudi.hms.enabled") else false
-  val hmsUsername: String = config.getString("hudi.hms.database.username")
-  val hmsPassword: String = config.getString("hudi.hms.database.password")
-  val hmsDatabaseName: String = config.getString("hudi.hms.database.name")
-  val hmsURI: String = config.getString("hudi.hms.uri")
+  // Was unconditional config.getString(...) regardless of hmsEnabled - a deployment with HMS
+  // disabled and these 4 keys reasonably omitted (no Hive Metastore to configure) crashed on
+  // startup with ConfigException.Missing anyway. Only required when actually enabled.
+  val hmsUsername: String = if (hmsEnabled) config.getString("hudi.hms.database.username") else ""
+  val hmsPassword: String = if (hmsEnabled) config.getString("hudi.hms.database.password") else ""
+  val hmsDatabaseName: String = if (hmsEnabled) config.getString("hudi.hms.database.name") else ""
+  val hmsURI: String = if (hmsEnabled) config.getString("hudi.hms.uri") else ""
 
   val hudiWriteTasks: Int = config.getInt("hudi.write.tasks")
   val hudiCompactionTasks: Int = config.getInt("hudi.compaction.tasks")

@@ -1,7 +1,6 @@
 package org.sunbird.obsrv.streaming
 
 import com.typesafe.config.ConfigFactory
-import org.apache.commons.lang3.StringUtils
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 import org.apache.flink.api.java.utils.ParameterTool
@@ -9,7 +8,6 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.contrib.streaming.state.EmbeddedRocksDBStateBackend
 import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSink}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
-import org.apache.hudi.common.config.TimestampKeyGeneratorConfig
 import org.apache.hudi.configuration.{FlinkOptions, OptionsResolver}
 import org.apache.hudi.sink.utils.Pipelines
 import org.apache.hudi.util.AvroSchemaConverter
@@ -25,9 +23,6 @@ import org.apache.hudi.common.config.HoodieCommonConfig.SCHEMA_EVOLUTION_ENABLE
 import org.apache.hudi.common.table.HoodieTableConfig.DROP_PARTITION_COLUMNS
 
 import java.io.File
-import java.sql.Timestamp
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 import scala.collection.mutable.{Map => MMap}
 
@@ -187,13 +182,5 @@ object HudiConnectorStreamTask {
     val kafkaUtil = new FlinkKafkaConnector(hudiWriterConfig)
     val task = new HudiConnectorStreamTask(hudiWriterConfig, kafkaUtil)
     task.process()
-  }
-
-  def getTimestamp(ts: String): Timestamp = {
-    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-    val localDateTime = if (StringUtils.isNotBlank(ts))
-      LocalDateTime.from(formatter.parse(ts))
-    else LocalDateTime.now
-    Timestamp.valueOf(localDateTime)
   }
 }

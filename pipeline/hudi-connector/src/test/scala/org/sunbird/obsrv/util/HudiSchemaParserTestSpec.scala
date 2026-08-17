@@ -162,17 +162,37 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
     result("when_col_partition") should be("2023-11-15")
   }
 
-  it should "parse an ISO-8601 string timestamp value without crashing (regression: this used to throw)" in {
-    // Real timestamp data is far more likely to be shaped like this than a raw epoch-millis
-    // number - Jackson's default Timestamp string deserializer expects SQL format
-    // ("yyyy-MM-dd HH:mm:ss[.fffffffff]"), not ISO-8601, and used to throw
-    // IllegalArgumentException here, silently dropping the non-nullable "_partition" key and
-    // crashing later downstream in JsonToRowDataConverter with a NullPointerException.
+  it should "parse a \"Z\"-terminated ISO-8601 string timestamp value" in {
+    // Verified empirically against jackson-databind:2.17.2 (this project's own pinned version):
+    // objectMapper.treeToValue(..., classOf[Timestamp]) already handles this correctly via its
+    // own lenient StdDateFormat - no special-casing needed for this specific shape.
     val parser = new HudiSchemaParser()
     val event = """{"id":"rec1","when_col":"2023-11-15T02:00:00Z"}"""
     val result = parser.parseJson("ds_ts_partition", event)
     result("when_col_partition") should be("2023-11-15")
     result("when_col") should be("2023-11-15T02:00:00Z")
+  }
+
+  it should "parse an explicit-offset ISO-8601 string timestamp value" in {
+    // "+05:30" instead of "Z" - also handled fine by Jackson's own deserializer (verified);
+    // Instant.parse alone (an earlier, since-corrected version of this fix) does NOT accept
+    // this format and would have regressed it.
+    val parser = new HudiSchemaParser()
+    val event = """{"id":"rec1","when_col":"2023-11-15T07:30:00+05:30"}"""
+    val result = parser.parseJson("ds_ts_partition", event)
+    result("when_col_partition") should be("2023-11-15")
+  }
+
+  it should "parse a SQL-format (space-separated) timestamp string via the Timestamp.valueOf fallback (regression: this used to throw)" in {
+    // The one representation Jackson's own Timestamp deserializer genuinely can't parse -
+    // confirmed via direct testing it throws InvalidFormatException for this exact shape,
+    // aborting this whole try block, skipping the "_partition" put (non-nullable in the
+    // schema) and crashing downstream in JsonToRowDataConverter with a NullPointerException.
+    // Falls back to java.sql.Timestamp.valueOf, the JDK's own parser for exactly this format.
+    val parser = new HudiSchemaParser()
+    val event = """{"id":"rec1","when_col":"2023-11-15 02:00:00"}"""
+    val result = parser.parseJson("ds_ts_partition", event)
+    result("when_col_partition") should be("2023-11-15")
   }
 
 }

@@ -122,25 +122,27 @@ class HudiSchemaParser {
                     }
                     if(field.name.equalsIgnoreCase(partitionField.name)){
                       if(fieldDataType.equalsIgnoreCase("timestamp")) {
-                        // Was objectMapper.treeToValue(nodeValue, classOf[Timestamp]) - Jackson's
-                        // default Timestamp string deserializer expects SQL format
-                        // ("yyyy-MM-dd HH:mm:ss[.fffffffff]"), not ISO-8601 - real timestamp data
-                        // shaped like "2023-11-15T02:00:00Z" threw IllegalArgumentException here,
-                        // which aborted this whole try block, skipping the "_partition" put below
-                        // (though not the fieldValue one, already computed above) - since
-                        // "_partition" is declared non-nullable in the schema (createRowType), the
-                        // missing key later NPE'd in JsonToRowDataConverter and crashed the
-                        // TaskManager. Also (unrelated to Jackson's format) ts.toLocalDateTime used
-                        // the JVM's default zone - different TaskManagers can have different
-                        // default zones, placing the same instant in different Hudi partitions
-                        // depending on which TM processed it. Handles both representations
-                        // (ISO-8601 string or epoch-millis number) and always resolves to UTC.
-                        val localDateTime = if (nodeValue.isTextual) {
-                          LocalDateTime.ofInstant(Instant.parse(nodeValue.asText()), ZoneOffset.UTC)
-                        } else {
-                          val ts = objectMapper.treeToValue(nodeValue, classOf[Timestamp])
-                          LocalDateTime.ofInstant(ts.toInstant, ZoneOffset.UTC)
+                        // Verified empirically (jackson-databind:2.17.2, the version this project
+                        // pins): objectMapper.treeToValue(nodeValue, classOf[Timestamp]) already
+                        // handles numeric epoch-millis AND ISO-8601 strings - 'Z'-terminated,
+                        // explicit-offset ("+05:30"), zone-less, with or without fractional
+                        // seconds - all parse fine via Jackson's own lenient StdDateFormat. The
+                        // one real gap: java.sql.Timestamp's OWN string format
+                        // ("yyyy-MM-dd HH:mm:ss[.f...]", space instead of 'T') throws
+                        // InvalidFormatException - if that aborts here, "_partition" (schema'd
+                        // non-nullable) never gets set and NPEs downstream in
+                        // JsonToRowDataConverter. Falls back to Timestamp.valueOf (the JDK's own
+                        // parser for exactly that format) for that one case.
+                        // Also (independent of parsing format) resolves to a fixed UTC zone, not
+                        // the JVM's default - different TaskManagers can have different default
+                        // zones, placing the same instant in different Hudi partitions depending
+                        // on which TM processed it.
+                        val ts = try {
+                          objectMapper.treeToValue(nodeValue, classOf[Timestamp])
+                        } catch {
+                          case _: Exception if nodeValue.isTextual => Timestamp.valueOf(nodeValue.asText())
                         }
+                        val localDateTime = LocalDateTime.ofInstant(ts.toInstant, ZoneOffset.UTC)
                         flattenedEventData.put(field.name + "_partition", localDateTime.format(df))
                       }
                       else if(fieldDataType.equalsIgnoreCase("epoch")) {

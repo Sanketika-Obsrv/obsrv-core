@@ -27,11 +27,18 @@
 		<module>unified-pipeline</module>
 		<module>cache-indexer</module>
 		<module>preprocessor</module>
+		<module>hudi-connector</module>
 	</modules>
 
 	<properties>
 		<!-- maven specific properties -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<!-- No local scala.maj.version/scala.version/flink.version/kafka.version override here
+		     (this branch used to have one, pinning flink.version to 1.20.5 specifically to get
+		     the other 6 modules compiling against framework's own 1.20.5 bump) - root pom.xml
+		     now provides flink.version 1.20.0 / kafka.version 3.9.1 directly, so every module
+		     under pipeline/ already gets a consistent 1.20.x line via inheritance, matching
+		     main's own pattern (which never had a local override here either). -->
 		<jackson-jaxrs.version>1.9.13</jackson-jaxrs.version>
 		<jackson-bom.version>2.17.2</jackson-bom.version>
 	</properties>
@@ -45,20 +52,11 @@
 			<id>apache-releases</id>
 			<url>https://repository.apache.org/content/groups/public</url>
 		</repository>
-		<repository>
-			<id>scala-tools.org</id>
-			<name>Scala-tools Maven2 Repository</name>
-			<url>https://oss.sonatype.org/content/groups/scala-tools</url>
-		</repository>
 	</repositories>
+	<!-- scala-tools.org / oss.sonatype.org/content/groups/scala-tools <repository> and
+	     <pluginRepository> entries removed - the URL 404s (verified), dead for years, and
+	     nothing in this reactor actually needs it. -->
 
-	<pluginRepositories>
-<!--		<pluginRepository>-->
-<!--			<id>scala-tools.org</id>-->
-<!--			<name>Scala-tools Maven2 Repository</name>-->
-<!--			<url>http://scala-tools.org/repo-releases</url>-->
-<!--		</pluginRepository>-->
-	</pluginRepositories>
 	<dependencyManagement>
 		<dependencies>
 			<dependency>

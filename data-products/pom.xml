@@ -304,22 +304,27 @@
             <version>3.14.1</version>
             <scope>test</scope>
         </dependency>
+        <!-- Was 2.8.1, whose own bundled kafka_2.12 (broker) pulls kafka-clients:2.8.1, while
+             framework brings kafka-clients:${kafka.version} (nearest-wins) - the broker's own
+             BrokerToControllerChannelManagerImpl called a NetworkClient constructor signature
+             that only exists in the older kafka-clients, so EmbeddedKafka.start() threw
+             NoSuchMethodError on every run.
+
+             First bumped this to 3.4.0 with a separate explicit kafka_2.12:${kafka.version} pin
+             (matching what was, at the time, kafka.version 3.7.1) - that overreached once this
+             pom picked up root's <parent> (via this same merge) and kafka.version became 3.9.1:
+             forcing embedded-kafka 3.4.0's own bundled broker jar up to 3.9.1 broke a DIFFERENT
+             way - kafka.server.KafkaConfig$.ZkConnectProp() doesn't exist in 3.9.1 (Kafka's own
+             KRaft-migration API changes), and embedded-kafka 3.4.0's own EmbeddedKafka.scala
+             calls it directly. framework's own merged pom.xml (main's side) has the actual
+             matching fix: embedded-kafka_2.12 itself bumped to 3.9.1, no separate kafka_2.12
+             pin at all - its own naturally-bundled broker is already the right version, so
+             nothing needs forcing. Matched that here instead. -->
         <dependency>
             <groupId>io.github.embeddedkafka</groupId>
             <artifactId>embedded-kafka_2.12</artifactId>
-            <version>2.8.1</version>
+            <version>${kafka.version}</version>
             <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.zookeeper</groupId>
-                    <artifactId>zookeeper</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-            <version>3.5.9</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>

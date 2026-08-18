@@ -45,20 +45,12 @@
 			<id>apache-releases</id>
 			<url>https://repository.apache.org/content/groups/public</url>
 		</repository>
-<!--		<repository>-->
-<!--			<id>scala-tools.org</id>-->
-<!--			<name>Scala-tools Maven2 Repository</name>-->
-<!--			<url>https://oss.sonatype.org/content/groups/scala-tools</url>-->
-<!--		</repository>-->
 	</repositories>
-
-	<pluginRepositories>
-<!--		<pluginRepository>-->
-<!--			<id>scala-tools.org</id>-->
-<!--			<name>Scala-tools Maven2 Repository</name>-->
-<!--			<url>http://scala-tools.org/repo-releases</url>-->
-<!--		</pluginRepository>-->
-	</pluginRepositories>
+	<!-- scala-tools.org / oss.sonatype.org/content/groups/scala-tools <repository> and
+	     <pluginRepository> entries removed - the URL 404s (verified), dead for years, and
+	     nothing in this reactor actually needs it. main independently arrived at the same
+	     conclusion by commenting the entries out instead of deleting them - took the cleaner
+	     full removal here. -->
 
 	<dependencyManagement>
 		<dependencies>

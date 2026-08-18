@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pipeline</artifactId>
+    <groupId>org.sunbird.obsrv</groupId>
+    <version>1.0</version>
+  </parent>
+  <artifactId>hudi-connector</artifactId>
+  <version>1.0.0</version>
+  <name>Hudi Connector</name>
+  <properties>
+    <encoding>UTF-8</encoding>
+    <scoverage.plugin.version>1.4.0</scoverage.plugin.version>
+    <jackson-bom.version>2.17.2</jackson-bom.version>
+    <flink.version>1.20.5</flink.version>
+  </properties>
+
+  <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-streaming-scala_${scala.maj.version}</artifactId>
+      <version>${flink.version}</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- Not provided scope (was): that assumed Flink's own runtime already carries a real,
+         unshaded com.fasterxml.jackson.core/.databind/.annotations - but Flink relocates its
+         own internal Jackson usage under org.apache.flink.shaded.jackson2.*, and the one
+         unshaded copy that used to incidentally satisfy this (flink-s3-fs-hadoop's bundled
+         2.15.3) is now isolated in plugins/s3-fs-hadoop/ (a separate fix, for a version
+         conflict). Nothing in lib/ provides these classes anymore, so
+         jackson-module-scala:2.17.2 (compile-scoped, bundled) crashed with NoClassDefFoundError
+         on TreeNode the moment it was actually used. Compile scope (default) + the
+         jackson-bom:2.17.2 import above pins these to the exact version jackson-module-scala
+         needs, bundled into hudi-connector-1.0.0.jar itself. -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.sunbird.obsrv</groupId>
+      <artifactId>framework</artifactId>
+      <version>1.0.0</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- framework now pins flink.version=1.20.5 too (matches this module), so this isn't about
+         overriding a version mismatch between the two - it's pinned explicitly, same pattern
+         already used below for flink-streaming-scala / flink-table-api-scala-bridge /
+         flink-statebackend-rocksdb, because flink-connector-kafka simply doesn't follow
+         flink.version's own numbering at all: it was externalized from the Flink release train
+         after 1.17 onto its own versioning (3.x-1.20 for the Flink-1.20 line) - "1.20.5" doesn't
+         exist as a coordinate and 404s. FlinkKafkaConnector.scala only uses the modern
+         KafkaSource/KafkaSink/OffsetsInitializer API, which 3.x provides. -->
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-connector-kafka</artifactId>
+      <version>3.4.0-1.20</version>
+    </dependency>
+    <dependency>
+      <groupId>org.sunbird.obsrv</groupId>
+      <artifactId>dataset-registry</artifactId>
+      <version>1.0.0</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.kafka</groupId>
+          <artifactId>kafka-clients</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <version>${kafka.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hudi</groupId>
+      <artifactId>hudi-flink1.20-bundle</artifactId>
+      <version>1.0.2</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-log4j12</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- hudi-connector's own code calls Hadoop's plain org.apache.hadoop.fs.FileSystem.get()
+         directly for checkpoint/table I/O - that resolves fs.s3a.impl via the thread context
+         classloader (Flink's user-code classloader: lib/ + job jars), which is a completely
+         separate mechanism from Flink's own isolated plugins/ classloaders (those only serve
+         org.apache.flink.core.fs.FileSystem, used by Flink's checkpoint storage client - not by
+         Hudi's direct Hadoop calls). Isolating flink-s3-fs-hadoop into plugins/ (above, for the
+         Jackson conflict) removed org.apache.hadoop.fs.s3a.S3AFileSystem from lib/ entirely,
+         so Hudi's own FileSystem.get() threw ClassNotFoundException. hadoop-aws, version-matched
+         to flink-shaded-hadoop-2-uber:2.8.3-10.0 already in lib/ (provides the hadoop-common
+         base classes S3AFileSystem extends), restores it without re-adding flink-s3-fs-hadoop's
+         own unshaded jackson-databind:2.15.3 that caused that earlier conflict. -->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-aws</artifactId>
+      <version>2.8.3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+        <!-- hadoop-aws:2.8.3's own pinned aws-java-sdk-s3 is 1.10.6 (2015) - predates
+             com.amazonaws.auth.WebIdentityTokenCredentialsProvider (added ~1.11.704, for EKS
+             IRSA). global-cloud-values-aws.yaml configures exactly that provider for the real
+             AWS/service-account deployment path. Excluded so the explicit 1.12.779 declaration
+             below (version-matched to flink-s3-fs-hadoop-1.20.5's own bundled SDK, verified to
+             contain the real class) wins instead of this ancient transitive one. -->
+        <exclusion>
+          <groupId>com.amazonaws</groupId>
+          <artifactId>aws-java-sdk-s3</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-s3</artifactId>
+      <version>1.12.779</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-table-api-scala-bridge_${scala.maj.version}</artifactId>
+      <version>${flink.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.classgraph</groupId>
+      <artifactId>classgraph</artifactId>
+      <version>4.8.168</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-connector-hive_${scala.maj.version}</artifactId>
+      <version>${flink.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-metastore</artifactId>
+      <version>3.1.3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+        <!-- hive-metastore's own direct commons-cli:1.2 was winning Maven's nearest-wins
+             over flink-runtime's needed 1.5.0 (1.2 predates Option.builder(String), added in
+             1.3) - shaded into hudi-connector-1.0.0.jar and landing in Flink's shared lib/,
+             it crashed both JobManager and TaskManager at startup with NoSuchMethodError
+             before user code ever ran. Same conflict class as the Jackson one above, just at
+             a different dependency. -->
+        <exclusion>
+          <groupId>commons-cli</groupId>
+          <artifactId>commons-cli</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-exec</artifactId>
+      <version>3.1.3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-cli</groupId>
+          <artifactId>commons-cli</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-statebackend-rocksdb</artifactId>
+      <version>${flink.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- 3.0.6, not 3.2.17: matches what every other module in the reactor resolves to (nearest
+         wins), and what BaseSpecWithPostgres/BaseSpecWithDatasetRegistry (framework/dataset-
+         registry test-jars, needed below) were compiled against - 3.2.x renamed/removed the
+         classic org.scalatest.FlatSpec/Matchers API those depend on. This module had no tests
+         before, so the mismatch never surfaced until now. -->
+    <dependency>
+      <groupId>org.scalatest</groupId>
+      <artifactId>scalatest_2.12</artifactId>
+      <version>3.0.6</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- scope=test dependencies never propagate transitively, even via test-jar - framework's
+         own embedded-postgres/embedded-redis (used by BaseSpecWithPostgres) need redeclaring
+         here too, same pattern already used by cache-indexer/denormalizer. -->
+    <dependency>
+      <groupId>org.sunbird.obsrv</groupId>
+      <artifactId>framework</artifactId>
+      <version>1.0.0</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.sunbird.obsrv</groupId>
+      <artifactId>dataset-registry</artifactId>
+      <version>1.0.0</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.zonky.test</groupId>
+      <artifactId>embedded-postgres</artifactId>
+      <version>2.0.3</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-compress</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.github.codemonstur</groupId>
+      <artifactId>embedded-redis</artifactId>
+      <version>1.0.0</version>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <sourceDirectory>src/main/scala</sourceDirectory>
+    <testSourceDirectory>src/test/scala</testSourceDirectory>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.8.1</version>
+        <configuration>
+          <release>11</release>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.2.1</version>
+        <executions>
+          <!-- Run shade goal on package phase -->
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <shadedArtifactAttached>false</shadedArtifactAttached>
+              <artifactSet>
+                <excludes>
+                  <exclude>com.google.code.findbugs:jsr305</exclude>
+                </excludes>
+              </artifactSet>
+              <filters>
+                <filter>
+                  <!-- Do not copy the signatures in the META-INF folder.
+                  Otherwise, this might cause SecurityExceptions when using the JAR. -->
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                     <exclude>core-site.xml</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>org.sunbird.obsrv.streaming.HudiConnectorStreamTask</mainClass>
+                </transformer>
+                <!-- append default configs -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                  <resource>reference.conf</resource>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+        <version>4.4.0</version>
+        <configuration>
+          <source>${java.target.runtime}</source>
+          <target>${java.target.runtime}</target>
+          <scalaVersion>${scala.version}</scalaVersion>
+          <checkMultipleScalaVersions>false</checkMultipleScalaVersions>
+        </configuration>
+        <!-- The plugin's own compiler-bridge pulls its own scala-library/-xml versions
+             (2.12.0 / 1.0.6 - much older than this project's own 2.12.18), which end up on the
+             same compile classpath as the project's scala-library:2.12.18 and corrupt the
+             compiler's bootstrap state ("bad constant pool index" fatal errors, not normal type
+             errors). checkMultipleScalaVersions was already turned off above instead of fixing
+             this - pinning the plugin's own toolchain deps to match the project's actually
+             fixes it. -->
+        <dependencies>
+          <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>${scala.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-compiler</artifactId>
+            <version>${scala.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-reflect</artifactId>
+            <version>${scala.version}</version>
+          </dependency>
+        </dependencies>
+        <executions>
+          <execution>
+            <id>scala-compile-first</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>add-source</goal>
+              <goal>compile</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>scala-test-compile</id>
+            <phase>process-test-resources</phase>
+            <goals>
+              <goal>testCompile</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.22.2</version>
+        <configuration>
+          <skipTests>true</skipTests>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.scalatest</groupId>
+        <artifactId>scalatest-maven-plugin</artifactId>
+        <version>1.0</version>
+        <configuration>
+          <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+          <junitxml>.</junitxml>
+          <filereports>hudi-connector-testsuite.txt</filereports>
+        </configuration>
+        <executions>
+          <execution>
+            <id>test</id>
+            <goals>
+              <goal>test</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.scoverage</groupId>
+        <artifactId>scoverage-maven-plugin</artifactId>
+        <version>${scoverage.plugin.version}</version>
+        <configuration>
+          <scalaVersion>${scala.version}</scalaVersion>
+          <aggregate>true</aggregate>
+          <highlighting>true</highlighting>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

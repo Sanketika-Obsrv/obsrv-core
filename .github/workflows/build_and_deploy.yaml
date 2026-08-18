@@ -15,7 +15,8 @@ jobs:
   build-image:
     runs-on: ubuntu-latest
     # optional legs (the individual pipeline modules) must not fail the workflow or block deploy;
-    # only unified-pipeline + cache-indexer are mandatory (merged-pipeline is the shipped topology).
+    # only unified-pipeline + lakehouse-connector + cache-indexer are mandatory (merged-pipeline
+    # is the shipped topology).
     continue-on-error: ${{ matrix.optional || false }}
     strategy:
       fail-fast: false
@@ -39,6 +40,9 @@ jobs:
           - image: "unified-pipeline"
             target: "unified-image"
             optional: false
+          - image: "lakehouse-connector"
+            target: "lakehouse-connector-image"
+            optional: false
           - image: "cache-indexer"
             target: "cache-indexer-image"
             optional: false
@@ -59,6 +63,10 @@ jobs:
       - name: Build ${{matrix.image}} image and push
         uses: docker/build-push-action@v5
         with:
+          # Confirmed on a sibling branch: without this, build-push-action can resolve a
+          # different context than the local checkout, missing files written by earlier
+          # steps in this same job. Explicit context avoids that ambiguity.
+          context: .
           platforms: linux/amd64
           target: ${{matrix.target}}
           push: true

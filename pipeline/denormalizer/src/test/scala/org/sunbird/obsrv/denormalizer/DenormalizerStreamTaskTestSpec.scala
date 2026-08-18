@@ -7,6 +7,8 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
+import org.scalatest.concurrent.Eventually
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model._
@@ -20,7 +22,7 @@ import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
 import scala.concurrent.duration._
 
-class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
+class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry with Eventually {
 
   private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
@@ -103,7 +105,16 @@ class DenormalizerStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.kafkaSystemTopic, 3, timeout = 30.seconds)
     validateSystemEvents(systemEvents)
 
-    validateMetrics(metricsReporter)
+    // Was a single immediate assertion - confirmed flaky both ways (over-count AND under-count
+    // across different CI runs, "4 was not equal to 3" in one, "0 was not equal to 1" in
+    // another), consistent with a timing race between when the output/system-event topics
+    // finish being consumed and when the job's own internal metric counters actually settle,
+    // not a deterministic logic bug or duplicate delivery (checkpointing.interval is 60s here,
+    // far longer than this test's own 30s consume timeout, so checkpoint-triggered redelivery
+    // isn't in play). Polls instead of asserting once immediately.
+    eventually(timeout(Span(10, Seconds)), interval(Span(500, Millis))) {
+      validateMetrics(metricsReporter)
+    }
   }
 
   it should "validate dynamic cache creation within DenormCache" in {

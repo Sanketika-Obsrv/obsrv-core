@@ -202,6 +202,19 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
     result("when_col_partition") should be("2023-11-15")
   }
 
+  it should "fall back to a default partition value when the partition field is missing from the event entirely (regression: this used to NPE downstream)" in {
+    // retrieveFieldFromJson returns None for a field that's genuinely absent - the whole
+    // node.map{...} block (where "_partition" gets set) never runs at all, only the .orElse
+    // branch does (which only sets the plain field to null). Since "_partition" is schema'd
+    // non-nullable, that key being completely absent from the map used to NPE downstream in
+    // JsonToRowDataConverter instead of failing this one record gracefully.
+    val parser = new HudiSchemaParser()
+    val event = """{"id":"rec1"}"""
+    val result = parser.parseJson("ds_ts_partition", event)
+    result("when_col_partition") should be(HudiSchemaParser.DEFAULT_PARTITION_VALUE)
+    result("when_col") should be(null)
+  }
+
   "the connector's own real shipped example (schemas/schema.json)" should "still create the expected RowType" in {
     val parser = new HudiSchemaParser()
     val rowType = parser.rowTypeMap("financial_transactions")

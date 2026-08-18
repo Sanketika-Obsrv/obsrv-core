@@ -23,6 +23,14 @@ case class InputFormat(`type`: String, flattenSpec: Option[JsonFlattenSpec] = No
 case class JsonFlattenSpec(fields: List[JsonFieldParserSpec])
 case class JsonFieldParserSpec(`type`: String, name: String, expr: Option[String] = None)
 
+object HudiSchemaParser {
+  // "_partition" is schema'd non-nullable (createRowType) for timestamp/epoch partition columns -
+  // when the partition field is missing from an event entirely, or its value is genuinely
+  // unparseable, this sentinel keeps the record from NPE-ing downstream in
+  // JsonToRowDataConverter instead of silently dropping the whole record.
+  val DEFAULT_PARTITION_VALUE = "1970-01-01"
+}
+
 class HudiSchemaParser {
 
   private val logger = LoggerFactory.getLogger(classOf[HudiSchemaParser])
@@ -160,9 +168,31 @@ class HudiSchemaParser {
                     case ex: Exception =>
                       // logger.debug("Hudi Schema Parser - Exception: ", ex.getMessage)
                       flattenedEventData.put(field.name, null)
+                      // "_partition" is schema'd non-nullable (createRowType) - if this catch
+                      // fires for the partition field itself (a genuinely unparseable value
+                      // beyond what the timestamp/epoch branches above already handle), the
+                      // field.name put above still leaves "_partition" unset, and
+                      // JsonToRowDataConverter NPEs on the missing required key downstream.
+                      // Same fallback as the fully-missing-field case below.
+                      if (field.name.equalsIgnoreCase(partitionField.name) &&
+                        (partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch"))) {
+                        flattenedEventData.put(field.name + "_partition", HudiSchemaParser.DEFAULT_PARTITION_VALUE)
+                      }
                   }
 
-              }.orElse(flattenedEventData.put(field.name, null))
+              }.orElse {
+                flattenedEventData.put(field.name, null)
+                // Field genuinely absent from the event (retrieveFieldFromJson returned None) -
+                // this whole node.map{...} block never ran, so if this is the partition field,
+                // "_partition" (non-nullable in the schema) never gets set at all, NPE-ing
+                // downstream in JsonToRowDataConverter. Same fallback as the catch-block case
+                // above.
+                if (field.name.equalsIgnoreCase(partitionField.name) &&
+                  (partitionField.`type`.equalsIgnoreCase("timestamp") || partitionField.`type`.equalsIgnoreCase("epoch"))) {
+                  flattenedEventData.put(field.name + "_partition", HudiSchemaParser.DEFAULT_PARTITION_VALUE)
+                }
+                None
+              }
           }
       }
     }

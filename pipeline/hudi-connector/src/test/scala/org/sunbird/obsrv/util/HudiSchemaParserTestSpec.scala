@@ -212,7 +212,9 @@ class HudiSchemaParserTestSpec extends BaseSpecWithDatasetRegistry {
     val event = """{"id":"rec1"}"""
     val result = parser.parseJson("ds_ts_partition", event)
     result("when_col_partition") should be(HudiSchemaParser.DEFAULT_PARTITION_VALUE)
-    result("when_col") should be(null)
+    // should be(null) on an Any-typed value doesn't unwrap correctly in this scalatest version -
+    // compares the AnyShouldWrapper itself, never null. assert(... == null) sidesteps it.
+    assert(result("when_col") == null)
   }
 
   "the connector's own real shipped example (schemas/schema.json)" should "still create the expected RowType" in {

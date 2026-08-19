@@ -54,6 +54,18 @@
 
 	<dependencyManagement>
 		<dependencies>
+			<!-- Align the scala toolchain: jackson-module-scala 2.18.x introspects case classes via
+			     scala-reflect, which was resolving to 2.12.8 against scala-library 2.12.20 -->
+			<dependency>
+				<groupId>org.scala-lang</groupId>
+				<artifactId>scala-library</artifactId>
+				<version>${scala.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.scala-lang</groupId>
+				<artifactId>scala-reflect</artifactId>
+				<version>${scala.version}</version>
+			</dependency>
 			<!-- Fix GHSA-r7wm-3cxj-wff9, CVE-2026-54512/54513 (HIGH), CVE-2026-54515/59889 + GHSA-mhm7-754m-9p8w (MEDIUM):
 			     jackson async-parser bypass / polymorphic deser RCE / ignored-property manipulation -->
 			<dependency>

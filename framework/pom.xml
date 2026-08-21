@@ -28,7 +28,7 @@
 		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
 		<release-version>release-4.6.0</release-version>
         <!-- <jackson-bom.version>2.13.4.20221013</jackson-bom.version> -->
-        <jackson-bom.version>2.17.2</jackson-bom.version>
+        <jackson-bom.version>2.18.9</jackson-bom.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -127,19 +127,19 @@
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-api</artifactId>
-            <version>1.42.1</version>
+            <version>1.62.0</version>
         </dependency>
 
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-sdk</artifactId>
-            <version>1.42.1</version>
+            <version>1.62.0</version>
         </dependency>
 
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-exporter-otlp</artifactId>
-            <version>1.42.1</version>
+            <version>1.62.0</version>
         </dependency>
 
         <dependency>
@@ -161,7 +161,7 @@
         <dependency>
             <groupId>at.yawk.lz4</groupId>
             <artifactId>lz4-java</artifactId>
-            <version>1.10.3</version>
+            <version>1.11.1</version>
         </dependency>
         <!-- Fix CVE-2023-43642 / BDSA-2023-2110/2111/2113: safe snappy-java replacing kafka-clients transitive -->
         <dependency>
@@ -232,7 +232,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.7</version>
+            <version>42.7.12</version>
         </dependency>
 
         <dependency>
@@ -280,7 +280,7 @@
         <dependency>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
-            <version>3.9.3</version>
+            <version>3.9.5</version>
             <scope>test</scope>
         
             <exclusions>

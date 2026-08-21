@@ -40,7 +40,7 @@
 		     under pipeline/ already gets a consistent 1.20.x line via inheritance, matching
 		     main's own pattern (which never had a local override here either). -->
 		<jackson-jaxrs.version>1.9.13</jackson-jaxrs.version>
-		<jackson-bom.version>2.17.2</jackson-bom.version>
+		<jackson-bom.version>2.18.9</jackson-bom.version>
 	</properties>
 
 	<repositories>

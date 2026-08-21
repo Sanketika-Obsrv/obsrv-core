@@ -109,6 +109,91 @@ RUN set -eux; \
     # not just lakehouse-connector-image.
 
 # =============================================================================
+# extractor runtime
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS extractor-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/extractor/target/extractor-1.0.0.jar ${FLINK_HOME}/usrlib/
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
+
+# =============================================================================
+# preprocessor runtime
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS preprocessor-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/preprocessor/target/preprocessor-1.0.0.jar ${FLINK_HOME}/usrlib/
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
+
+# =============================================================================
+# denormalizer runtime
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS denormalizer-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/denormalizer/target/denormalizer-1.0.0.jar ${FLINK_HOME}/usrlib/
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
+
+# =============================================================================
+# transformer runtime
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS transformer-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/transformer/target/transformer-1.0.0.jar ${FLINK_HOME}/usrlib/
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
+
+# =============================================================================
+# dataset-router runtime
+# =============================================================================
+FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS dataset-router-image
+ARG FLINK_UID
+ENV FLINK_HOME=/opt/flink
+ENV PATH="${FLINK_HOME}/bin:${PATH}"
+USER 0
+COPY --from=flink-dist --chown=${FLINK_UID}:${FLINK_UID} /opt/flink /opt/flink
+COPY --from=build-pipeline --chown=${FLINK_UID}:${FLINK_UID} /app/pipeline/dataset-router/target/dataset-router-1.0.0.jar ${FLINK_HOME}/usrlib/
+RUN printf 'flink:x:%s:%s:flink:/opt/flink:/bin/bash\n' "${FLINK_UID}" "${FLINK_UID}" >> /etc/passwd \
+    && printf 'flink:x:%s:\n' "${FLINK_UID}" >> /etc/group
+USER ${FLINK_UID}:${FLINK_UID}
+WORKDIR ${FLINK_HOME}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD bash -c "pgrep -f org.apache.flink >/dev/null || java -version >/dev/null 2>&1 || exit 1"
+
+# =============================================================================
 # unified-pipeline runtime  (DHI debian/glibc JDK 11 — has bash, coreutils, glibc)
 # =============================================================================
 FROM dhi.io/eclipse-temurin:11-jdk-debian13-dev AS unified-image

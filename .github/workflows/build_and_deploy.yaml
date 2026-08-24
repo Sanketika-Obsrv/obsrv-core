@@ -51,6 +51,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # QEMU provides the arm64 emulation the cross-arch leg needs on an amd64 runner.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -67,7 +71,7 @@ jobs:
           # different context than the local checkout, missing files written by earlier
           # steps in this same job. Explicit context avoids that ambiguity.
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           target: ${{matrix.target}}
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{matrix.image}}:${{ github.ref_name }}

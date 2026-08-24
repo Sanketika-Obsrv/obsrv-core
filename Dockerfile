@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # =============================================================================
 # Hardened Flink runtime for obsrv-core (unified-pipeline + cache-indexer + lakehouse-connector)
 # -----------------------------------------------------------------------------
@@ -23,12 +24,13 @@ ARG LOG4J_VERSION=2.25.5
 # ---- build stages: compile obsrv-core (original maven, discarded) ------------
 FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-core
 COPY . /app
-RUN mvn clean install -DskipTests -f /app/pom.xml
+RUN --mount=type=cache,target=/root/.m2,id=obsrv-core-m2 mvn clean install -DskipTests -f /app/pom.xml
 
 FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
-COPY --from=build-core /root/.m2 /root/.m2
+# Shares the id=obsrv-core-m2 cache mount above instead of COPY --from=build-core /root/.m2:
+# cache mounts live outside the exported layer, so a COPY --from can never see them anyway.
 COPY . /app
-RUN mvn clean package -DskipTests -f /app/pipeline/pom.xml
+RUN --mount=type=cache,target=/root/.m2,id=obsrv-core-m2 mvn clean package -DskipTests -f /app/pipeline/pom.xml
 
 # ---- download-hudi-plugins: extra JARs for hudi-connector's S3/GCS plugin classloaders -------
 # Not produced by the maven build above - flink-shaded-hadoop-2-uber, flink-gs-fs-hadoop and
@@ -60,7 +62,8 @@ RUN mvn clean package -DskipTests -f /app/pipeline/pom.xml
 # com.fasterxml.jackson/com.google.common classes), so a second copy in lib/ is safe: same
 # ClassNotFoundException-for-Hudi's-direct-FileSystem.get() problem as S3AFileSystem, same fix,
 # but no pom.xml dependency-exclusion dance needed since this jar doesn't collide.
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS download-hudi-plugins
+# $BUILDPLATFORM: only arch-independent JARs here, so build once natively
+FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS download-hudi-plugins
 RUN mkdir -p /plugins/s3-fs-hadoop /plugins/gs-fs-hadoop /jars && \
     curl -fsSL -o /plugins/s3-fs-hadoop/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar && \

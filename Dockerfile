@@ -27,8 +27,11 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.m2,id=obsrv-core-m2 mvn clean install -DskipTests -f /app/pom.xml
 
 FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
-# Shares the id=obsrv-core-m2 cache mount above instead of COPY --from=build-core /root/.m2:
-# cache mounts live outside the exported layer, so a COPY --from can never see them anyway.
+# This COPY's actual content is moot (cache-mount writes never land in build-core's exported
+# layer), but --from=build-core is still required: it's the only edge that makes BuildKit run
+# build-core to completion before this stage starts. Drop it and the two stages race, so
+# build-pipeline can try to resolve framework/dataset-registry before build-core installs them.
+COPY --from=build-core /root/.m2 /root/.m2
 COPY . /app
 RUN --mount=type=cache,target=/root/.m2,id=obsrv-core-m2 mvn clean package -DskipTests -f /app/pipeline/pom.xml
 

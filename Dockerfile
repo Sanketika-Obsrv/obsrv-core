@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # =============================================================================
 # Hardened Flink runtime for obsrv-core (unified-pipeline + cache-indexer + lakehouse-connector)
 # -----------------------------------------------------------------------------
@@ -23,12 +24,13 @@ ARG LOG4J_VERSION=2.25.5
 # ---- build stages: compile obsrv-core (original maven, discarded) ------------
 FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-core
 COPY . /app
-RUN mvn clean install -DskipTests -f /app/pom.xml
+RUN --mount=type=cache,target=/root/.m2,id=obsrv-core-m2 mvn clean install -DskipTests -f /app/pom.xml
 
 FROM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
-COPY --from=build-core /root/.m2 /root/.m2
+# Shares the id=obsrv-core-m2 cache mount above instead of COPY --from=build-core /root/.m2:
+# cache mounts live outside the exported layer, so a COPY --from can never see them anyway.
 COPY . /app
-RUN mvn clean package -DskipTests -f /app/pipeline/pom.xml
+RUN --mount=type=cache,target=/root/.m2,id=obsrv-core-m2 mvn clean package -DskipTests -f /app/pipeline/pom.xml
 
 # ---- download-hudi-plugins: extra JARs for hudi-connector's S3/GCS plugin classloaders -------
 # Not produced by the maven build above - flink-shaded-hadoop-2-uber, flink-gs-fs-hadoop and

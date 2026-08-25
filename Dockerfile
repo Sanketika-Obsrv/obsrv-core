@@ -22,19 +22,13 @@ ARG FLINK_UID=9999
 ARG LOG4J_VERSION=2.25.5
 
 # ---- build stages: compile obsrv-core (original maven, discarded) ------------
-# Pinned to $BUILDPLATFORM: Maven/Scala output is arch-independent JVM bytecode, so this
-# only needs to run once (natively) instead of once per target platform under QEMU.
+# Pinned to $BUILDPLATFORM: Maven output is arch-independent, so build once natively.
 FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-core
 COPY . /app
 RUN --mount=type=cache,target=/root/.m2,id=obsrv-core-m2 mvn clean install -DskipTests -f /app/pom.xml
 
 FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS build-pipeline
-# Pure ordering dependency: --from=build-core is what makes BuildKit run build-core to
-# completion before this stage starts. Can't reference /root/.m2 for this (as before the
-# cache-mount change) - that path is entirely owned by the cache mount during build-core's
-# RUN and does not exist at all once the RUN finishes, so COPY --from=build-core /root/.m2
-# fails with "not found" rather than copying nothing. pom.xml is real, unmounted, and gets
-# overwritten by the COPY below anyway - a no-op with the side effect we actually need.
+# Ordering dependency only - /root/.m2 is cache-mounted so it can't be COPY'd across stages.
 COPY --from=build-core /app/pom.xml /app/pom.xml
 COPY . /app
 RUN --mount=type=cache,target=/root/.m2,id=obsrv-core-m2 mvn clean package -DskipTests -f /app/pipeline/pom.xml

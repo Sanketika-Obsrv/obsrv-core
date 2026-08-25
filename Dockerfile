@@ -60,7 +60,8 @@ RUN mvn clean package -DskipTests -f /app/pipeline/pom.xml
 # com.fasterxml.jackson/com.google.common classes), so a second copy in lib/ is safe: same
 # ClassNotFoundException-for-Hudi's-direct-FileSystem.get() problem as S3AFileSystem, same fix,
 # but no pom.xml dependency-exclusion dance needed since this jar doesn't collide.
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS download-hudi-plugins
+# $BUILDPLATFORM: only arch-independent JARs here, so build once natively
+FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/maven:3.9.4-eclipse-temurin-11-focal AS download-hudi-plugins
 RUN mkdir -p /plugins/s3-fs-hadoop /plugins/gs-fs-hadoop /jars && \
     curl -fsSL -o /plugins/s3-fs-hadoop/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar \
         https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar && \

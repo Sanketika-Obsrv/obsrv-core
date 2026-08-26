@@ -278,6 +278,34 @@
         </exclusion>
       </exclusions>
     </dependency>
+    <!-- com.amazonaws.auth.WebIdentityTokenCredentialsProvider (from aws-java-sdk-s3 above) needs
+         this at runtime to actually call sts:AssumeRoleWithWebIdentity - the class itself loads
+         fine without it, but constructing the STS client inside the provider throws
+         NoClassDefFoundError on com.amazonaws.services.securitytoken.*, which gets swallowed
+         somewhere in Hadoop's S3A credential-provider chain instead of failing loudly. Result:
+         it silently falls through to the EC2 instance profile (the underlying node's IAM role)
+         instead of using the pod's actual IRSA role - exactly the real-cluster symptom this
+         fixes: S3 AccessDenied as the eks_nodes_role instead of the flink-sa IRSA role, despite
+         the pod's ServiceAccount/AWS_ROLE_ARN/AWS_WEB_IDENTITY_TOKEN_FILE all being set correctly. -->
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-sts</artifactId>
+      <version>1.12.779</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-table-api-scala-bridge_${scala.maj.version}</artifactId>

@@ -2,6 +2,7 @@ package org.sunbird.obsrv.dataproducts
 
 import com.redislabs.provider.redis._
 import com.typesafe.config.{Config, ConfigFactory}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.logging.log4j.{LogManager, Logger}
 import org.apache.spark.sql.SparkSession
 import org.joda.time.{DateTime, DateTimeZone}
@@ -101,16 +102,33 @@ object MasterDataProcessorIndexer {
     val cacheConfig = dataset.datasetConfig.cacheConfig.get
     val redisConfig = new RedisConfig(initialHost = RedisEndpoint(host = cacheConfig.redisDBHost.get, port = cacheConfig.redisDBPort.get, dbNum = cacheConfig.redisDB.get))
     val ts: Long = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
-    val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
-      f => CommonUtil.processEvent(f._2, ts)
+    val recordCount = spark.sparkContext.longAccumulator(s"${dataset.id}-recordCount")
+    // spark-redis's RedisKVRDD.getKV() fully materializes every key's type-check and value-fetch
+    // reply for an ENTIRE partition into memory (via PipelineUtils.mapWithPipeline, which
+    // accumulates every pipelined batch into one Seq before returning) before Spark's RDD
+    // iterator layer ever sees anything — persist()/count()/write() choices downstream can't
+    // bound this. The only real lever is how many keys land in each partition: fromRedisKV
+    // defaults to partitionNum=3 regardless of dataset size, so a large master dataset forces a
+    // huge per-partition materialization no matter what. Using many more, smaller partitions
+    // keeps each one's materialized footprint bounded.
+    val redisPartitions = if (config.hasPath("redis.partitions")) config.getInt("redis.partitions") else 100
+    val rdd = spark.sparkContext.fromRedisKV("*", partitionNum = redisPartitions)(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
+      f => {
+        recordCount.add(1)
+        CommonUtil.processEvent(f._2, ts)
+      }
     )
-    // Persist so count() + read.json() reuse a single Redis scan instead of scanning twice.
-    rdd.persist()
-    val noOfRecords: Long = rdd.count()
-    if (noOfRecords > 0) {
-      spark.read.json(rdd).write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
-    }
-    rdd.unpersist()
+    // No persist(), no count()-then-read.json() replay, no spark.read.json() schema inference —
+    // all three force retaining or re-scanning the full dataset, which is what OOMs large master
+    // datasets (persist() keeps every record alive until the whole partition is scanned, and
+    // read.json() does its own full extra pass to infer a schema). A single saveAsTextFile pass
+    // writes each record immediately (nothing is retained once written) and the accumulator yields
+    // the count as a side effect of that same pass, so Redis is still scanned exactly once.
+    val outputPath = new Path(outputFilePath)
+    val fs = outputPath.getFileSystem(spark.sparkContext.hadoopConfiguration)
+    if (fs.exists(outputPath)) fs.delete(outputPath, true)
+    rdd.saveAsTextFile(outputFilePath, classOf[org.apache.hadoop.io.compress.GzipCodec])
+    val noOfRecords: Long = recordCount.value
     logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
     noOfRecords
   }

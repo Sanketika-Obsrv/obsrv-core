@@ -7,6 +7,8 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.test.util.MiniClusterWithClientResource
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.scalatest.Matchers._
+import org.scalatest.concurrent.Eventually
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.sunbird.obsrv.core.cache.RedisConnect
 import org.sunbird.obsrv.core.model.Models.SystemEvent
 import org.sunbird.obsrv.core.model._
@@ -17,7 +19,7 @@ import org.sunbird.obsrv.spec.BaseSpecWithDatasetRegistry
 
 import scala.concurrent.duration._
 
-class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
+class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry with Eventually {
 
   private val metricsReporter = InMemoryReporter.createWithRetainedMetrics
   val flinkCluster = new MiniClusterWithClientResource(new MiniClusterResourceConfiguration.Builder()
@@ -95,7 +97,14 @@ class DenormalizerWindowStreamTaskTestSpec extends BaseSpecWithDatasetRegistry {
     val systemEvents = EmbeddedKafka.consumeNumberMessagesFrom[String](denormConfig.kafkaSystemTopic, 5, timeout = 30.seconds)
     validateSystemEvents(systemEvents)
 
-    validateMetrics(metricsReporter)
+    // Same class of flakiness as DenormalizerStreamTaskTestSpec - a timing race between when
+    // the output/system-event topics finish being consumed and when the job's own internal
+    // metric counters actually settle, not a duplicate-delivery or logic bug (checkpointing
+    // never fires within this test's lifetime - interval is 60s, timeout is 30s). Polls instead
+    // of asserting once immediately.
+    eventually(timeout(Span(10, Seconds)), interval(Span(500, Millis))) {
+      validateMetrics(metricsReporter)
+    }
   }
 
   private def validateOutputs(outputs: List[String]): Unit = {

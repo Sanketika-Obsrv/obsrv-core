@@ -17,9 +17,9 @@
         <spark.version>3.1.0</spark.version>
         <scoverage.plugin.version>1.4.0</scoverage.plugin.version>
         <java.target.runtime>11</java.target.runtime>
-        <log4j.version>2.14.1</log4j.version>
+        <log4j.version>2.25.5</log4j.version>
         <!-- <jackson-bom.version>2.13.4.20221013</jackson-bom.version> -->
-        <jackson-bom.version>2.17.2</jackson-bom.version>
+        <jackson-bom.version>2.18.9</jackson-bom.version>
     </properties>
 
     <dependencyManagement>
@@ -30,6 +30,20 @@
                 <version>${jackson-bom.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- Pin transitive Netty (from Spark/ZooKeeper) to a version with all known CVEs fixed -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.137.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Fix CVE-2025-48924: pin transitive commons-lang3 (from Spark/Hadoop) -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.18.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -53,6 +67,15 @@
                     <groupId>org.apache.zookeeper</groupId>
                     <artifactId>zookeeper</artifactId>
                 </exclusion>
+                <!-- Exclude EOL log4j 1.x (CVE-2019-17571, CVE-2022-23305/23307, no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -65,6 +88,17 @@
             <artifactId>spark-sql_${scala.maj.version}</artifactId>
             <version>${spark.version}</version>
             <scope>provided</scope>
+            <exclusions>
+                <!-- Exclude EOL log4j 1.x (no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.scala-lang</groupId>
@@ -79,7 +113,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
-            <version>1.6</version>
+            <version>1.10.0</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -185,6 +219,17 @@
             <artifactId>hadoop-client</artifactId>
             <version>2.7.3</version>
             <scope>provided</scope>
+            <exclusions>
+                <!-- Exclude EOL log4j 1.x (no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -200,6 +245,15 @@
                     <groupId>org.apache.zookeeper</groupId>
                     <artifactId>zookeeper</artifactId>
                 </exclusion>
+                <!-- Exclude EOL log4j 1.x (no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -207,6 +261,17 @@
             <artifactId>hadoop-aws</artifactId>
             <version>2.7.3</version>
             <scope>provided</scope>
+            <exclusions>
+                <!-- Exclude EOL log4j 1.x (no fixed version) -->
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -236,6 +301,13 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <!-- log4j 1.x API bridge backed by log4j2: replaces excluded EOL log4j:log4j 1.2.17
+             (Spark 3.1 still needs org.apache.log4j.* classes at runtime) -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-1.2-api</artifactId>
             <version>${log4j.version}</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.mockito/mockito-scala-scalatest -->
@@ -289,10 +361,26 @@
             <version>3.14.1</version>
             <scope>test</scope>
         </dependency>
+        <!-- Was 2.8.1, whose own bundled kafka_2.12 (broker) pulls kafka-clients:2.8.1, while
+             framework brings kafka-clients:${kafka.version} (nearest-wins) - the broker's own
+             BrokerToControllerChannelManagerImpl called a NetworkClient constructor signature
+             that only exists in the older kafka-clients, so EmbeddedKafka.start() threw
+             NoSuchMethodError on every run.
+
+             First bumped this to 3.4.0 with a separate explicit kafka_2.12:${kafka.version} pin
+             (matching what was, at the time, kafka.version 3.7.1) - that overreached once this
+             pom picked up root's <parent> (via this same merge) and kafka.version became 3.9.1:
+             forcing embedded-kafka 3.4.0's own bundled broker jar up to 3.9.1 broke a DIFFERENT
+             way - kafka.server.KafkaConfig$.ZkConnectProp() doesn't exist in 3.9.1 (Kafka's own
+             KRaft-migration API changes), and embedded-kafka 3.4.0's own EmbeddedKafka.scala
+             calls it directly. framework's own merged pom.xml (main's side) has the actual
+             matching fix: embedded-kafka_2.12 itself bumped to 3.9.1, no separate kafka_2.12
+             pin at all - its own naturally-bundled broker is already the right version, so
+             nothing needs forcing. Matched that here instead. -->
         <dependency>
             <groupId>io.github.embeddedkafka</groupId>
             <artifactId>embedded-kafka_2.12</artifactId>
-            <version>2.8.1</version>
+            <version>${kafka.version}</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -304,7 +392,7 @@
         <dependency>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
-            <version>3.5.9</version>
+            <version>3.9.5</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>

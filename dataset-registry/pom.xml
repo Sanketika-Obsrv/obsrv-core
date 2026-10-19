@@ -19,7 +19,21 @@
 		<java.target.runtime>11</java.target.runtime>
 		<scoverage.plugin.version>1.4.0</scoverage.plugin.version>
 		<release-version>release-4.6.0</release-version>
+        <jackson-bom.version>2.18.9</jackson-bom.version>
     </properties>
+    <dependencyManagement>
+        <dependencies>
+            <!-- Align all Jackson artifacts (flink-connector-kafka pulls jackson-core 2.15.2
+                 which is binary-incompatible with jackson-databind 2.18.x from framework) -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>org.sunbird.obsrv</groupId>

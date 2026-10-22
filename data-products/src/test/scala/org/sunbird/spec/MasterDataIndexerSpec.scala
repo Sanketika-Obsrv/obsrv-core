@@ -222,14 +222,8 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
       MasterDataProcessorIndexer.processDataset(config, dataset.get, spark)
     )
 
-    // createDataFile() runs (and completes) before submitIngestionTask() throws against the fake
-    // druid.indexer.url above, so the output is on disk by the time we get here. Guards against
-    // the output filenames silently drifting from the objectGlob the ingestion spec filters on
-    // (masterdata-indexer.conf's source.spec "filter") -- a mismatch there means Druid matches
-    // zero input files and, with dropExisting=true, tombstones the dataset instead of failing
-    // loudly. cloud.storage.container here is a bare path (no "://" prefix), so
-    // StorageUtil.getPaths' cloudPrefix ("file" + container) has no scheme/leading-slash
-    // separator and Hadoop resolves it as relative to the working directory.
+    // createDataFile() completes before the throw above, so output exists; guards against output
+    // filenames drifting from the configured ingestion glob (see PR description).
     val outputDir = new java.io.File(s"${pwd}/file${pwd}/obsrv-ingestion-testmasterdata-indexer/md1/$date")
     outputDir.exists() shouldBe true
     val files = outputDir.listFiles().filter(_.isFile).filterNot(f => f.getName.startsWith(".") || f.getName == "_SUCCESS")

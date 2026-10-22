@@ -109,9 +109,15 @@ object MasterDataProcessorIndexer {
     // iterator layer ever sees anything — persist()/count()/write() choices downstream can't
     // bound this. The only real lever is how many keys land in each partition: fromRedisKV
     // defaults to partitionNum=3 regardless of dataset size, so a large master dataset forces a
-    // huge per-partition materialization no matter what. Using many more, smaller partitions
-    // keeps each one's materialized footprint bounded.
-    val redisPartitions = if (config.hasPath("redis.partitions")) config.getInt("redis.partitions") else 100
+    // huge per-partition materialization no matter what. Using more, smaller partitions keeps
+    // each one's materialized footprint bounded. Kept modest (not pushed higher, e.g. 100) because
+    // RedisKeysRDD.getKeys()/scanKeys() fetches the FULL keyspace per partition before filtering
+    // down to that partition's slot range on a single-node Redis (every partition maps to the same
+    // node) — more partitions means more concurrent full-keyspace SCANs against that one node, not
+    // less. 32 bounds per-partition memory well below the 3-partition default while keeping that
+    // SCAN amplification reasonable; it's configurable since the right value is dataset-size
+    // dependent and this default is a starting point, not a measured optimum.
+    val redisPartitions = if (config.hasPath("redis.partitions")) config.getInt("redis.partitions") else 32
     val rdd = spark.sparkContext.fromRedisKV("*", partitionNum = redisPartitions)(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
       f => {
         recordCount.add(1)
@@ -124,10 +130,20 @@ object MasterDataProcessorIndexer {
     // read.json() does its own full extra pass to infer a schema). A single saveAsTextFile pass
     // writes each record immediately (nothing is retained once written) and the accumulator yields
     // the count as a side effect of that same pass, so Redis is still scanned exactly once.
+    //
+    // coalesce() is a separate knob from redisPartitions: it only merges existing partitions
+    // (narrow dependency, no shuffle, no extra pass over the data) right before the write, so the
+    // Redis-side fetch still benefits from redisPartitions' smaller per-partition memory footprint
+    // while the output file count stays bounded regardless of dataset size — without it, every
+    // dataset (even an empty one) would produce `redisPartitions` output files. It has to be a
+    // fixed/configured count rather than sized from the actual record count, since finding that
+    // count would require an extra action (e.g. count()) over the data, reintroducing the
+    // double-pass this fix removes.
+    val outputFiles = if (config.hasPath("output.files")) config.getInt("output.files") else 10
     val outputPath = new Path(outputFilePath)
     val fs = outputPath.getFileSystem(spark.sparkContext.hadoopConfiguration)
     if (fs.exists(outputPath)) fs.delete(outputPath, true)
-    rdd.saveAsTextFile(outputFilePath, classOf[org.apache.hadoop.io.compress.GzipCodec])
+    rdd.coalesce(outputFiles).saveAsTextFile(outputFilePath, classOf[org.apache.hadoop.io.compress.GzipCodec])
     val noOfRecords: Long = recordCount.value
     logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
     noOfRecords

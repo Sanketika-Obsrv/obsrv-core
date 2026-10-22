@@ -147,6 +147,19 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
     noException should be thrownBy (
       MasterDataProcessorIndexer.processDatasets(config, spark)
     )
+
+    // Guards against the output filenames silently drifting from the objectGlob the ingestion
+    // spec filters on (masterdata-indexer.conf's source.spec "filter") -- a mismatch there means
+    // Druid matches zero input files and, with dropExisting=true, tombstones the dataset instead
+    // of failing loudly.
+    // cloud.storage.container here is a bare path (no "://" prefix), so StorageUtil.getPaths'
+    // cloudPrefix ("file" + container) has no scheme/leading-slash separator and Hadoop resolves
+    // it as relative to the working directory -- pre-existing quirk of this test, not changed here.
+    val outputDir = new java.io.File(s"${pwd}/file${pwd}/obsrv-datamasterdata-indexer/md1/$date")
+    outputDir.exists() shouldBe true
+    val files = outputDir.listFiles().filter(_.isFile).filterNot(f => f.getName.startsWith(".") || f.getName == "_SUCCESS")
+    files should not be empty
+    files.map(_.getName) foreach { name => name should endWith(".gz") }
   }
 
   it should "index datasets for aws" in {

@@ -222,8 +222,7 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
       MasterDataProcessorIndexer.processDataset(config, dataset.get, spark)
     )
 
-    // createDataFile() completes before the throw above, so output exists; guards against output
-    // filenames drifting from the configured ingestion glob (see PR description).
+    // createDataFile() already wrote its output before the exception above.
     val outputDir = new java.io.File(s"${pwd}/file${pwd}/obsrv-ingestion-testmasterdata-indexer/md1/$date")
     outputDir.exists() shouldBe true
     val files = outputDir.listFiles().filter(_.isFile).filterNot(f => f.getName.startsWith(".") || f.getName == "_SUCCESS")

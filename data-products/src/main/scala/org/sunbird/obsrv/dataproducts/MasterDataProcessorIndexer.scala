@@ -113,7 +113,13 @@ object MasterDataProcessorIndexer {
       }
     )
     // Writes each record as it's read instead of buffering everything in memory first.
-    val outputFiles = if (config.hasPath("output.files")) config.getInt("output.files") else 10
+    val configuredOutputFiles = if (config.hasPath("output.files")) config.getInt("output.files") else 10
+    // coalesce can only reduce partitions, never increase them -- cap output.files at redisPartitions
+    // so a misconfigured value doesn't silently produce fewer files than requested.
+    val outputFiles = math.min(configuredOutputFiles, redisPartitions)
+    if (outputFiles != configuredOutputFiles) {
+      logger.warn(s"output.files=$configuredOutputFiles exceeds redis.partitions=$redisPartitions; capping at $outputFiles")
+    }
     val outputPath = new Path(outputFilePath)
     val fs = outputPath.getFileSystem(spark.sparkContext.hadoopConfiguration)
     if (fs.exists(outputPath)) fs.delete(outputPath, true)

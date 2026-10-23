@@ -216,11 +216,18 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
   }
 
   it should "throw exception while submitting ingestion" in {
-    val config = jobConfig.withValue("cloud.storage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-data"))
+    val config = jobConfig.withValue("cloud.storage.container", ConfigValueFactory.fromAnyRef(s"${pwd}/obsrv-ingestion-test"))
     val dataset = DatasetRegistry.getDataset("md1")
     assertThrows[Exception](
       MasterDataProcessorIndexer.processDataset(config, dataset.get, spark)
     )
+
+    // createDataFile() already wrote its output before the exception above.
+    val outputDir = new java.io.File(s"${pwd}/file${pwd}/obsrv-ingestion-testmasterdata-indexer/md1/$date")
+    outputDir.exists() shouldBe true
+    val files = outputDir.listFiles().filter(_.isFile).filterNot(f => f.getName.startsWith(".") || f.getName == "_SUCCESS")
+    files should not be empty
+    files.map(_.getName) foreach { name => name should endWith(".gz") }
   }
 
   it should "create the datasources record and stay idempotent after ingestion" in {

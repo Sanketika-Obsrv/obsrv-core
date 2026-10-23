@@ -2,6 +2,7 @@ package org.sunbird.obsrv.dataproducts
 
 import com.redislabs.provider.redis._
 import com.typesafe.config.{Config, ConfigFactory}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.logging.log4j.{LogManager, Logger}
 import org.apache.spark.sql.SparkSession
 import org.joda.time.{DateTime, DateTimeZone}
@@ -101,16 +102,30 @@ object MasterDataProcessorIndexer {
     val cacheConfig = dataset.datasetConfig.cacheConfig.get
     val redisConfig = new RedisConfig(initialHost = RedisEndpoint(host = cacheConfig.redisDBHost.get, port = cacheConfig.redisDBPort.get, dbNum = cacheConfig.redisDB.get))
     val ts: Long = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis
-    val rdd = spark.sparkContext.fromRedisKV("*")(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
-      f => CommonUtil.processEvent(f._2, ts)
+    val recordCount = spark.sparkContext.longAccumulator(s"${dataset.id}-recordCount")
+    // More Redis partitions means less data held in memory per partition.
+    // Kept at 32, not higher, since each partition also triggers its own full Redis scan.
+    val redisPartitions = if (config.hasPath("redis.partitions")) config.getInt("redis.partitions") else 32
+    val rdd = spark.sparkContext.fromRedisKV("*", partitionNum = redisPartitions)(redisConfig = redisConfig, readWriteConfig = readWriteConf).map(
+      f => {
+        recordCount.add(1)
+        CommonUtil.processEvent(f._2, ts)
+      }
     )
-    // Persist so count() + read.json() reuse a single Redis scan instead of scanning twice.
-    rdd.persist()
-    val noOfRecords: Long = rdd.count()
-    if (noOfRecords > 0) {
-      spark.read.json(rdd).write.mode("overwrite").option("compression", "gzip").json(outputFilePath)
+    // Writes each record as it's read instead of buffering everything in memory first.
+    val configuredOutputFiles = if (config.hasPath("output.files")) config.getInt("output.files") else 10
+    // coalesce can only reduce partitions, never increase them -- cap output.files at redisPartitions
+    // so a misconfigured value doesn't silently produce fewer files than requested.
+    val outputFiles = math.min(configuredOutputFiles, redisPartitions)
+    if (outputFiles != configuredOutputFiles) {
+      logger.warn(s"output.files=$configuredOutputFiles exceeds redis.partitions=$redisPartitions; capping at $outputFiles")
     }
-    rdd.unpersist()
+    val outputPath = new Path(outputFilePath)
+    val fs = outputPath.getFileSystem(spark.sparkContext.hadoopConfiguration)
+    if (fs.exists(outputPath)) fs.delete(outputPath, true)
+    // coalesce keeps the output file count small and fixed, regardless of dataset size.
+    rdd.coalesce(outputFiles).saveAsTextFile(outputFilePath, classOf[org.apache.hadoop.io.compress.GzipCodec])
+    val noOfRecords: Long = recordCount.value
     logger.info(s"createDataFile() | END | dataset=${dataset.id} | noOfRecords=$noOfRecords")
     noOfRecords
   }

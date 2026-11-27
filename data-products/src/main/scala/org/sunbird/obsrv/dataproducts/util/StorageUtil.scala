@@ -45,13 +45,27 @@ object StorageUtil {
     val dt = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay()
     val timestamp = dt.getMillis
     val date = dayPeriodFormat.print(dt)
-    val provider = providerFormat(config.getString("cloud.storage.provider"))
-    val cloudPrefix = provider.sparkURIFormat + config.getString("cloud.storage.container")
+    val cloudProvider = config.getString("cloud.storage.provider")
+    val provider = providerFormat(cloudProvider)
     val pathSuffix = s"""masterdata-indexer/${dataset.id}/$date/"""
-    val ingestionPath = cloudPrefix.replace(provider.sparkURIFormat, provider.druidURIFormat) + pathSuffix
+    val (sparkPrefix, druidPrefix) = cloudProvider match {
+      case "azure" => azurePrefixes(config)
+      case _ =>
+        val cloudPrefix = provider.sparkURIFormat + config.getString("cloud.storage.container")
+        (cloudPrefix, cloudPrefix.replace(provider.sparkURIFormat, provider.druidURIFormat))
+    }
     val datasourceRef = this.getDataSourceRefFormat(dataset)
-    val outputFilePath = cloudPrefix + pathSuffix
-    Paths(datasourceRef, ingestionPath, outputFilePath, timestamp)
+    Paths(datasourceRef, druidPrefix + pathSuffix, sparkPrefix + pathSuffix, timestamp)
+  }
+
+  // Hadoop needs the account in the URI; Druid's azure input source doesn't (it takes the account
+  // from druid.azure.account). abfss:// (ABFS driver) rather than wasbs:// because it works with both
+  // an account key and AKS Workload Identity; which one is decided by the Spark Hadoop conf.
+  def azurePrefixes(config: Config): (String, String) = {
+    val container = config.getString("cloud.storage.container").stripPrefix("://").stripSuffix("/")
+    val account = if (config.hasPath("cloud.storage.accountName")) config.getString("cloud.storage.accountName").trim else ""
+    if (account.isEmpty) throw new ObsrvException(ErrorConstants.ERR_AZURE_ACCOUNT_NAME_MISSING)
+    (s"abfss://$container@$account.dfs.core.windows.net/", s"azure://$container/")
   }
 
   // This method provides appropriate input source spec depending on the cloud storage provider

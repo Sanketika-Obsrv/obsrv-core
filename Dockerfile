@@ -84,9 +84,14 @@ FROM public.ecr.aws/docker/library/flink:1.20.5-scala_2.12-java11 AS flink-dist
 ARG FLINK_UID
 ENV FLINK_HOME=/opt/flink
 USER root
+# azure-fs-hadoop gets its own plugin dir (abfss:// and wasbs://). The Workload Identity token
+# provider sits next to it so the plugin classloader can see Hadoop's CustomTokenProviderAdaptee.
+COPY --from=build-core /app/azure-workload-identity/target/azure-workload-identity-1.0.0.jar /tmp/
 RUN set -eux; \
-    mkdir -p "${FLINK_HOME}/usrlib" "${FLINK_HOME}/plugins/s3-fs-hadoop"; \
+    mkdir -p "${FLINK_HOME}/usrlib" "${FLINK_HOME}/plugins/s3-fs-hadoop" "${FLINK_HOME}/plugins/azure-fs-hadoop"; \
     mv "${FLINK_HOME}"/opt/flink-s3-fs-hadoop-*.jar "${FLINK_HOME}/plugins/s3-fs-hadoop/"; \
+    mv "${FLINK_HOME}"/opt/flink-azure-fs-hadoop-*.jar "${FLINK_HOME}/plugins/azure-fs-hadoop/"; \
+    mv /tmp/azure-workload-identity-1.0.0.jar "${FLINK_HOME}/plugins/azure-fs-hadoop/"; \
     chown -R ${FLINK_UID}:${FLINK_UID} "${FLINK_HOME}"
 
 # Replace the log4j jars bundled in the Flink dist (CVE-2026-49844 and earlier)

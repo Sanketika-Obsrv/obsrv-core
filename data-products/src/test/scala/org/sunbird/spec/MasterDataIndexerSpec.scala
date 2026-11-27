@@ -12,6 +12,8 @@ import org.mockito.MockitoSugar.mock
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import org.sunbird.fixture.EventFixture
 import org.sunbird.obsrv.core.cache.RedisConnect
+import org.sunbird.obsrv.core.exception.ObsrvException
+import org.sunbird.obsrv.core.model.ErrorConstants
 import org.sunbird.obsrv.core.util.{PostgresConnect, PostgresConnectionConfig}
 import org.sunbird.obsrv.dataproducts.MasterDataProcessorIndexer
 import org.sunbird.obsrv.dataproducts.helper.BaseMetricHelper
@@ -268,6 +270,18 @@ class MasterDataIndexerSpec extends FlatSpec with BeforeAndAfterAll with Matcher
     StorageUtil.providerFormat("gcloud") shouldEqual BlobProvider("gs", "google", "gs")
     StorageUtil.providerFormat("cephs3") shouldEqual BlobProvider("s3a", "s3", "s3")
     StorageUtil.providerFormat("oci") shouldEqual BlobProvider("s3a", "s3", "s3")
+  }
+
+  it should "build azure paths with the storage account" in {
+    val base = ConfigFactory.parseString(
+      """cloud.storage.container="://obsrv-main/"
+        |cloud.storage.accountName="obsrvacct"
+        |""".stripMargin)
+
+    StorageUtil.azurePrefixes(base) shouldEqual ("abfss://obsrv-main@obsrvacct.dfs.core.windows.net/", "azure://obsrv-main/")
+
+    val noAccount = ConfigFactory.parseString("""cloud.storage.accountName=""""").withFallback(base)
+    the[ObsrvException] thrownBy StorageUtil.azurePrefixes(noAccount) should have message ErrorConstants.ERR_AZURE_ACCOUNT_NAME_MISSING.errorMsg
   }
 
 }

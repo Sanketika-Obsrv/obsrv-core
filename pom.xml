@@ -20,6 +20,7 @@
 		<module>dataset-registry</module>
 		<module>transformation-sdk</module>
 		<module>pipeline</module>
+		<module>azure-workload-identity</module>
 	</modules>
 
 	<properties>
